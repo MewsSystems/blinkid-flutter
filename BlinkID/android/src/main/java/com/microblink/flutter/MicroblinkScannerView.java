@@ -73,7 +73,7 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
                 PreviewView.LayoutParams.MATCH_PARENT
         );
         view.setLayoutParams(matchParent);
-        if (useFrontFacingCamera(creationParams)) mirrorPreview();
+        if (useFrontFacingCamera(creationParams) && (boolean) creationParams.get("mirrorFrontCameraPreview")) mirrorPreview();
 
         LifecycleOwner lifecycleOwner = this;
         Camera.InitializationCallbacks initializationCallbacks = this;

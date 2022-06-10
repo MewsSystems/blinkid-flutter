@@ -19,6 +19,7 @@ class MicroblinkScannerWidget extends StatefulWidget {
     required this.onError,
     required this.onFirstSideScanned,
     required this.onDetectionStatusUpdate,
+    required this.mirrorAndroidFrontCameraPreview,
   }) : super(key: key);
 
   final RecognizerCollection collection;
@@ -28,10 +29,10 @@ class MicroblinkScannerWidget extends StatefulWidget {
   final ValueChanged<String> onError;
   final VoidCallback onFirstSideScanned;
   final ValueChanged<DetectionStatus> onDetectionStatusUpdate;
+  final bool mirrorAndroidFrontCameraPreview;
 
   @override
-  State<MicroblinkScannerWidget> createState() =>
-      _MicroblinkScannerWidgetState();
+  State<MicroblinkScannerWidget> createState() => _MicroblinkScannerWidgetState();
 }
 
 class _MicroblinkScannerWidgetState extends State<MicroblinkScannerWidget> {
@@ -94,6 +95,8 @@ class _MicroblinkScannerWidgetState extends State<MicroblinkScannerWidget> {
       'recognizerCollection': widget.collection.toJson(),
       'licenseKey': widget.licenseKey,
       'overlaySettings': widget.settings.toJson(),
+      if (defaultTargetPlatform == TargetPlatform.android)
+        'mirrorFrontCameraPreview': widget.mirrorAndroidFrontCameraPreview
     };
 
     switch (defaultTargetPlatform) {
