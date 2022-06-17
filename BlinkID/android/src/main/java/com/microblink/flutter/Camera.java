@@ -24,10 +24,9 @@ public final class Camera {
             Executor mainThreadExecutor,
             final UseCaseGroup useCaseGroup,
             final CameraSelector cameraSelector,
-            final Camera.InitializationCallbacks callbacks
-    ) {
-        final ListenableFuture<ProcessCameraProvider> processCameraProviderFuture =
-                ProcessCameraProvider.getInstance(context);
+            final Camera.InitializationCallbacks callbacks) {
+        final ListenableFuture<ProcessCameraProvider> processCameraProviderFuture = ProcessCameraProvider
+                .getInstance(context);
 
         processCameraProviderFuture.addListener(new Runnable() {
             @Override
