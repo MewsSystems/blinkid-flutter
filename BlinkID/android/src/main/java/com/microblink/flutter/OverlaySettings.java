@@ -4,7 +4,7 @@ import androidx.annotation.NonNull;
 
 import java.util.Map;
 
-public class OverlaySettings   {
+public class OverlaySettings {
     Boolean useFrontCamera = false;
     Boolean flipFrontCamera = false;
 
