@@ -38,10 +38,10 @@ public class MicroblinkScanner implements ImageAnalysis.Analyzer {
             MicroblinkCreationParams creationParams,
             MicroblinkScanner.Callbacks callbacks
     ) {
-        setLicense(context, creationParams.getLicenseKey());
+        setLicense(context, creationParams.licenseKey);
 
         this.callbacks = callbacks;
-        recognizerBundle = createRecognizerBundle((Map<String, Object>) creationParams.getRecognizerCollection() );
+        recognizerBundle = createRecognizerBundle((Map<String, Object>) creationParams.recognizerCollection);
         recognizerRunner = createRecognizer(context, recognizerBundle);
         recognizerRunner.setMetadataCallbacks(createMetadataCallbacks(callbacks));
     }

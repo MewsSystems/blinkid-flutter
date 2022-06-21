@@ -31,7 +31,7 @@ class MicroblinkScannerViewFactory extends PlatformViewFactory {
         return new MicroblinkScannerView(
                 context,
                 id,
-                MicroblinkCreationParams.Companion.fromMap((Map<String, Object>) args),
+                new MicroblinkCreationParams((Map<String, Object>) args),
                 messenger,
                 activityPluginBinding
         );

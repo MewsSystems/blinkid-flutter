@@ -25,7 +25,7 @@ public final class Camera {
             final UseCaseGroup useCaseGroup,
             final CameraSelector cameraSelector,
             final Camera.InitializationCallbacks callbacks) {
-        final ListenableFuture<ProcessCameraProvider> processCameraProviderFuture = ProcessCameraProvider
+            final ListenableFuture<ProcessCameraProvider> processCameraProviderFuture = ProcessCameraProvider
                 .getInstance(context);
 
         processCameraProviderFuture.addListener(new Runnable() {
