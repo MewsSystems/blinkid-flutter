@@ -31,15 +31,13 @@ import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.platform.PlatformView;
 
-
 class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkScanner.Callbacks,
         Camera.InitializationCallbacks {
     private final LifecycleRegistry lifecycleRegistry = new LifecycleRegistry(this);
     private final MethodChannel methodChannel;
     private final PreviewView view;
     private final MicroblinkScanner scanner;
-    private final ScheduledExecutorService backgroundExecutor =
-            Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService backgroundExecutor = Executors.newSingleThreadScheduledExecutor();
     private final Executor mainThreadExecutor = new Executor() {
         private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -50,11 +48,13 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
     };
 
     /**
-     * @param creationParams structure: { "overlaySettings": { "useFrontCamera": false, "flipFrontCamera": false },
+     * @param creationParams structure: { "overlaySettings": { "useFrontCamera":
+     *                       false, "flipFrontCamera": false },
      *                       "licenseKey": "...", "recognizerCollection": {...} }
      */
     @SuppressLint("NewApi")
-    MicroblinkScannerView(@NonNull Context context, int id, final MicroblinkCreationParams creationParams, BinaryMessenger messenger,
+    MicroblinkScannerView(@NonNull Context context, int id, final MicroblinkCreationParams creationParams,
+            BinaryMessenger messenger,
             ActivityPluginBinding activityPluginBinding) {
         methodChannel = new MethodChannel(messenger, "MicroblinkScannerWidget/" + id);
 
@@ -62,16 +62,14 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
         scanner = new MicroblinkScanner(
                 activityPluginBinding.getActivity(),
                 creationParams,
-                scannerCallbacks
-        );
+                scannerCallbacks);
 
         view = new PreviewView(context);
         PreviewView.LayoutParams matchParent = new PreviewView.LayoutParams(
                 PreviewView.LayoutParams.MATCH_PARENT,
-                PreviewView.LayoutParams.MATCH_PARENT
-        );
+                PreviewView.LayoutParams.MATCH_PARENT);
         view.setLayoutParams(matchParent);
-        if (shouldFlipView(creationParams.overlaySettings)) mirrorPreview();
+        mirrorPreview(shouldFlipView(creationParams.overlaySettings));
 
         LifecycleOwner lifecycleOwner = this;
         Camera.InitializationCallbacks initializationCallbacks = this;
@@ -81,18 +79,19 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
                 mainThreadExecutor,
                 createPreviewAndAnalysisUseCaseGroup(view, backgroundExecutor, scanner),
                 getCameraSelector(creationParams.overlaySettings),
-                initializationCallbacks
-        );
+                initializationCallbacks);
     }
 
     @SuppressLint("NewApi")
-    private void mirrorPreview() {
-        // To be able to mirror preview. See https://stackoverflow.com/a/65583947/7408927.
+    private void processView(boolean shouldFlip) {
+        // To be able to mirror preview. See
+        // https://stackoverflow.com/a/65583947/7408927.
         view.setImplementationMode(PreviewView.ImplementationMode.COMPATIBLE);
         view.getPreviewStreamState().observe(this, new Observer<PreviewView.StreamState>() {
             @Override
             public void onChanged(PreviewView.StreamState streamState) {
-                if (streamState == PreviewView.StreamState.STREAMING) view.setScaleX(-1F);
+                if (streamState == PreviewView.StreamState.STREAMING)
+                    view.setScaleX(shouldFlip ? -1F : 1F);
             }
         });
     }
@@ -114,8 +113,7 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
     UseCaseGroup createPreviewAndAnalysisUseCaseGroup(
             PreviewView view,
             Executor analysisExecutor,
-            ImageAnalysis.Analyzer analyzer
-    ) {
+            ImageAnalysis.Analyzer analyzer) {
         Preview previewUseCase = new Preview.Builder()
                 .setTargetAspectRatio(AspectRatio.RATIO_16_9)
                 .build();
@@ -170,8 +168,7 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
     public void onDetectionStatusUpdated(final DetectionStatus detectionStatus) {
         sendToMethodChannel(
                 "onDetectionStatusUpdate",
-                String.format("{\"%s\": \"%s\"}", "detectionStatus", detectionStatus.name())
-        );
+                String.format("{\"%s\": \"%s\"}", "detectionStatus", detectionStatus.name()));
     }
 
     @Override
@@ -191,7 +188,6 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
                     public void run() {
                         methodChannel.invokeMethod(method, argument);
                     }
-                }
-        );
+                });
     }
 }
