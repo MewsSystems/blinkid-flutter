@@ -54,8 +54,8 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
      */
     @SuppressLint("NewApi")
     MicroblinkScannerView(@NonNull Context context, int id, final MicroblinkCreationParams creationParams,
-            BinaryMessenger messenger,
-            ActivityPluginBinding activityPluginBinding) {
+                          BinaryMessenger messenger,
+                          ActivityPluginBinding activityPluginBinding) {
         methodChannel = new MethodChannel(messenger, "MicroblinkScannerWidget/" + id);
 
         MicroblinkScanner.Callbacks scannerCallbacks = this;
@@ -69,7 +69,7 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
                 PreviewView.LayoutParams.MATCH_PARENT,
                 PreviewView.LayoutParams.MATCH_PARENT);
         view.setLayoutParams(matchParent);
-        mirrorPreview(shouldFlipView(creationParams.overlaySettings));
+        processView(shouldFlipView(creationParams.overlaySettings));
 
         LifecycleOwner lifecycleOwner = this;
         Camera.InitializationCallbacks initializationCallbacks = this;
@@ -83,7 +83,7 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
     }
 
     @SuppressLint("NewApi")
-    private void processView(boolean shouldFlip) {
+    private void processView(final boolean shouldFlip) {
         // To be able to mirror preview. See
         // https://stackoverflow.com/a/65583947/7408927.
         view.setImplementationMode(PreviewView.ImplementationMode.COMPATIBLE);
