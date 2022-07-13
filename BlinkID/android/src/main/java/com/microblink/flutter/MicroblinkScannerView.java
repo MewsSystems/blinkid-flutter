@@ -31,6 +31,7 @@ import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.platform.PlatformView;
 
+
 class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkScanner.Callbacks,
         Camera.InitializationCallbacks {
     private final LifecycleRegistry lifecycleRegistry = new LifecycleRegistry(this);
@@ -63,12 +64,14 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
         scanner = new MicroblinkScanner(
                 activityPluginBinding.getActivity(),
                 creationParams,
-                scannerCallbacks);
+                scannerCallbacks
+        );
 
         view = new PreviewView(context);
         PreviewView.LayoutParams matchParent = new PreviewView.LayoutParams(
                 PreviewView.LayoutParams.MATCH_PARENT,
-                PreviewView.LayoutParams.MATCH_PARENT);
+                PreviewView.LayoutParams.MATCH_PARENT
+        );
         view.setLayoutParams(matchParent);
         processView(shouldFlipView(creationParams.overlaySettings));
 
@@ -80,7 +83,8 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
                 mainThreadExecutor,
                 createPreviewAndAnalysisUseCaseGroup(view, backgroundExecutor, scanner),
                 getCameraSelector(creationParams.overlaySettings),
-                initializationCallbacks);
+                initializationCallbacks
+        );
     }
 
     @SuppressLint("NewApi")
@@ -115,7 +119,8 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
     UseCaseGroup createPreviewAndAnalysisUseCaseGroup(
             PreviewView view,
             Executor analysisExecutor,
-            ImageAnalysis.Analyzer analyzer) {
+            ImageAnalysis.Analyzer analyzer
+    ) {
         Preview previewUseCase = new Preview.Builder()
                 .setTargetAspectRatio(AspectRatio.RATIO_16_9)
                 .build();
@@ -170,7 +175,8 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
     public void onDetectionStatusUpdated(final DetectionStatus detectionStatus) {
         sendToMethodChannel(
                 "onDetectionStatusUpdate",
-                String.format("{\"%s\": \"%s\"}", "detectionStatus", detectionStatus.name()));
+                String.format("{\"%s\": \"%s\"}", "detectionStatus", detectionStatus.name())
+        );
     }
 
     @Override
@@ -190,6 +196,7 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
                     public void run() {
                         methodChannel.invokeMethod(method, argument);
                     }
-                });
+                }
+        );
     }
 }
