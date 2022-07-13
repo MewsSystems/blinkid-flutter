@@ -55,8 +55,7 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
      */
     @SuppressLint("NewApi")
     MicroblinkScannerView(@NonNull Context context, int id,
-            final MicroblinkCreationParams creationParams,
-            BinaryMessenger messenger,
+            final MicroblinkCreationParams creationParams, BinaryMessenger messenger,
             ActivityPluginBinding activityPluginBinding) {
         methodChannel = new MethodChannel(messenger, "MicroblinkScannerWidget/" + id);
 
