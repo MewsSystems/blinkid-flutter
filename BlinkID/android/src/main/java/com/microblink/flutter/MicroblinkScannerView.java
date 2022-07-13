@@ -37,7 +37,8 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
     private final MethodChannel methodChannel;
     private final PreviewView view;
     private final MicroblinkScanner scanner;
-    private final ScheduledExecutorService backgroundExecutor = Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService backgroundExecutor =
+            Executors.newSingleThreadScheduledExecutor();
     private final Executor mainThreadExecutor = new Executor() {
         private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -48,14 +49,15 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
     };
 
     /**
-     * @param creationParams structure: { "overlaySettings": { "useFrontCamera":
-     *                       false, "flipFrontCamera": false },
-     *                       "licenseKey": "...", "recognizerCollection": {...} }
+     * @param creationParams structure: { "overlaySettings": { "useFrontCamera": false,
+     *                       "flipFrontCamera": false }, "licenseKey": "...",
+     *                       "recognizerCollection": {...} }
      */
     @SuppressLint("NewApi")
-    MicroblinkScannerView(@NonNull Context context, int id, final MicroblinkCreationParams creationParams,
-                          BinaryMessenger messenger,
-                          ActivityPluginBinding activityPluginBinding) {
+    MicroblinkScannerView(@NonNull Context context, int id,
+            final MicroblinkCreationParams creationParams,
+            BinaryMessenger messenger,
+            ActivityPluginBinding activityPluginBinding) {
         methodChannel = new MethodChannel(messenger, "MicroblinkScannerWidget/" + id);
 
         MicroblinkScanner.Callbacks scannerCallbacks = this;
@@ -90,8 +92,9 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
         view.getPreviewStreamState().observe(this, new Observer<PreviewView.StreamState>() {
             @Override
             public void onChanged(PreviewView.StreamState streamState) {
-                if (streamState == PreviewView.StreamState.STREAMING)
+                if (streamState == PreviewView.StreamState.STREAMING) {
                     view.setScaleX(shouldFlip ? -1F : 1F);
+                }
             }
         });
     }
