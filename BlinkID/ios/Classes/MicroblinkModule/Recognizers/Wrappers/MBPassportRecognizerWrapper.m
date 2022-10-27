@@ -66,9 +66,6 @@
         }
 
     }
-    {
-
-    }
 
     return recognizer;
 }

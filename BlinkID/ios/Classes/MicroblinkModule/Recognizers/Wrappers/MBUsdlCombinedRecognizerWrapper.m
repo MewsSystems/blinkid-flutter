@@ -41,9 +41,6 @@
         }
     }
     {
-        
-    }
-    {
         id numStableDetectionsThreshold = [jsonRecognizer valueForKey:@"numStableDetectionsThreshold"];
         if (numStableDetectionsThreshold != nil) {
             recognizer.numStableDetectionsThreshold = [(NSNumber *)numStableDetectionsThreshold integerValue];
