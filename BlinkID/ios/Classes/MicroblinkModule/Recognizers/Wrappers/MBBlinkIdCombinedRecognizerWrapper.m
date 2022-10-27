@@ -123,13 +123,6 @@
 
     }
     {
-//        id signResult = [jsonRecognizer valueForKey:@"signResult"];
-//        if (signResult != nil) {
-//            recognizer.signResult = [(NSNumber *)signResult boolValue];
-//        }
-
-    }
-    {
         id signatureImageDpi = [jsonRecognizer valueForKey:@"signatureImageDpi"];
         if (signatureImageDpi != nil) {
             recognizer.signatureImageDpi = [(NSNumber *)signatureImageDpi integerValue];
@@ -176,8 +169,6 @@
     [jsonResult setValue:[MBSerializationUtils serializeMBDateResult:self.result.dateOfExpiry] forKey:@"dateOfExpiry"];
     [jsonResult setValue:[NSNumber numberWithBool:self.result.dateOfExpiryPermanent] forKey:@"dateOfExpiryPermanent"];
     [jsonResult setValue:[MBSerializationUtils serializeMBDateResult:self.result.dateOfIssue] forKey:@"dateOfIssue"];
-//    [jsonResult setValue:[self.result.digitalSignature base64EncodedStringWithOptions:0] forKey:@"digitalSignature"];
-//    [jsonResult setValue:[NSNumber numberWithInteger:self.result.digitalSignatureVersion] forKey:@"digitalSignatureVersion"];
     [jsonResult setValue:self.result.documentAdditionalNumber forKey:@"documentAdditionalNumber"];
     [jsonResult setValue:[NSNumber numberWithInteger:(self.result.documentDataMatch)] forKey:@"documentDataMatch"];
     [jsonResult setValue:self.result.documentNumber forKey:@"documentNumber"];
