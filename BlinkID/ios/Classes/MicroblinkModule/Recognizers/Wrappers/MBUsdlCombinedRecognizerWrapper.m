@@ -41,10 +41,10 @@
         }
     }
     {
-        id signResult = [jsonRecognizer valueForKey:@"signResult"];
-        if (signResult != nil) {
-            recognizer.signResult = [(NSNumber *)signResult boolValue];
-        }
+//        id signResult = [jsonRecognizer valueForKey:@"signResult"];
+//        if (signResult != nil) {
+//            recognizer.signResult = [(NSNumber *)signResult boolValue];
+//        }
     }
     {
         id numStableDetectionsThreshold = [jsonRecognizer valueForKey:@"numStableDetectionsThreshold"];
@@ -71,8 +71,8 @@
 
 -(NSDictionary *) serializeResult {
     NSMutableDictionary* jsonResult = (NSMutableDictionary*)[super serializeResult];
-    [jsonResult setValue:[self.result.digitalSignature base64EncodedStringWithOptions:0] forKey:@"digitalSignature"];
-    [jsonResult setValue:[NSNumber numberWithUnsignedInteger:self.result.digitalSignatureVersion] forKey:@"digitalSignatureVersion"];
+//    [jsonResult setValue:[self.result.digitalSignature base64EncodedStringWithOptions:0] forKey:@"digitalSignature"];
+//    [jsonResult setValue:[NSNumber numberWithUnsignedInteger:self.result.digitalSignatureVersion] forKey:@"digitalSignatureVersion"];
     [jsonResult setValue:[NSNumber numberWithInteger:self.result.documentDataMatch] forKey:@"documentDataMatch"];
     [jsonResult setValue:[MBSerializationUtils encodeMBImage:self.result.faceImage] forKey:@"faceImage"];
     [jsonResult setValue:[MBSerializationUtils encodeMBImage:self.result.fullDocumentImage] forKey:@"fullDocumentImage"];
