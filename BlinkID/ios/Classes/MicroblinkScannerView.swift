@@ -108,6 +108,8 @@ class MicroblinkScannerView: NSObject,
         
         MBOverlaySerializationUtils.extractCommonOverlaySettings(jsonSettings, overlaySettings: settings)
         
+        settings.cameraSettings.cameraPreset = MBCameraPreset.presetPhoto
+        
         let overlayViewController = CustomOverlayViewController.init(recognizerCollection: self.recognizerCollection!,
                                                                      cameraSettings: settings.cameraSettings)
         overlayViewController.delegate = self
