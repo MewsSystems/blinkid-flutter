@@ -1,6 +1,7 @@
+import 'package:json_annotation/json_annotation.dart';
+
 import '../recognizer.dart';
 import '../types.dart';
-import 'package:json_annotation/json_annotation.dart';
 
 part 'usdl_combined_recognizer.g.dart';
 
@@ -86,8 +87,7 @@ class UsdlCombinedRecognizerResult extends RecognizerResult {
 
   UsdlCombinedRecognizerResult(Map<String, dynamic> nativeResult)
       : super(RecognizerResultState.values[nativeResult['resultState']]) {
-    this.documentDataMatch =
-        DataMatchState.values[nativeResult["documentDataMatch"]];
+    this.documentDataMatch = DataMatchState.values[nativeResult["documentDataMatch"]];
 
     this.faceImage = nativeResult['faceImage'];
 
@@ -95,9 +95,8 @@ class UsdlCombinedRecognizerResult extends RecognizerResult {
 
     this.scanningFirstSideDone = nativeResult['scanningFirstSideDone'];
 
-    this.optionalElements = nativeResult['optionalElements'] != null
-        ? List<String>.from(nativeResult['optionalElements'])
-        : null;
+    this.optionalElements =
+        nativeResult['optionalElements'] != null ? List<String>.from(nativeResult['optionalElements']) : null;
 
     this.rawData = nativeResult['rawData'];
 
@@ -105,9 +104,7 @@ class UsdlCombinedRecognizerResult extends RecognizerResult {
 
     this.uncertain = nativeResult['uncertain'];
 
-    this.fields = nativeResult['fields'] != null
-        ? List<String>.from(nativeResult['fields'])
-        : null;
+    this.fields = nativeResult['fields'] != null ? List<String>.from(nativeResult['fields']) : null;
 
     this.firstName = nativeResult['firstName'];
 
@@ -131,17 +128,11 @@ class UsdlCombinedRecognizerResult extends RecognizerResult {
 
     this.vehicleClass = nativeResult['vehicleClass'];
 
-    this.dateOfBirth = nativeResult['dateOfBirth'] != null
-        ? Date(nativeResult['dateOfBirth'])
-        : null;
+    this.dateOfBirth = nativeResult['dateOfBirth'] != null ? Date(nativeResult['dateOfBirth']) : null;
 
-    this.dateOfIssue = nativeResult['dateOfIssue'] != null
-        ? Date(nativeResult['dateOfIssue'])
-        : null;
+    this.dateOfIssue = nativeResult['dateOfIssue'] != null ? Date(nativeResult['dateOfIssue']) : null;
 
-    this.dateOfExpiry = nativeResult['dateOfExpiry'] != null
-        ? Date(nativeResult['dateOfExpiry'])
-        : null;
+    this.dateOfExpiry = nativeResult['dateOfExpiry'] != null ? Date(nativeResult['dateOfExpiry']) : null;
 
     this.age = nativeResult['age'];
   }
@@ -167,8 +158,7 @@ class UsdlCombinedRecognizer extends Recognizer {
   bool returnFullDocumentImage = false;
 
   /// The extension factors for full document image.
-  ImageExtensionFactors fullDocumentImageExtensionFactors =
-      ImageExtensionFactors();
+  ImageExtensionFactors fullDocumentImageExtensionFactors = ImageExtensionFactors();
 
   /// Minimum number of stable detections required for detection to be successful.
   int numStableDetectionsThreshold = 6;
@@ -179,7 +169,6 @@ class UsdlCombinedRecognizer extends Recognizer {
     return UsdlCombinedRecognizerResult(nativeResult);
   }
 
-  factory UsdlCombinedRecognizer.fromJson(Map<String, dynamic> json) =>
-      _$UsdlCombinedRecognizerFromJson(json);
+  factory UsdlCombinedRecognizer.fromJson(Map<String, dynamic> json) => _$UsdlCombinedRecognizerFromJson(json);
   Map<String, dynamic> toJson() => _$UsdlCombinedRecognizerToJson(this);
 }

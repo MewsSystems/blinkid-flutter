@@ -1,5 +1,6 @@
-import '../overlay_settings.dart';
 import 'package:json_annotation/json_annotation.dart';
+
+import '../overlay_settings.dart';
 
 part 'blinkid_overlays.g.dart';
 
@@ -9,8 +10,7 @@ part 'blinkid_overlays.g.dart';
 class DocumentOverlaySettings extends OverlaySettings {
   DocumentOverlaySettings() : super('DocumentOverlaySettings');
 
-  factory DocumentOverlaySettings.fromJson(Map<String, dynamic> json) =>
-      _$DocumentOverlaySettingsFromJson(json);
+  factory DocumentOverlaySettings.fromJson(Map<String, dynamic> json) => _$DocumentOverlaySettingsFromJson(json);
   Map<String, dynamic> toJson() => _$DocumentOverlaySettingsToJson(this);
 }
 
@@ -92,8 +92,7 @@ class BlinkIdOverlaySettings extends OverlaySettings {
 
   BlinkIdOverlaySettings() : super('BlinkIdOverlaySettings');
 
-  factory BlinkIdOverlaySettings.fromJson(Map<String, dynamic> json) =>
-      _$BlinkIdOverlaySettingsFromJson(json);
+  factory BlinkIdOverlaySettings.fromJson(Map<String, dynamic> json) => _$BlinkIdOverlaySettingsFromJson(json);
   Map<String, dynamic> toJson() => _$BlinkIdOverlaySettingsToJson(this);
 }
 
@@ -127,12 +126,10 @@ class DocumentVerificationOverlaySettings extends OverlaySettings {
   /// If null, default value will be used.
   String? glareMessage;
 
-  DocumentVerificationOverlaySettings()
-      : super('DocumentVerificationOverlaySettings');
+  DocumentVerificationOverlaySettings() : super('DocumentVerificationOverlaySettings');
 
-  factory DocumentVerificationOverlaySettings.fromJson(
-          Map<String, dynamic> json) =>
+  factory DocumentVerificationOverlaySettings.fromJson(Map<String, dynamic> json) =>
       _$DocumentVerificationOverlaySettingsFromJson(json);
-          Map<String, dynamic> toJson() =>
-      _$DocumentVerificationOverlaySettingsToJson(this);
+
+  Map<String, dynamic> toJson() => _$DocumentVerificationOverlaySettingsToJson(this);
 }

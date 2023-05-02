@@ -17,7 +17,6 @@ A new flutter plugin project.
   s.public_header_files = 'Classes/**/*.h'
   s.dependency 'Flutter'
   s.platform = :ios, '13.0'
-
   s.dependency 'PPBlinkID', '~> 6.1.2'
 
   # Flutter.framework does not contain a i386 slice. Only x86_64 simulators are supported.

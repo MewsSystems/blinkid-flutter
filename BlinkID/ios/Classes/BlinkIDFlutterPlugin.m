@@ -4,6 +4,7 @@
 #import "MicroblinkModule/Recognizers/MBRecognizerSerializers.h"
 #import "MicroblinkModule/Overlays/MBOverlaySettingsSerializers.h"
 #import "MBSerializationUtils.h"
+#import <blinkid_flutter/blinkid_flutter-Swift.h>
 
 @interface BlinkIDFlutterPlugin () <MBOverlayViewControllerDelegate>
 
@@ -22,7 +23,12 @@ static NSString* const kScanWithCameraMethodName = @"scanWithCamera";
     FlutterMethodChannel* channel = [FlutterMethodChannel
                                      methodChannelWithName:kChannelName
                                      binaryMessenger:[registrar messenger]];
-    BlinkIDFlutterPlugin* instance = [[BlinkIDFlutterPlugin alloc] init];
+    // Register MicroblinkScannerView
+    MicroblinkScannerViewFactory* factory =
+          [[MicroblinkScannerViewFactory alloc] initWithMessenger:registrar.messenger];
+    [registrar registerViewFactory:factory withId:@"MicroblinkScannerView"];
+    
+   BlinkIDFlutterPlugin* instance = [[BlinkIDFlutterPlugin alloc] init];
     [registrar addMethodCallDelegate:instance channel:channel];
 }
 

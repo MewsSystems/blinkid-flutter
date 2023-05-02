@@ -47,5 +47,4 @@ class MicroblinkScanner {
 
     return List<RecognizerResult>.from(results);
   }
-
 }

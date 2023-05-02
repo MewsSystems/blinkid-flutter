@@ -20,7 +20,8 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> scan() async {
     String license;
-    if (Theme.of(context).platform == TargetPlatform.iOS) {
+    if (Theme.of(context).platform == TargetPlatform.iOS)  {
+
       license =
           "sRwAAAEVY29tLm1pY3JvYmxpbmsuc2FtcGxl1BIcP4FpSuS/38LVO6iNNLvwTdq8BXiJ5UonUGzXseoV2n66Da5wNIZLr1ZBRlnFt2rbdnzzt/qU/fcwoCOqO8Zs2aUb2Psx4KutvE2SPyDiBo2Ko6yiA/P54/B8Jh8sEVWrLT341QghRicpTDbfiuJLtQ6HyCUrQOd28fxlwulwrZhqdyHmVJVQ6S4Gu2Dxd5dxt3LiIcZ0JeOjNKaPtc4Qnz7BYI2nQ5VfW2V2gYRIsvTzjgvT1AM2OibUXY0HeY4CTZ0BHwPVKTkQVnE39cOJST5k9JtZoZV086L2elpxizJueRIh4J8IzopUIFEFwq70cBj17Qr5gtc=";
     } else if (Theme.of(context).platform == TargetPlatform.android) {
@@ -159,10 +160,25 @@ class _MyAppState extends State<MyApp> {
         buildResult(result.conditions, "Conditions");
   }
 
+
   String buildDataMatchResult(DataMatchResult? result) {
     if (result == null) {
       return "";
     }
+
+  String buildDataMatchDetailedInfoResult(DataMatchDetailedInfo? result) {
+    if (result == null) {
+      return "";
+    }
+
+    return buildResult(result.dateOfBirth?.toString(), "Date of birth") +
+        buildResult(result.dateOfExpiry?.toString(), "Date Of Expiry") +
+        buildResult(result.documentNumber?.toString(), "Document Number") +
+        buildResult(result.dataMatchResult?.toString(), "Data Match Result");
+  }
+
+  String getPassportResultString(BlinkIdCombinedRecognizerResult? result) {
+
 
     return buildStringResult(result.dateOfBirth.toString(), "Date of birth") +
         buildStringResult(result.dateOfExpiry.toString(), "Date Of Expiry") +

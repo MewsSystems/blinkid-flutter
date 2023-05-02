@@ -180,4 +180,3 @@ public class BlinkIDFlutterPlugin implements FlutterPlugin, MethodCallHandler, P
       return true;
   }
 }
-

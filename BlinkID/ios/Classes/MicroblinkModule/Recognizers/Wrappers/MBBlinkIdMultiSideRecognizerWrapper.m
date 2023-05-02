@@ -108,6 +108,13 @@
         }
     }
     {
+        id saveCameraFrames = [jsonRecognizer valueForKey:@"saveCameraFrames"];
+        if (saveCameraFrames != nil) {
+            recognizer.saveCameraFrames = [(NSNumber *)saveCameraFrames boolValue];
+        }
+    }
+    {
+
         id scanCroppedDocumentImage = [jsonRecognizer valueForKey:@"scanCroppedDocumentImage"];
         if (scanCroppedDocumentImage != nil) {
             recognizer.scanCroppedDocumentImage = [(NSNumber *)scanCroppedDocumentImage boolValue];

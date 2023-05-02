@@ -16,5 +16,5 @@ Map<String, dynamic> _$SuccessFrameGrabberRecognizerToJson(
         SuccessFrameGrabberRecognizer instance) =>
     <String, dynamic>{
       'recognizerType': instance.recognizerType,
-      'slaveRecognizer': instance.slaveRecognizer,
+      'slaveRecognizer': instance.slaveRecognizer.toJson(),
     };

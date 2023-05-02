@@ -123,6 +123,7 @@
     };
 }
 
+
 +(NSDictionary *) serializeClassInfo:(MBClassInfo *)classInfo {
     return @{
              @"country" : [NSNumber numberWithInteger:(classInfo.country)],
