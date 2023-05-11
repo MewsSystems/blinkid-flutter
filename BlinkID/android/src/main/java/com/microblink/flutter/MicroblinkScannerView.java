@@ -23,6 +23,7 @@ import androidx.lifecycle.Observer;
 import com.microblink.recognition.RecognitionSuccessType;
 import com.microblink.view.recognition.DetectionStatus;
 
+import java.util.EnumMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -50,6 +51,8 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
             handler.post(runnable);
         }
     };
+
+    private final EnumMap<RecognitionSuccessType, String> nameMap = new EnumMap<>(RecognitionSuccessType.class);
 
     /**
      * @param creationParams structure: { "overlaySettings": { "useFrontCamera": false,
@@ -92,6 +95,11 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
                 getCameraSelector(creationParams.overlaySettings),
                 initializationCallbacks
         );
+
+        nameMap.put(RecognitionSuccessType.UNSUCCESSFUL, "empty");
+        nameMap.put(RecognitionSuccessType.PARTIAL, "uncertain");
+        nameMap.put(RecognitionSuccessType.SUCCESSFUL, "valid");
+        nameMap.put(RecognitionSuccessType.STAGE_SUCCESSFUL, "stageValid");
     }
 
     @SuppressLint("NewApi")
@@ -188,7 +196,8 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
 
     @Override
     public void onScanningDone(RecognitionSuccessType recognitionSuccessType) {
-        sendToMethodChannel("onScanDone", recognitionSuccessType.name());
+        String name = nameMap.get(recognitionSuccessType);
+        sendToMethodChannel("onScanDone", name);
     }
 
     @Override

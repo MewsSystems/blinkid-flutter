@@ -78,33 +78,14 @@ class _MicroblinkScannerWidgetState extends State<MicroblinkScannerWidget> {
     widget.onDetectionStatusUpdate(detectionStatusUpdate.detectionStatus);
   }
 
-  void _onScanDone(MethodCall call) {
-    final name = call.arguments as String;
-    late final RecognizerResultState resultState;
-    if (name == 'UNSUCCESSFUL') {
-      resultState = RecognizerResultState.empty;
-    } else if (name == 'PARTIAL') {
-      resultState = RecognizerResultState.uncertain;
-    } else if (name == 'SUCCESSFUL') {
-      resultState = RecognizerResultState.valid;
-    } else if (name == 'STAGE_SUCCESSFUL') {
-      resultState = RecognizerResultState.stageValid;
-    } else {
-      throw PlatformException(
-        code: 'Unsupported',
-        details: 'Unsupported name: $name',
-      );
-    }
-    widget.onScanDone(resultState);
-  }
-
   void _createChannel(int viewId) {
     channel = MethodChannel('MicroblinkScannerWidget/$viewId')
       ..setMethodCallHandler((call) async {
         if (call.method == 'onScan') {
           widget.onScan();
         } else if (call.method == 'onScanDone') {
-          _onScanDone(call);
+          final name = call.arguments as String;
+          widget.onScanDone(RecognizerResultState.values.byName(name));
         } else if (call.method == 'onFinishScanning') {
           _onFinishScanning(call);
         } else if (call.method == 'onClose') {
