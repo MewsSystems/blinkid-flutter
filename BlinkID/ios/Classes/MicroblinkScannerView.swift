@@ -140,7 +140,7 @@ extension MicroblinkScannerView: CustomOverlayViewControllerDelegate {
         
         self.channel.invokeMethod("onDetectionStatusUpdate", arguments: "{\"detectionStatus\": \"\(encodedStatus)\"}")
     }
-    
+
     func onScanDone(_ state: MBRecognizerResultState) {
         DispatchQueue.main.async {
             self.channel.invokeMethod("onScanDone", arguments: state.name)
@@ -201,7 +201,7 @@ class CustomOverlayViewController : MBCustomOverlayViewController,
             self.delegate?.onFirstSideScanned()
         }
     }
-    
+
     func recognizerRunnerViewController(_ recognizerRunnerViewController: UIViewController & MBRecognizerRunnerViewController,
                                         didFinishDetectionWithDisplayableQuad displayableQuad: MBDisplayableQuadDetection) {
         DispatchQueue.main.async {
