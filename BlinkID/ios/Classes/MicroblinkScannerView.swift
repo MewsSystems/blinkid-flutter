@@ -168,7 +168,6 @@ class CustomOverlayViewController : MBCustomOverlayViewController,
         self.metadataDelegates.firstSideFinishedRecognizerRunnerViewControllerDelegate = self
     }
     
-  
     func recognizerRunnerViewControllerUnauthorizedCamera(_ recognizerRunnerViewController: UIViewController & MBRecognizerRunnerViewController) {}
     
     func recognizerRunnerViewController(_ recognizerRunnerViewController: UIViewController & MBRecognizerRunnerViewController,
@@ -216,5 +215,5 @@ class CustomOverlayViewController : MBCustomOverlayViewController,
     
     func resumeScanning() { recognizerRunnerViewController?.resumeScanningAndResetState(true)}
     
-
+    
 }
