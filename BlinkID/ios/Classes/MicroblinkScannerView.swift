@@ -13,6 +13,7 @@ public class MicroblinkScannerViewFactory: NSObject, FlutterPlatformViewFactory 
         return FlutterStandardMessageCodec.sharedInstance()
     }
     
+    
     public func create(
         withFrame frame: CGRect,
         viewIdentifier viewId: Int64,
@@ -29,55 +30,14 @@ public class MicroblinkScannerViewFactory: NSObject, FlutterPlatformViewFactory 
 class MicroblinkScannerView: NSObject,
                              FlutterPlatformView,
                              CustomOverlayViewControllerDelegate {
-    func onClose() {
-        self.channel.invokeMethod("onClose", arguments: nil)
-    }
-    
-    func onError(error: Error) {
-        self.channel.invokeMethod("onError", arguments: error.localizedDescription)
-    }
-    
-    func onFinishScanning(results: [[AnyHashable : Any]?]) {
-        let data = try? JSONSerialization.data(withJSONObject: results, options: .prettyPrinted)
-        let arguments = data == nil ? nil : String(data: data!, encoding: .utf8)
-        self.channel.invokeMethod("onFinishScanning", arguments: arguments)
-    }
-    
-    func onFirstSideScanned() {
-        self.channel.invokeMethod("onFirstSideScanned", arguments: nil)
-    }
-    
-    func onDetectionStatusUpdated(_ status: MBDetectionStatus) {
-        let encodedStatus: String = {switch status {
-        case .cameraAtAngle:
-            return "CAMERA_AT_ANGLE"
-        case .fail:
-            return "FAIL"
-        case .success:
-            return "SUCCESS"
-        case .cameraTooHigh:
-            return "CAMERA_TOO_HIGH"
-        case .fallbackSuccess:
-            return "FALLBACK_SUCCESS"
-        case .partialForm:
-            return "PARTIAL_OBJECT"
-        case .cameraTooNear:
-            return "CAMERA_TOO_NEAR"
-        case .documentTooCloseToEdge:
-            return "DOCUMENT_TOO_CLOSE_TO_EDGE"
-        default:
-            return ""
-        }}()
-        if encodedStatus.isEmpty {
-            return
-        }
-        
-        self.channel.invokeMethod("onDetectionStatusUpdate", arguments: "{\"detectionStatus\": \"\(encodedStatus)\"}")
-    }
     
     private let controller = UIViewController()
     private let channel: FlutterMethodChannel
     private var recognizerCollection: MBRecognizerCollection?
+    private var overlayViewController: CustomOverlayViewController?
+    
+    private var statusHandler: DetectionStatusStreamHandler
+    private var resulstHandler: ResultsStreamHandler
     
     init(
         frame: CGRect,
@@ -86,7 +46,18 @@ class MicroblinkScannerView: NSObject,
         binaryMessenger messenger: FlutterBinaryMessenger
     ) {
         controller.view = UIView()
-        self.channel = FlutterMethodChannel(name: "MicroblinkScannerWidget/" + String(viewId), binaryMessenger: messenger)
+        
+        let channelBaseName = "MicroblinkScannerWidget/\(String(viewId))";
+        
+        self.channel = FlutterMethodChannel(name: "\(channelBaseName)/method", binaryMessenger: messenger)
+        
+        let statusEventChannel = FlutterEventChannel(name: "\(channelBaseName)/events/status", binaryMessenger: messenger)
+        let resultsEventChannel = FlutterEventChannel(name: "\(channelBaseName)/events/scan", binaryMessenger: messenger)
+        
+        self.statusHandler = DetectionStatusStreamHandler()
+        self.resulstHandler = ResultsStreamHandler()
+        
+        
         let arguments = args as! [AnyHashable : Any]
         MBMicroblinkSDK.shared().setLicenseKey(arguments["licenseKey"] as! String, errorCallback: { _ in })
         
@@ -94,6 +65,11 @@ class MicroblinkScannerView: NSObject,
         self.recognizerCollection = MBRecognizerSerializers.sharedInstance().deserializeRecognizerCollection(recognizerCollectionDict)!
         
         super.init()
+        
+        self.channel.setMethodCallHandler(self.methodHandler)
+        statusEventChannel.setStreamHandler(self.statusHandler)
+        resultsEventChannel.setStreamHandler(self.resulstHandler)
+        
         
         let settingsDict = arguments["overlaySettings"] as! [AnyHashable : Any]
         self.prepare(frame: frame, jsonSettings: settingsDict)
@@ -113,6 +89,7 @@ class MicroblinkScannerView: NSObject,
         let overlayViewController = CustomOverlayViewController.init(recognizerCollection: self.recognizerCollection!,
                                                                      cameraSettings: settings.cameraSettings)
         overlayViewController.delegate = self
+        self.overlayViewController = overlayViewController
         
         let recognizerController = MBViewControllerFactory.recognizerRunnerViewController(withOverlayViewController: overlayViewController)!
         recognizerController.view.frame = frame
@@ -121,10 +98,82 @@ class MicroblinkScannerView: NSObject,
         recognizerController.didMove(toParent: controller)
     }
     
+    func onClose() {
+        self.channel.invokeMethod("onClose", arguments: nil)
+    }
+    
+    func onError(error: Error) {
+        print("\(error)")
+        self.channel.invokeMethod("onError", arguments: error.localizedDescription)
+    }
+    
+    func onFinishScanning(results:  [MBRecognizer]) {
+        print("onFinishScanning: \(results)")
+        self.resulstHandler.add(results)
+        //        let data = try? JSONSerialization.data(withJSONObject: results, options: .prettyPrinted)
+        //        let arguments = data == nil ? nil : String(data: data!, encoding: .utf8)
+        //        self.channel.invokeMethod("onFinishScanning", arguments: arguments)
+    }
+    
+    func onFirstSideScanned() {
+        self.channel.invokeMethod("onFirstSideScanned", arguments: nil)
+    }
+    
+    func onDetectionStatusUpdated(_ status: MBDetectionStatus) {
+        print("onDetectionStatusUpdated: \(status)")
+        self.statusHandler.add(status)
+        
+        //        let encodedStatus: String = {switch status {
+        //        case .cameraAtAngle:
+        //            return "CAMERA_AT_ANGLE"
+        //        case .fail:
+        //            return "FAIL"
+        //        case .success:
+        //            return "SUCCESS"
+        //        case .cameraTooHigh:
+        //            return "CAMERA_TOO_HIGH"
+        //        case .fallbackSuccess:
+        //            return "FALLBACK_SUCCESS"
+        //        case .partialForm:
+        //            return "PARTIAL_OBJECT"
+        //        case .cameraTooNear:
+        //            return "CAMERA_TOO_NEAR"
+        //        case .documentTooCloseToEdge:
+        //            return "DOCUMENT_TOO_CLOSE_TO_EDGE"
+        //        default:
+        //            return ""
+        //        }}()
+        //        if encodedStatus.isEmpty {
+        //            return
+        //        }
+        //
+        //        self.channel.invokeMethod("onDetectionStatusUpdate", arguments: "{\"detectionStatus\": \"\(encodedStatus)\"}")
+    }
+    
+    
+    
+    
+    
+    private func methodHandler(call: FlutterMethodCall, result: @escaping FlutterResult ){
+        print(call.method)
+        switch (call.method) {
+        case "pauseScanning":
+            self.overlayViewController?.pauseScanning()
+            result(nil)
+        case "resumeScanningAndResetState":
+            self.overlayViewController?.resumeScanningAndResetState(call.arguments as! Bool)
+            result(nil)
+        default:
+            result(FlutterError(code: "Unimplemented", message: "\(call.method) not implemented.", details: nil))
+        }
+        
+    }
+    
+    
 }
 
 protocol CustomOverlayViewControllerDelegate {
-    func onFinishScanning(results: [[AnyHashable : Any]?])
+    func onFinishScanning(results:  [MBRecognizer] )
     func onFirstSideScanned()
     func onDetectionStatusUpdated(_ status: MBDetectionStatus)
     func onClose()
@@ -135,6 +184,8 @@ class CustomOverlayViewController : MBCustomOverlayViewController,
                                     MBScanningRecognizerRunnerViewControllerDelegate,
                                     MBFirstSideFinishedRecognizerRunnerViewControllerDelegate,
                                     MBDetectionRecognizerRunnerViewControllerDelegate, MBRecognizerRunnerViewControllerDelegate {
+    var delegate: CustomOverlayViewControllerDelegate?
+    
     func recognizerRunnerViewControllerUnauthorizedCamera(_ recognizerRunnerViewController: UIViewController & MBRecognizerRunnerViewController) {}
     
     func recognizerRunnerViewController(_ recognizerRunnerViewController: UIViewController & MBRecognizerRunnerViewController,
@@ -176,22 +227,23 @@ class CustomOverlayViewController : MBCustomOverlayViewController,
     
     func recognizerRunnerViewController(_ recognizerRunnerViewController: UIViewController & MBRecognizerRunnerViewController,
                                         didFinishDetectionWithDisplayableQuad displayableQuad: MBDisplayableQuadDetection) {
-        DispatchQueue.main.async {
-            self.delegate?.onDetectionStatusUpdated(displayableQuad.detectionStatus)
-        }
+        self.delegate?.onDetectionStatusUpdated(displayableQuad.detectionStatus)
     }
     
     func recognizerRunnerViewControllerDidFinishScanning(_ recognizerRunnerViewController: UIViewController & MBRecognizerRunnerViewController,
                                                          state: MBRecognizerResultState) {
-        if state == .valid {
-            recognizerRunnerViewController.pauseScanning()
-            DispatchQueue.main.async(execute: {() -> Void in
-                let results = self.recognizerCollection.recognizerList.map({ return $0.serializeResult() })
-                self.delegate?.onFinishScanning(results: results)
-                recognizerRunnerViewController.resumeScanningAndResetState(true)
-            })
+        recognizerRunnerViewController.pauseScanning()
+        self.delegate?.onFinishScanning(results:  self.recognizerCollection.recognizerList)
+        
+    }
+
+    func pauseScanning() { recognizerRunnerViewController?.pauseScanning() }
+    
+    func resumeScanningAndResetState(_ resetState: Bool) {
+        DispatchQueue.main.async {
+            self.recognizerRunnerViewController?.resumeScanningAndResetState(resetState)
         }
+        
     }
     
-    var delegate: CustomOverlayViewControllerDelegate?
 }

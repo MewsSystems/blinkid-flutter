@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart:async';
 
 import 'package:blinkid_flutter/microblink_scanner.dart';
 import 'package:flutter/foundation.dart';
@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 typedef MicroblinkScannerResultCallback = void Function(
-  List<RecognizerResult>?,
+  List<RecognizerResult>,
 );
 
 class MicroblinkScannerWidget extends StatefulWidget {
@@ -19,6 +19,7 @@ class MicroblinkScannerWidget extends StatefulWidget {
     required this.onError,
     required this.onFirstSideScanned,
     required this.onDetectionStatusUpdate,
+    this.onControllerCreated,
   }) : super(key: key);
 
   final RecognizerCollection collection;
@@ -28,63 +29,87 @@ class MicroblinkScannerWidget extends StatefulWidget {
   final ValueChanged<String> onError;
   final VoidCallback onFirstSideScanned;
   final ValueChanged<DetectionStatus> onDetectionStatusUpdate;
+  final ValueChanged<MicroblinkScannerController>? onControllerCreated;
 
   @override
-  State<MicroblinkScannerWidget> createState() =>
-      _MicroblinkScannerWidgetState();
+  State<MicroblinkScannerWidget> createState() => _MicroblinkScannerWidgetState();
 }
 
 class _MicroblinkScannerWidgetState extends State<MicroblinkScannerWidget> {
-  late MethodChannel channel;
+  // late MethodChannel channel;
+  late MicroblinkScannerController _controller;
+  late StreamSubscription<DetectionStatus>? _detectionStatusSubscription;
+  late StreamSubscription<List<RecognizerResult>>? _resultSubscription;
 
-  void _onFinishScanning(MethodCall call) {
-    final List? jsonResults = jsonDecode(call.arguments);
+  // void _onFinishScanning(MethodCall call) {
+  //   final List? jsonResults = jsonDecode(call.arguments);
 
-    if (jsonResults == null) {
-      widget.onResult(null);
+  //   if (jsonResults == null) {
+  //     widget.onResult(null);
 
-      return;
-    }
+  //     return;
+  //   }
 
-    List<RecognizerResult> results = [];
+  //   List<RecognizerResult> results = [];
 
-    for (var i = 0; i < jsonResults.length; i++) {
-      final map = Map<String, dynamic>.from(jsonResults[i]);
-      final data = widget.collection.recognizerArray[i].createResultFromNative(map);
-      if (data.resultState != RecognizerResultState.empty) {
-        results.add(data);
-      }
-    }
+  //   for (var i = 0; i < jsonResults.length; i++) {
+  //     final map = Map<String, dynamic>.from(jsonResults[i]);
+  //     final data = widget.collection.recognizerArray[i].createResultFromNative(map);
+  //     if (data.resultState != RecognizerResultState.empty) {
+  //       results.add(data);
+  //     }
+  //   }
 
-    widget.onResult(results);
-  }
+  //   widget.onResult(results);
+  // }
 
-  void _onDetectionStatusUpdate(MethodCall call) {
-    final Map<String, dynamic> json = jsonDecode(call.arguments);
-    final detectionStatusUpdate = DetectionStatusUpdate.fromJson(json);
-    widget.onDetectionStatusUpdate(detectionStatusUpdate.detectionStatus);
-  }
+  // void _onDetectionStatusUpdate(MethodCall call) {
+  //   final Map<String, dynamic> json = jsonDecode(call.arguments);
+  //   final detectionStatusUpdate = DetectionStatusUpdate.fromJson(json);
+  //   widget.onDetectionStatusUpdate(detectionStatusUpdate.detectionStatus);
+  // }
 
   void _createChannel(int viewId) {
-    channel = MethodChannel('MicroblinkScannerWidget/$viewId')
-      ..setMethodCallHandler((call) async {
-        if (call.method == 'onFinishScanning') {
-          _onFinishScanning(call);
-        } else if (call.method == 'onClose') {
-          widget.onResult(null);
-        } else if (call.method == 'onFirstSideScanned') {
-          widget.onFirstSideScanned();
-        } else if (call.method == 'onError') {
-          widget.onError(call.arguments as String);
-        } else if (call.method == 'onDetectionStatusUpdate') {
-          _onDetectionStatusUpdate(call);
-        } else {
-          throw PlatformException(
-            code: 'Unsupported',
-            details: 'Unsupported method ${call.method}',
-          );
-        }
-      });
+    _controller = MicroblinkScannerController(viewId, widget.collection)..addListener(_listener);
+
+    _detectionStatusSubscription = _controller.detectionStatus.listen(widget.onDetectionStatusUpdate);
+    _resultSubscription = _controller.results.listen(widget.onResult);
+
+    widget.onControllerCreated?.call(_controller);
+
+    // channel = MethodChannel('MicroblinkScannerWidget/$viewId')
+    //   ..setMethodCallHandler((call) async {
+    //     if (call.method == 'onFinishScanning') {
+    //       _onFinishScanning(call);
+    //     } else if (call.method == 'onClose') {
+    //       widget.onResult(null);
+    //     } else if (call.method == 'onFirstSideScanned') {
+    //       widget.onFirstSideScanned();
+    //     } else if (call.method == 'onError') {
+    //       widget.onError(call.arguments as String);
+    //     } else if (call.method == 'onDetectionStatusUpdate') {
+    //       _onDetectionStatusUpdate(call);
+    //     } else {
+    //       throw PlatformException(
+    //         code: 'Unsupported',
+    //         details: 'Unsupported method ${call.method}',
+    //       );
+    //     }
+    //   });
+  }
+
+  void _listener() {
+    if (_controller.firstSideScanned) {
+      widget.onFirstSideScanned();
+    }
+  }
+
+  @override
+  void dispose() {
+    _detectionStatusSubscription?.cancel();
+    _resultSubscription?.cancel();
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
