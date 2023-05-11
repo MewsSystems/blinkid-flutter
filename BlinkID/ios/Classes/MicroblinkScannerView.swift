@@ -140,12 +140,17 @@ extension MicroblinkScannerView: CustomOverlayViewControllerDelegate {
         
         self.channel.invokeMethod("onDetectionStatusUpdate", arguments: "{\"detectionStatus\": \"\(encodedStatus)\"}")
     }
+    
+    func onScanDone(_ state: MBRecognizerResultState) {
+        self.channel.invokeMethod("onScanDone", arguments: state.name)
+    }
 }
 
 protocol CustomOverlayViewControllerDelegate {
     func onFinishScanning(results: [[AnyHashable : Any]?])
     func onFirstSideScanned()
     func onDetectionStatusUpdated(_ status: MBDetectionStatus)
+    func onScanDone(_ state: MBRecognizerResultState)
     func onClose()
     func onError(error: Error)
 }
@@ -204,6 +209,8 @@ class CustomOverlayViewController : MBCustomOverlayViewController,
     
     func recognizerRunnerViewControllerDidFinishScanning(_ recognizerRunnerViewController: UIViewController & MBRecognizerRunnerViewController,
                                                          state: MBRecognizerResultState) {
+        self.delegate?.onScanDone(state)
+        
         if state == .valid {
             recognizerRunnerViewController.pauseScanning()
             DispatchQueue.main.async(execute: {() -> Void in
@@ -216,4 +223,22 @@ class CustomOverlayViewController : MBCustomOverlayViewController,
     func resumeScanning() { recognizerRunnerViewController?.resumeScanningAndResetState(true)}
     
     
+}
+
+
+extension MBRecognizerResultState {
+    var name: String {
+        switch(self){
+        case .empty:
+            return "empty"
+        case .stageValid:
+            return "stageValid"
+        case .uncertain:
+            return "uncertain"
+        case .valid:
+            return "valid"
+        @unknown default:
+            fatalError("\(self) is not supported.")
+        }
+    }
 }
