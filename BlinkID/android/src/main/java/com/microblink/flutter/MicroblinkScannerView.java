@@ -20,6 +20,7 @@ import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.LifecycleRegistry;
 import androidx.lifecycle.Observer;
 
+import com.microblink.recognition.RecognitionSuccessType;
 import com.microblink.view.recognition.DetectionStatus;
 
 import java.util.concurrent.Executor;
@@ -178,6 +179,16 @@ class MicroblinkScannerView implements PlatformView, LifecycleOwner, MicroblinkS
                 "onDetectionStatusUpdate",
                 String.format("{\"%s\": \"%s\"}", "detectionStatus", detectionStatus.name())
         );
+    }
+
+    @Override
+    public void onRecognizeBitmap() {
+        sendToMethodChannel("onScan", null);
+    }
+
+    @Override
+    public void onScanningDone(RecognitionSuccessType recognitionSuccessType) {
+        sendToMethodChannel("onScanDone", recognitionSuccessType.name());
     }
 
     @Override
