@@ -142,7 +142,9 @@ extension MicroblinkScannerView: CustomOverlayViewControllerDelegate {
     }
     
     func onScanDone(_ state: MBRecognizerResultState) {
-        self.channel.invokeMethod("onScanDone", arguments: state.name)
+        DispatchQueue.main.async {
+            self.channel.invokeMethod("onScanDone", arguments: state.name)
+        }
     }
 }
 

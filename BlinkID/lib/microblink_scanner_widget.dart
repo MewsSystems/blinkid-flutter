@@ -26,6 +26,8 @@ class MicroblinkScannerWidget extends StatefulWidget {
   /// Called on every image frame that is passed to Microblink for recognition.
   ///
   /// Supposed to be used to track the real usage of Microblink recognition engine.
+  ///
+  /// Note that this method is only available on Android since iOS handles image processing internally.
   final VoidCallback onScan;
 
   /// Called when Microblink has done the recognition of the image frame.
