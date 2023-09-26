@@ -1,4 +1,4 @@
-package com.microblink.flutter;
+package com.microblink.blinkid.flutter;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -20,8 +20,8 @@ import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.LifecycleRegistry;
 import androidx.lifecycle.Observer;
 
-import com.microblink.recognition.RecognitionSuccessType;
-import com.microblink.view.recognition.DetectionStatus;
+import com.microblink.blinkid.recognition.RecognitionSuccessType;
+import com.microblink.blinkid.view.recognition.DetectionStatus;
 
 import java.util.EnumMap;
 import java.util.concurrent.Executor;
