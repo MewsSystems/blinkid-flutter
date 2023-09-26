@@ -160,9 +160,6 @@ class BlinkIdSingleSideRecognizerResult extends RecognizerResult {
   ///Additional info on processing.
   AdditionalProcessingInfo? additionalProcessingInfo;
 
-  ///The one more additional address information of the document owner.
-  String? additionalOptionalAddressInformation;
-
   ///The address of the document owner.
   StringResult? address;
 

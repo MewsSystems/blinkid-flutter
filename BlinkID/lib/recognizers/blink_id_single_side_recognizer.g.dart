@@ -42,9 +42,9 @@ Map<String, dynamic> _$BlinkIdSingleSideRecognizerToJson(
       'faceImageDpi': instance.faceImageDpi,
       'fullDocumentImageDpi': instance.fullDocumentImageDpi,
       'fullDocumentImageExtensionFactors':
-          instance.fullDocumentImageExtensionFactors,
+          instance.fullDocumentImageExtensionFactors.toJson(),
       'paddingEdge': instance.paddingEdge,
-      'recognitionModeFilter': instance.recognitionModeFilter,
+      'recognitionModeFilter': instance.recognitionModeFilter.toJson(),
       'returnFaceImage': instance.returnFaceImage,
       'returnFullDocumentImage': instance.returnFullDocumentImage,
       'returnSignatureImage': instance.returnSignatureImage,
