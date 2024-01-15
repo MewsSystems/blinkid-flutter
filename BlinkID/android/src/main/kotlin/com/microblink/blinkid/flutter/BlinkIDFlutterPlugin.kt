@@ -21,14 +21,15 @@ import io.flutter.plugin.common.PluginRegistry.ActivityResultListener
 import io.flutter.plugin.common.PluginRegistry.Registrar
 import org.json.JSONObject
 
-class BlinkIDFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityResultListener,
-    ActivityAware {
+class BlinkIDFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityResultListener, ActivityAware {
     private var mRecognizerBundle: RecognizerBundle? = null
     private var channel: MethodChannel? = null
     private var context: Context? = null
     private var activity: Activity? = null
     private var pendingResult: MethodChannel.Result? = null
+    private var flutterPluginBinding: FlutterPluginBinding? = null
     override fun onAttachedToEngine(binding: FlutterPluginBinding) {
+        flutterPluginBinding = binding
         setupPlugin(
             binding.applicationContext,
             binding.binaryMessenger
@@ -88,6 +89,10 @@ class BlinkIDFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Act
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
         binding.addActivityResultListener(this)
+        flutterPluginBinding!!.platformViewRegistry.registerViewFactory(
+            "MicroblinkScannerView",
+            MicroblinkScannerViewFactory(flutterPluginBinding!!.binaryMessenger, binding)
+        )
     }
 
     override fun onDetachedFromActivityForConfigChanges() {}
