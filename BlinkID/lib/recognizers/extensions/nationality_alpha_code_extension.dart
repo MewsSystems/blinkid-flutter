@@ -22,7 +22,8 @@ extension NationalityAlphaCodeExtension on BlinkIdMultiSideRecognizerResult {
   /// tried instead and is converted to 2-letter code value, if it is
   /// a 3-letter code one.
   String? get nationalityIsoAlpha2 {
-    final alpha2Code = _nationalityToCountryMap[nationality];
+    final sanitisedNationality = nationality?.latin?.trim();
+    final alpha2Code = _nationalityToCountryMap[sanitisedNationality];
     if (alpha2Code == null) {
       // At this stage nationality is either unknown, or contains some
       // random value from OCR (e.g. a country name).
