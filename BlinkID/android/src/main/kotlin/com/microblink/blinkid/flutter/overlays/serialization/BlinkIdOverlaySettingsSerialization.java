@@ -7,7 +7,6 @@ import com.microblink.blinkid.fragment.overlay.blinkid.reticleui.ReticleOverlayS
 import com.microblink.blinkid.uisettings.BlinkIdUISettings;
 import com.microblink.blinkid.uisettings.UISettings;
 import com.microblink.blinkid.flutter.overlays.OverlaySettingsSerialization;
-import com.microblink.blinkid.flutter.SerializationUtils;
 
 import org.json.JSONObject;
 

@@ -6,6 +6,7 @@ import com.microblink.blinkid.entities.recognizers.Recognizer
 import com.microblink.blinkid.entities.recognizers.blinkid.imageoptions.extension.ImageExtensionFactors
 import com.microblink.blinkid.geometry.Point
 import com.microblink.blinkid.geometry.Quadrilateral
+import com.microblink.blinkid.geometry.Rectangle
 import com.microblink.blinkid.image.Image
 import com.microblink.blinkid.results.date.Date
 import com.microblink.blinkid.results.date.SimpleDate
@@ -18,7 +19,6 @@ import java.io.IOException
 //import com.microblink.blinkid.entities.parsers.Parser;
 object SerializationUtils {
     private const val COMPRESSED_IMAGE_QUALITY = 90
-    @JvmStatic
     @Throws(JSONException::class)
     fun <T : Recognizer.Result?> addCommonRecognizerResultData(jsonObject: JSONObject, result: T) {
         jsonObject.put("resultState", serializeEnum(result!!.resultState))
@@ -27,7 +27,6 @@ object SerializationUtils {
     /*public static <T extends Parser.Result> void addCommonParserResultData(JSONObject jsonObject, T result) throws JSONException {
         jsonObject.put("resultState", serializeEnum(result.getResultState()));
     }*/
-    @JvmStatic
     @Throws(JSONException::class)
     fun serializeSimpleDate(date: SimpleDate?): JSONObject? {
         return if (date != null) {
@@ -41,7 +40,6 @@ object SerializationUtils {
         }
     }
 
-    @JvmStatic
     @Throws(JSONException::class)
     fun serializeDate(dateResult: Date?): JSONObject? {
         return if (dateResult == null) {
@@ -51,12 +49,10 @@ object SerializationUtils {
         }
     }
 
-    @JvmStatic
     fun serializeEnum(e: Enum<*>): Int {
         return e.ordinal
     }
 
-    @JvmStatic
     fun serializeStringArray(strings: Array<String?>): JSONArray {
         val jsonStrings = JSONArray()
         for (str in strings) {
@@ -65,7 +61,6 @@ object SerializationUtils {
         return jsonStrings
     }
 
-    @JvmStatic
     fun encodeImageBase64(image: Image?): String? {
         if (image == null) {
             return null
@@ -84,7 +79,6 @@ object SerializationUtils {
         return resultImgBase64
     }
 
-    @JvmStatic
     fun encodeByteArrayToBase64(arr: ByteArray?): String? {
         return if (arr == null) {
             null
@@ -99,7 +93,6 @@ object SerializationUtils {
         return jsonPoint
     }
 
-    @JvmStatic
     @Throws(JSONException::class)
     fun serializeQuad(quad: Quadrilateral): JSONObject {
         val jsonQuad = JSONObject()
@@ -110,7 +103,18 @@ object SerializationUtils {
         return jsonQuad
     }
 
-    @JvmStatic
+    @Throws(JSONException::class)
+    fun serializeRectangle(rectangle: Rectangle?): JSONObject {
+        val jsonRectangle = JSONObject()
+        if (rectangle != null) {
+            jsonRectangle.put("x", rectangle.x.toDouble())
+            jsonRectangle.put("y", rectangle.y.toDouble())
+            jsonRectangle.put("height", rectangle.height.toDouble())
+            jsonRectangle.put("width", rectangle.width.toDouble())
+        }
+        return jsonRectangle
+    }
+
     fun getStringFromJSONObject(map: JSONObject, key: String?): String? {
         var value = map.optString(key, null)
         if ("null" == value) {
@@ -119,7 +123,6 @@ object SerializationUtils {
         return value
     }
 
-    @JvmStatic
     fun deserializeExtensionFactors(jsonExtensionFactors: JSONObject?): ImageExtensionFactors {
         return if (jsonExtensionFactors == null) {
             ImageExtensionFactors(0f, 0f, 0f, 0f)
