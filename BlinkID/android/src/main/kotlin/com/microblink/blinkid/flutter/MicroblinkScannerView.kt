@@ -99,7 +99,7 @@ class MicroblinkScannerView(
         )
 
         view.previewStreamState.observe(this) { state ->
-            if(state == PreviewView.StreamState.STREAMING && creationParams.overlaySettings.flipFrontCamera) {
+            if (state == PreviewView.StreamState.STREAMING && creationParams.overlaySettings.flipFrontCamera) {
                 view.scaleX = -1F;
             }
         }
@@ -193,10 +193,6 @@ internal class MicroblinkEventDispatcher(binaryMessenger: BinaryMessenger, id: I
     }
 
     fun reportQuadDetection(displayableQuadDetection: DisplayableQuadDetection) {
-        Log.i(
-            "MicroblinkScannerView",
-            "onQuadDetection: ${displayableQuadDetection.detectionStatus.name}"
-        )
         val jsonObject = JSONObject()
             .put("detectionStatus", displayableQuadDetection.detectionStatus.name)
             .put(
@@ -217,10 +213,6 @@ internal class MicroblinkEventDispatcher(binaryMessenger: BinaryMessenger, id: I
 
     private fun sendToMethodChannel(method: String, arguments: Any?) {
         handler.post {
-            Log.i(
-                "MicroblinkScannerView",
-                "dispatching to method channel: $method with arguments: $arguments"
-            )
             methodChannel.invokeMethod(method, arguments)
         }
     }
