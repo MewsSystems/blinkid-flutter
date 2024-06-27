@@ -196,10 +196,6 @@ internal class MicroblinkEventDispatcher(binaryMessenger: BinaryMessenger, id: I
         val jsonObject = JSONObject()
             .put("detectionStatus", displayableQuadDetection.detectionStatus.name)
             .put(
-                "displayLocationNonUpdated",
-                SerializationUtils.serializeQuad(displayableQuadDetection.displayLocation)
-            )
-            .put(
                 "displayLocation",
                 SerializationUtils.serializeQuad(displayableQuadDetection.transformedDisplayLocation)
             )

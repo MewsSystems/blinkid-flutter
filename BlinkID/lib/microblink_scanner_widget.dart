@@ -124,31 +124,6 @@ class _MicroblinkScannerWidgetState extends State<MicroblinkScannerWidget> {
           creationParamsCodec: const StandardMessageCodec(),
           onPlatformViewCreated: _createChannel,
         );
-      // return PlatformViewLink(
-      //   viewType: viewType,
-      //   surfaceFactory: (context, controller) {
-      //     return AndroidViewSurface(
-      //       controller: controller as AndroidViewController,
-      //       gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{},
-      //       hitTestBehavior: PlatformViewHitTestBehavior.opaque,
-      //     );
-      //   },
-      //   onCreatePlatformView: (params) {
-      //     return PlatformViewsService.initSurfaceAndroidView(
-      //       id: params.id,
-      //       viewType: viewType,
-      //       layoutDirection: TextDirection.ltr,
-      //       creationParams: creationParams,
-      //       creationParamsCodec: const StandardMessageCodec(),
-      //       onFocus: () {
-      //         params.onFocusChanged(true);
-      //       },
-      //     )
-      //       ..addOnPlatformViewCreatedListener(params.onPlatformViewCreated)
-      //       ..addOnPlatformViewCreatedListener(_createChannel)
-      //       ..create();
-      //   },
-      // );
       default:
         throw UnsupportedError('$viewType platform view is not supported on ${defaultTargetPlatform.name}.');
     }
