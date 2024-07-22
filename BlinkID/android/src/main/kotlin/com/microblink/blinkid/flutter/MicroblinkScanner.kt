@@ -46,16 +46,18 @@ class MicroblinkScanner internal constructor(
         if (!isPaused && recognizerRunner.currentState == RecognizerRunner.State.READY) {
             imageProxy.image?.let {
                 val image = ImageBuilder.buildImageFromCamera2Image(it, Orientation.ORIENTATION_LANDSCAPE_RIGHT, null)
-                recognizerRunner.recognizeVideoImage(image, createScanResultListener(image))
+                recognizerRunner.recognizeVideoImage(image, createScanResultListener(image, imageProxy))
             }
+        } else {
+            imageProxy.close()
         }
-        imageProxy.close()
     }
 
-    private fun createScanResultListener(image: Image): ScanResultListener {
+    private fun createScanResultListener(image: Image, imageProxy: ImageProxy): ScanResultListener {
         return object : ScanResultListener {
             override fun onScanningDone(recognitionSuccessType: RecognitionSuccessType) {
                 image.dispose()
+                imageProxy.close()
                 if (recognitionSuccessType == RecognitionSuccessType.UNSUCCESSFUL) {
                     return
                 }
@@ -74,6 +76,7 @@ class MicroblinkScanner internal constructor(
 
             override fun onUnrecoverableError(throwable: Throwable) {
                 image.dispose()
+                imageProxy.close()
                 callbacks.onError(throwable)
                 recognizerRunner.resetRecognitionState()
             }
