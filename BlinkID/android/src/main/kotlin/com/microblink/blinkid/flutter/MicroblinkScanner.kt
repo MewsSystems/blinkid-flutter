@@ -1,6 +1,7 @@
 package com.microblink.blinkid.flutter
 
 import android.content.Context
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
@@ -39,12 +40,18 @@ class MicroblinkScanner internal constructor(
         recognizerBundle = createRecognizerBundle(creationParams.recognizerCollection)
         recognizerRunner = createRecognizer(context, recognizerBundle)
         recognizerRunner.setMetadataCallbacks(createMetadataCallbacks(callbacks))
+        com.microblink.blinkid.util.Log.setLogLevel(com.microblink.blinkid.util.Log.LogLevel.LOG_VERBOSE);
     }
 
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(imageProxy: ImageProxy) {
+        Log.i(
+            "MicroblinkScanner",
+            "Analyze called. Recognizer state: ${recognizerRunner.currentState}, isPaused: $isPaused"
+        )
         if (!isPaused && recognizerRunner.currentState == RecognizerRunner.State.READY) {
             imageProxy.image?.let {
+                Log.i("MicroblinkScanner", "Sent image to analyze.")
                 val image = ImageBuilder.buildImageFromCamera2Image(it, Orientation.ORIENTATION_LANDSCAPE_RIGHT, null)
                 recognizerRunner.recognizeVideoImage(image, createScanResultListener(image, imageProxy))
             }
@@ -58,7 +65,8 @@ class MicroblinkScanner internal constructor(
             override fun onScanningDone(recognitionSuccessType: RecognitionSuccessType) {
                 image.dispose()
                 imageProxy.close()
-                if (recognitionSuccessType == RecognitionSuccessType.UNSUCCESSFUL) {
+                Log.i("MicroblinkScanner", "Scaning is done: $recognitionSuccessType")
+                if (recognitionSuccessType == RecognitionSuccessType.UNSUCCESSFUL || isPaused) {
                     return
                 }
 
@@ -75,6 +83,7 @@ class MicroblinkScanner internal constructor(
             }
 
             override fun onUnrecoverableError(throwable: Throwable) {
+                Log.i("MicroblinkScanner", "Scanner erroed out: $throwable")
                 image.dispose()
                 imageProxy.close()
                 callbacks.onError(throwable)

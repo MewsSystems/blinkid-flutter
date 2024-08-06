@@ -1,11 +1,15 @@
 package com.microblink.blinkid.flutter
 
 import android.content.Context
+import android.hardware.camera2.CaptureRequest
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
+import androidx.annotation.OptIn
+import androidx.camera.camera2.interop.Camera2Interop
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
@@ -30,6 +34,7 @@ import io.flutter.plugin.platform.PlatformView
 import org.json.JSONObject
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.logging.Logger
 
 
 class MicroblinkScannerView(
@@ -42,12 +47,13 @@ class MicroblinkScannerView(
     private val scanner: MicroblinkScanner
     private val dispatcher = MicroblinkEventDispatcher(messenger, id)
     private val view = PreviewView(context)
-        .also {
-            it.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-            it.layoutParams = ViewGroup.LayoutParams(
+        .apply {
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+            layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
+
         }
     private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val cameraSelector: CameraSelector
@@ -141,6 +147,7 @@ class MicroblinkScannerView(
 
     }
 
+    @OptIn(ExperimentalCamera2Interop::class)
     private fun createPreviewAndAnalysisUseCaseGroup(
         view: PreviewView,
     ): UseCaseGroup {
@@ -150,17 +157,35 @@ class MicroblinkScannerView(
             .setResolutionStrategy(ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY)
             .build()
 
-        val previewUseCase = Preview.Builder()
+        val previewBuilder = Preview.Builder()
             .setResolutionSelector(resolutionSelector)
-            .build()
-            .also { it.setSurfaceProvider(view.surfaceProvider) }
 
-        val imageAnalysisUseCase = ImageAnalysis.Builder()
+        Camera2Interop.Extender(previewBuilder).apply {
+            setCaptureRequestOption(
+                CaptureRequest.CONTROL_AF_MODE,
+                CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
+            )
+        }
+
+        val previewUseCase = previewBuilder
+            .build()
+            .apply { setSurfaceProvider(view.surfaceProvider) }
+
+        val imageAnalysisBuilder = ImageAnalysis.Builder()
             .setResolutionSelector(resolutionSelector)
             .setImageQueueDepth(1)
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+
+        Camera2Interop.Extender(imageAnalysisBuilder).apply {
+            setCaptureRequestOption(
+                CaptureRequest.CONTROL_AF_MODE,
+                CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
+            )
+        }
+
+        val imageAnalysisUseCase = imageAnalysisBuilder
             .build()
-            .also { it.setAnalyzer(cameraExecutor, scanner) }
+            .apply { setAnalyzer(cameraExecutor, scanner) }
 
         return UseCaseGroup.Builder()
             .addUseCase(previewUseCase)
@@ -208,6 +233,7 @@ internal class MicroblinkEventDispatcher(binaryMessenger: BinaryMessenger, id: I
     }
 
     private fun sendToMethodChannel(method: String, arguments: Any?) {
+        Log.i("MicroblinkScannerView", "Sending $method with arguments $arguments")
         handler.post {
             methodChannel.invokeMethod(method, arguments)
         }
