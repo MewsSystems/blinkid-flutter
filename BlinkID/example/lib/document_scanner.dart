@@ -9,7 +9,7 @@ typedef MicroblinkRecognizerResult = List<RecognizerResult>;
 
 extension ScanDocumentExtension on BuildContext {
   Future<MicroblinkRecognizerResult?> scanDocument() async {
-    final permissions = await [Permission.camera, Permission.storage].request();
+    final permissions = await [Permission.camera].request();
 
     if (permissions.values.any((status) => status.isDenied)) {
       ScaffoldMessenger.of(this)
