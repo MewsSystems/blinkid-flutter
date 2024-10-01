@@ -45,10 +45,6 @@ class MicroblinkScanner internal constructor(
 
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(imageProxy: ImageProxy) {
-        Log.i(
-            "MicroblinkScanner",
-            "Analyze called. Recognizer state: ${recognizerRunner.currentState}, isPaused: $isPaused"
-        )
         if (!isPaused && recognizerRunner.currentState == RecognizerRunner.State.READY) {
             imageProxy.image?.let {
                 Log.i("MicroblinkScanner", "Sent image to analyze.")
@@ -65,11 +61,14 @@ class MicroblinkScanner internal constructor(
             override fun onScanningDone(recognitionSuccessType: RecognitionSuccessType) {
                 image.dispose()
                 imageProxy.close()
-                Log.i("MicroblinkScanner", "Scaning is done: $recognitionSuccessType")
-                if (recognitionSuccessType == RecognitionSuccessType.UNSUCCESSFUL || isPaused) {
+
+                if(isPaused) return;
+
+                if (recognitionSuccessType == RecognitionSuccessType.UNSUCCESSFUL || isPAUSED) {
+                    recognizerRunner.resetRecognitionState()
                     return
                 }
-
+                
                 val recognizers = recognizerBundle.recognizers
                 recognizers.forEach { recognizer ->
                     val resultState = recognizer.result.resultState
@@ -83,7 +82,6 @@ class MicroblinkScanner internal constructor(
             }
 
             override fun onUnrecoverableError(throwable: Throwable) {
-                Log.i("MicroblinkScanner", "Scanner erroed out: $throwable")
                 image.dispose()
                 imageProxy.close()
                 callbacks.onError(throwable)
