@@ -40,7 +40,6 @@ class MicroblinkScanner internal constructor(
         recognizerBundle = createRecognizerBundle(creationParams.recognizerCollection)
         recognizerRunner = createRecognizer(context, recognizerBundle)
         recognizerRunner.setMetadataCallbacks(createMetadataCallbacks(callbacks))
-        com.microblink.blinkid.util.Log.setLogLevel(com.microblink.blinkid.util.Log.LogLevel.LOG_VERBOSE);
     }
 
     @OptIn(ExperimentalGetImage::class)
@@ -62,13 +61,10 @@ class MicroblinkScanner internal constructor(
                 image.dispose()
                 imageProxy.close()
 
-                if(isPaused) return;
-
-                if (recognitionSuccessType == RecognitionSuccessType.UNSUCCESSFUL || isPAUSED) {
-                    recognizerRunner.resetRecognitionState()
+                if (recognitionSuccessType == RecognitionSuccessType.UNSUCCESSFUL || isPaused) {
                     return
                 }
-                
+
                 val recognizers = recognizerBundle.recognizers
                 recognizers.forEach { recognizer ->
                     val resultState = recognizer.result.resultState
