@@ -1,7 +1,6 @@
 package com.microblink.blinkid.flutter
 
 import android.content.Context
-import android.util.Log
 import androidx.annotation.OptIn
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
@@ -46,7 +45,6 @@ class MicroblinkScanner internal constructor(
     override fun analyze(imageProxy: ImageProxy) {
         if (!isPaused && recognizerRunner.currentState == RecognizerRunner.State.READY) {
             imageProxy.image?.let {
-                Log.i("MicroblinkScanner", "Sent image to analyze.")
                 val image = ImageBuilder.buildImageFromCamera2Image(it, Orientation.ORIENTATION_LANDSCAPE_RIGHT, null)
                 recognizerRunner.recognizeVideoImage(image, createScanResultListener(image, imageProxy))
             }
@@ -60,8 +58,7 @@ class MicroblinkScanner internal constructor(
             override fun onScanningDone(recognitionSuccessType: RecognitionSuccessType) {
                 image.dispose()
                 imageProxy.close()
-
-                if (recognitionSuccessType == RecognitionSuccessType.UNSUCCESSFUL || isPaused) {
+                if (recognitionSuccessType == RecognitionSuccessType.UNSUCCESSFUL) {
                     return
                 }
 
