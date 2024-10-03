@@ -8,18 +8,18 @@ environment:
   sdk: ">=3.4.4 <4.0.0"
 
 dependencies:
-  flutter:
-    sdk: flutter
-  permission_handler: ^11.3.1
   blinkid_flutter:
     path: ../
   cupertino_icons: ^1.0.6
+  flutter:
+    sdk: flutter
+  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  flutter_lints: ^3.0.0
+  mews_pedantic: ^0.31.1
 
 flutter:
   uses-material-design: true
