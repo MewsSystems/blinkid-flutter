@@ -192,11 +192,7 @@ internal class MicroblinkEventDispatcher(binaryMessenger: BinaryMessenger, id: I
 
     fun reportQuadDetection(displayableQuadDetection: DisplayableQuadDetection) {
         val jsonObject = JSONObject()
-            .put("detectionStatus", displayableQuadDetection.detectionStatus.name)
-            .put(
-                "displayLocation",
-                SerializationUtils.serializeQuad(displayableQuadDetection.transformedDisplayLocation)
-            )
+            .put("status", displayableQuadDetection.detectionStatus.name)
 
         sendToMethodChannel("onDetectionStatusUpdate", jsonObject.toString())
     }
