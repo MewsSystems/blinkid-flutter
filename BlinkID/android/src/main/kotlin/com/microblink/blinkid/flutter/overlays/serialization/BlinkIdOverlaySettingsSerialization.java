@@ -7,6 +7,10 @@ import com.microblink.blinkid.fragment.overlay.blinkid.reticleui.ReticleOverlayS
 import com.microblink.blinkid.uisettings.BlinkIdUISettings;
 import com.microblink.blinkid.uisettings.UISettings;
 import com.microblink.blinkid.flutter.overlays.OverlaySettingsSerialization;
+import com.microblink.blinkid.flutter.SerializationUtils;
+import com.microblink.blinkid.locale.LanguageUtils;
+import com.microblink.blinkid.hardware.camera.VideoResolutionPreset;
+import com.microblink.blinkid.uisettings.CameraSettings;
 
 import org.json.JSONObject;
 
@@ -16,9 +20,9 @@ public final class BlinkIdOverlaySettingsSerialization implements OverlaySetting
     @Override
     public UISettings createUISettings(Context context, JSONObject jsonUISettings, RecognizerBundle recognizerBundle) {
         BlinkIdUISettings settings = new BlinkIdUISettings(recognizerBundle);
-        
+
         OverlaySerializationUtils.extractCommonUISettings(jsonUISettings, settings);
-        
+
         boolean requireDocumentSidesDataMatch = jsonUISettings.optBoolean("requireDocumentSidesDataMatch", true);
         settings.setDocumentDataMatchRequired(requireDocumentSidesDataMatch);
 
@@ -52,7 +56,7 @@ public final class BlinkIdOverlaySettingsSerialization implements OverlaySetting
         int videoResolutionPreset = jsonUISettings.optInt("androidCameraResolutionPreset", VideoResolutionPreset.VIDEO_RESOLUTION_DEFAULT.ordinal());
 
         boolean androidLegacyCameraApi = jsonUISettings.optBoolean("enableAndroidLegacyCameraApi", false);
-        
+
         settings.setCameraSettings(new CameraSettings.Builder()
                 .setVideoResolutionPreset(VideoResolutionPreset.values()[videoResolutionPreset])
                 .setForceLegacyApi(androidLegacyCameraApi)
