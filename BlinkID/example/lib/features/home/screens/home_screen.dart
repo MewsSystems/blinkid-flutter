@@ -5,17 +5,19 @@ import 'package:sample/document_scanner.dart';
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
+  Future<void> _handleScanningDocument(BuildContext context) async {
+    final result = await context.scanDocument();
+    if (!context.mounted || result == null) return;
+
+    await context.showResultDialog(result);
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(title: const Text('BlinkID Example')),
         body: Center(
           child: FilledButton(
-            onPressed: () async {
-              final result = await context.scanDocument();
-              if (!context.mounted || result == null) return;
-
-              await context.showResultDialog(result);
-            },
+            onPressed: () => _handleScanningDocument(context),
             child: const Text('Scan Document'),
           ),
         ),
