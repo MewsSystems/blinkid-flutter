@@ -5,6 +5,7 @@ import 'package:blinkid_flutter/overlay_settings.dart';
 import 'package:blinkid_flutter/recognizer.dart';
 import 'package:flutter/services.dart';
 
+export 'package:blinkid_flutter/models/detection_update.dart';
 export 'package:blinkid_flutter/overlay_settings.dart';
 export 'package:blinkid_flutter/recognizer.dart';
 export 'package:blinkid_flutter/types.dart';

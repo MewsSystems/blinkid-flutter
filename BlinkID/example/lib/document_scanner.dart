@@ -76,7 +76,7 @@ class _DocumentScannerDialogState extends State<_DocumentScannerDialog> {
                     onError: print,
                     licenseKey: Theme.of(context).platform.microblinkLicenseKey,
                     onFirstSideScanned: () => _firstSideScannedNotifier.value = true,
-                    onDetectionUpdate: (update) => _detectionStatusNotifier.value = update.detectionStatus,
+                    onDetectionUpdate: (update) => _detectionStatusNotifier.value = update.status,
                     settings: DocumentVerificationOverlaySettings()
                       ..useFrontCamera = false
                       ..flipFrontCamera = false,
