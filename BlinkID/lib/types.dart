@@ -21,75 +21,79 @@ class Date {
 }
 
 /// Represents a point in image
-@JsonSerializable()
 class Point {
-  const Point({required this.x, required this.y});
-
   /// x coordinate of the point
-  final double x;
+  double? x;
 
   /// y coordinate of the point
-  final double y;
+  double? y;
 
-  factory Point.fromJson(Map<String, dynamic> json) => _$PointFromJson(json);
-
-  Map<String, dynamic> toJson() => _$PointToJson(this);
+  Point(Map<String, dynamic> nativePoint) {
+    this.x = nativePoint['x'] != null ? nativePoint['x'] * 1.0 : null;
+    this.y = nativePoint['y'] != null ? nativePoint['y'] * 1.0 : null;
+  }
 }
 
 /// Represents a quadrilateral location in the image
-@JsonSerializable()
 class Quadrilateral {
   /// upper left point of the quadrilateral
-  final Point upperLeft;
+  Point? upperLeft;
 
   /// upper right point of the quadrilateral
-  final Point upperRight;
+  Point? upperRight;
 
   /// lower left point of the quadrilateral
-  final Point lowerLeft;
+  Point? lowerLeft;
 
   /// lower right point of the quadrilateral
-  final Point lowerRight;
+  Point? lowerRight;
 
-    Quadrilateral(Map<String, dynamic> nativeQuad) {
-        this.upperLeft = Point(Map<String, dynamic>.from(nativeQuad['upperLeft']));
-        this.upperRight = Point(Map<String, dynamic>.from(nativeQuad['upperRight']));
-        this.lowerLeft = Point(Map<String, dynamic>.from(nativeQuad['lowerLeft']));
-        this.lowerRight = Point(Map<String, dynamic>.from(nativeQuad['lowerRight']));
-    }
+  Quadrilateral(Map<String, dynamic> nativeQuad) {
+    this.upperLeft = Point(Map<String, dynamic>.from(nativeQuad['upperLeft']));
+    this.upperRight = Point(Map<String, dynamic>.from(nativeQuad['upperRight']));
+    this.lowerLeft = Point(Map<String, dynamic>.from(nativeQuad['lowerLeft']));
+    this.lowerRight = Point(Map<String, dynamic>.from(nativeQuad['lowerRight']));
+  }
 }
 
 /// AlphabetType represents all of the alphabet types that BlinkID supports extracting.
 enum AlphabetType {
-  /// The Latin alphabet type   
-  @JsonValue(0) Latin,
+  /// The Latin alphabet type
+  @JsonValue(0)
+  Latin,
+
   /// The Arabic alphabet type
-  @JsonValue(1) Arabic,
+  @JsonValue(1)
+  Arabic,
+
   /// The Cyrillic alphabet type
-  @JsonValue(2) Cyrillic
+  @JsonValue(2)
+  Cyrillic
 }
 
 /// Represents rectangle location of each document field
 class Rectangle {
+  /// x location
+  double? x;
 
-    /// x location
-    double? x;
-    /// y location
-    double? y;
-    /// rectangle width
-    double? width;
-    /// rectangle height
-    double? height;
+  /// y location
+  double? y;
 
-    Rectangle(Map<String, dynamic> nativeRect) {
-        this.x = nativeRect['x'] != null? nativeRect['x']*1.0 : null;
-        this.y = nativeRect['y'] != null? nativeRect['y']*1.0 : null;
-        this.width = nativeRect['width'] != null? nativeRect['width']*1.0 : null;
-        this.height = nativeRect['height'] != null? nativeRect['height']*1.0 : null;
-    }
+  /// rectangle width
+  double? width;
+
+  /// rectangle height
+  double? height;
+
+  Rectangle(Map<String, dynamic> nativeRect) {
+    this.x = nativeRect['x'] != null ? nativeRect['x'] * 1.0 : null;
+    this.y = nativeRect['y'] != null ? nativeRect['y'] * 1.0 : null;
+    this.width = nativeRect['width'] != null ? nativeRect['width'] * 1.0 : null;
+    this.height = nativeRect['height'] != null ? nativeRect['height'] * 1.0 : null;
+  }
 }
 
-///Represents document field location for three alphabets 
+///Represents document field location for three alphabets
 class Location {
   Rectangle? latin;
   Rectangle? arabic;
@@ -99,10 +103,10 @@ class Location {
     this.latin = Rectangle(Map<String, dynamic>.from(nativeLocation['latin']));
     this.arabic = Rectangle(Map<String, dynamic>.from(nativeLocation['arabic']));
     this.cyrillic = Rectangle(Map<String, dynamic>.from(nativeLocation['cyrillic']));
-    }
+  }
 }
 
-///Represents document side for document field for three alphabets 
+///Represents document side for document field for three alphabets
 class Side {
   DocumentSide? latin;
   DocumentSide? arabic;
@@ -117,115 +121,179 @@ class Side {
 
 /// Represents string results for three alphabets
 class StringResult {
-    ///  All strings separated by new line
-    String? description;
-    /// String for field in latin alphabet
-    String? latin;
-    /// String for field in arabic alphabet
-    String? arabic;
-    /// String for field in cyrillic alphabet
-    String? cyrillic;
-    /// Document field location
-    Location? location;
-    /// Document field side
-    Side? side;
+  ///  All strings separated by new line
+  String? description;
 
-    StringResult(Map<String, dynamic> nativeStringResult) {
-        this.description = nativeStringResult['description'];
-        this.latin = nativeStringResult['latin'];
-        this.arabic = nativeStringResult['arabic'];
-        this.cyrillic = nativeStringResult['cyrillic'];
-        this.location = nativeStringResult['location'] != null? Location(Map<String, dynamic>.from(nativeStringResult['location'])) : null;
-        this.side = nativeStringResult['location'] != null? Side(Map<String, dynamic>.from(nativeStringResult['side'])) : null;
-    }
+  /// String for field in latin alphabet
+  String? latin;
+
+  /// String for field in arabic alphabet
+  String? arabic;
+
+  /// String for field in cyrillic alphabet
+  String? cyrillic;
+
+  /// Document field location
+  Location? location;
+
+  /// Document field side
+  Side? side;
+
+  StringResult(Map<String, dynamic> nativeStringResult) {
+    this.description = nativeStringResult['description'];
+    this.latin = nativeStringResult['latin'];
+    this.arabic = nativeStringResult['arabic'];
+    this.cyrillic = nativeStringResult['cyrillic'];
+    this.location = nativeStringResult['location'] != null
+        ? Location(Map<String, dynamic>.from(nativeStringResult['location']))
+        : null;
+    this.side =
+        nativeStringResult['location'] != null ? Side(Map<String, dynamic>.from(nativeStringResult['side'])) : null;
+  }
 }
 
 enum FieldType {
-    @JsonValue(0) AdditionalAddressInformation,
-    @JsonValue(1) AdditionalNameInformation,
-    @JsonValue(2) AdditionalOptionalAddressInformation,
-    @JsonValue(3) AdditionalPersonalIdNumber,
-    @JsonValue(4) Address,
-    @JsonValue(5) ClassEffectiveDate,
-    @JsonValue(6) ClassExpiryDate,
-    @JsonValue(7) Conditions,
-    @JsonValue(8) DateOfBirth,
-    @JsonValue(9) DateOfExpiry,
-    @JsonValue(10) DateOfIssue,
-    @JsonValue(11) DocumentAdditionalNumber,
-    @JsonValue(12) DocumentOptionalAdditionalNumber,
-    @JsonValue(13) DocumentNumber,
-    @JsonValue(14) Employer,
-    @JsonValue(15) Endorsements,
-    @JsonValue(16) FathersName,
-    @JsonValue(17) FirstName,
-    @JsonValue(18) FullName,
-    @JsonValue(19) IssuingAuthority,
-    @JsonValue(20) LastName,
-    @JsonValue(21) LicenceType,
-    @JsonValue(22) LocalizedName,
-    @JsonValue(23) MaritalStatus,
-    @JsonValue(24) MothersName,
-    @JsonValue(25) Mrz,
-    @JsonValue(26) Nationality,
-    @JsonValue(27) PersonalIdNumber,
-    @JsonValue(28) PlaceOfBirth,
-    @JsonValue(29) Profession,
-    @JsonValue(30) Race,
-    @JsonValue(31) Religion,
-    @JsonValue(32) ResidentialStatus,
-    @JsonValue(33) Restrictions,
-    @JsonValue(34) Sex,
-    @JsonValue(35) VehicleClass,
-    @JsonValue(36) BloodType,
-    @JsonValue(37) Sponsor,
-    @JsonValue(38) VisaType,
-    @JsonValue(39) DocumentSubtype,
-    @JsonValue(40) Remarks,
-    @JsonValue(41) ResidencePermitType,
+  @JsonValue(0)
+  AdditionalAddressInformation,
+  @JsonValue(1)
+  AdditionalNameInformation,
+  @JsonValue(2)
+  AdditionalOptionalAddressInformation,
+  @JsonValue(3)
+  AdditionalPersonalIdNumber,
+  @JsonValue(4)
+  Address,
+  @JsonValue(5)
+  ClassEffectiveDate,
+  @JsonValue(6)
+  ClassExpiryDate,
+  @JsonValue(7)
+  Conditions,
+  @JsonValue(8)
+  DateOfBirth,
+  @JsonValue(9)
+  DateOfExpiry,
+  @JsonValue(10)
+  DateOfIssue,
+  @JsonValue(11)
+  DocumentAdditionalNumber,
+  @JsonValue(12)
+  DocumentOptionalAdditionalNumber,
+  @JsonValue(13)
+  DocumentNumber,
+  @JsonValue(14)
+  Employer,
+  @JsonValue(15)
+  Endorsements,
+  @JsonValue(16)
+  FathersName,
+  @JsonValue(17)
+  FirstName,
+  @JsonValue(18)
+  FullName,
+  @JsonValue(19)
+  IssuingAuthority,
+  @JsonValue(20)
+  LastName,
+  @JsonValue(21)
+  LicenceType,
+  @JsonValue(22)
+  LocalizedName,
+  @JsonValue(23)
+  MaritalStatus,
+  @JsonValue(24)
+  MothersName,
+  @JsonValue(25)
+  Mrz,
+  @JsonValue(26)
+  Nationality,
+  @JsonValue(27)
+  PersonalIdNumber,
+  @JsonValue(28)
+  PlaceOfBirth,
+  @JsonValue(29)
+  Profession,
+  @JsonValue(30)
+  Race,
+  @JsonValue(31)
+  Religion,
+  @JsonValue(32)
+  ResidentialStatus,
+  @JsonValue(33)
+  Restrictions,
+  @JsonValue(34)
+  Sex,
+  @JsonValue(35)
+  VehicleClass,
+  @JsonValue(36)
+  BloodType,
+  @JsonValue(37)
+  Sponsor,
+  @JsonValue(38)
+  VisaType,
+  @JsonValue(39)
+  DocumentSubtype,
+  @JsonValue(40)
+  Remarks,
+  @JsonValue(41)
+  ResidencePermitType,
 }
 
 /// Represents the type of the extracted image.
 enum ImageExtractionType {
-    /// Full document image.
-    @JsonValue(0) FullDocument,
-    /// Face image.
-    @JsonValue(1) Face,
-    /// Signature image.
-    @JsonValue(2) Signature
+  /// Full document image.
+  @JsonValue(0)
+  FullDocument,
+
+  /// Face image.
+  @JsonValue(1)
+  Face,
+
+  /// Signature image.
+  @JsonValue(2)
+  Signature
 }
 
 /// Represents additional info on processing.
-/// Information about missing fields, invalid characters, extra presented fields for each document field and image extraction failures can be obtained. 
+/// Information about missing fields, invalid characters, extra presented fields for each document field and image extraction failures can be obtained.
 class AdditionalProcessingInfo {
   /// List of fields that were expected on the document but were missing.
   List<FieldType>? missingMandatoryFields;
+
   /// List of fields that contained characters which were not expected in that field.
   List<FieldType>? invalidCharacterFields;
+
   /// List of fields that weren't expected on the document but were present.
   List<FieldType>? extraPresentFields;
+
   /// List of failed image extractions.
   List<ImageExtractionType>? imageExtractionFailures;
 
   AdditionalProcessingInfo(Map<String, dynamic> nativeAdditionalProcessingInfo) {
-        this.missingMandatoryFields = List<FieldType>.from(nativeAdditionalProcessingInfo['missingMandatoryFields'].map ((v) => FieldType.values[v]));
-        this.invalidCharacterFields = List<FieldType>.from(nativeAdditionalProcessingInfo['invalidCharacterFields'].map ((v) => FieldType.values[v]));
-        this.extraPresentFields = List<FieldType>.from(nativeAdditionalProcessingInfo['extraPresentFields'].map ((v) => FieldType.values[v]));
-        this.imageExtractionFailures = List<ImageExtractionType>.from(nativeAdditionalProcessingInfo['imageExtractionFailures'].map ((v) => ImageExtractionType.values[v]));
-    }
+    this.missingMandatoryFields =
+        List<FieldType>.from(nativeAdditionalProcessingInfo['missingMandatoryFields'].map((v) => FieldType.values[v]));
+    this.invalidCharacterFields =
+        List<FieldType>.from(nativeAdditionalProcessingInfo['invalidCharacterFields'].map((v) => FieldType.values[v]));
+    this.extraPresentFields =
+        List<FieldType>.from(nativeAdditionalProcessingInfo['extraPresentFields'].map((v) => FieldType.values[v]));
+    this.imageExtractionFailures = List<ImageExtractionType>.from(
+        nativeAdditionalProcessingInfo['imageExtractionFailures'].map((v) => ImageExtractionType.values[v]));
+  }
 }
 
 class DateResult {
   Date? date;
+
   /// original date string
   StringResult? originalDateStringResult;
+
   /// is filled by domain knowledge
   bool? isFilledByDomainKnowledge;
 
   DateResult(Map<String, dynamic> nativeDateResult) {
-      this.date = Date(nativeDateResult);
-      this.originalDateStringResult = createStringResult(nativeDateResult, 'originalDateStringResult');
-      this.isFilledByDomainKnowledge = nativeDateResult["isFilledByDomainKnowledge"];
+    this.date = Date(nativeDateResult);
+    this.originalDateStringResult = createStringResult(nativeDateResult, 'originalDateStringResult');
+    this.isFilledByDomainKnowledge = nativeDateResult["isFilledByDomainKnowledge"];
   }
 }
 
@@ -270,22 +338,24 @@ enum BarcodeType {
 
 /// Gives more info on data match
 class DataMatchResult {
+  ///  State for the whole document result
+  DataMatchState? stateForWholeDocument;
 
-    ///  State for the whole document result
-    DataMatchState? stateForWholeDocument;
-    /// Date of birth result
-    DataMatchState? dateOfBirth;
-    /// Date of expiry result
-    DataMatchState? dateOfExpiry;
-    /// Document number result
-    DataMatchState? documentNumber;
+  /// Date of birth result
+  DataMatchState? dateOfBirth;
 
-    DataMatchResult(Map<String, dynamic> nativeDataMatchResult) {
-        this.stateForWholeDocument = DataMatchState.values[nativeDataMatchResult['stateForWholeDocument']];
-        this.dateOfBirth = DataMatchState.values[nativeDataMatchResult['states'][0]['state']];
-        this.dateOfExpiry = DataMatchState.values[nativeDataMatchResult['states'][1]['state']];
-        this.documentNumber = DataMatchState.values[nativeDataMatchResult['states'][2]['state']];
-    }
+  /// Date of expiry result
+  DataMatchState? dateOfExpiry;
+
+  /// Document number result
+  DataMatchState? documentNumber;
+
+  DataMatchResult(Map<String, dynamic> nativeDataMatchResult) {
+    this.stateForWholeDocument = DataMatchState.values[nativeDataMatchResult['stateForWholeDocument']];
+    this.dateOfBirth = DataMatchState.values[nativeDataMatchResult['states'][0]['state']];
+    this.dateOfExpiry = DataMatchState.values[nativeDataMatchResult['states'][1]['state']];
+    this.documentNumber = DataMatchState.values[nativeDataMatchResult['states'][2]['state']];
+  }
 }
 
 /// Represents data extracted from the Driver's license barcode.
@@ -305,81 +375,95 @@ class BarcodeDriverLicenseDetailedInfo {
   /// The additional information on vehicle class.
   List<BarcodeVehicleClassInfo>? vehicleClassesInfo;
 
-  BarcodeDriverLicenseDetailedInfo(
-      Map<String, dynamic> nativeDriverLicenseDetailedInfo) {
+  BarcodeDriverLicenseDetailedInfo(Map<String, dynamic> nativeDriverLicenseDetailedInfo) {
     this.restrictions = nativeDriverLicenseDetailedInfo['restrictions'];
     this.endorsements = nativeDriverLicenseDetailedInfo['endorsements'];
     this.vehicleClass = nativeDriverLicenseDetailedInfo['vehicleClass'];
     this.conditions = nativeDriverLicenseDetailedInfo['conditions'];
-    this.vehicleClassesInfo =
-        nativeDriverLicenseDetailedInfo['vehicleClassesInfo'] != null
-            ? List<BarcodeVehicleClassInfo>.from(
-                nativeDriverLicenseDetailedInfo['vehicleClassesInfo']
-                    .map((v) => BarcodeVehicleClassInfo(v)))
-            : null;
+    this.vehicleClassesInfo = nativeDriverLicenseDetailedInfo['vehicleClassesInfo'] != null
+        ? List<BarcodeVehicleClassInfo>.from(
+            nativeDriverLicenseDetailedInfo['vehicleClassesInfo'].map((v) => BarcodeVehicleClassInfo(v)))
+        : null;
   }
 }
 
 /// Represents data extracted from the Driver's license.
 class DriverLicenseDetailedInfo {
+  ///  Restrictions to driving privileges for the driver license owner.
+  StringResult? restrictions;
 
-    ///  Restrictions to driving privileges for the driver license owner.
-    StringResult? restrictions;
-    /// Additional privileges granted to the driver license owner.
-    StringResult? endorsements;
-    /// The type of vehicle the driver license owner has privilege to drive.
-    StringResult? vehicleClass;
-    /// The driver license conditions.
-    StringResult? conditions;
-    /// The additional information on vehicle class.
-    List<VehicleClassInfo>? vehicleClassesInfo;
+  /// Additional privileges granted to the driver license owner.
+  StringResult? endorsements;
 
-    DriverLicenseDetailedInfo(Map<String, dynamic> nativeDriverLicenseDetailedInfo) {
-        this.restrictions = createStringResult(nativeDriverLicenseDetailedInfo, 'restrictions');
-        this.endorsements = createStringResult(nativeDriverLicenseDetailedInfo, 'endorsements');
-        this.vehicleClass = createStringResult(nativeDriverLicenseDetailedInfo, 'vehicleClass');
-        this.conditions = createStringResult(nativeDriverLicenseDetailedInfo, 'conditions');
-        this.vehicleClassesInfo = nativeDriverLicenseDetailedInfo['vehicleClassesInfo'] != null
-            ? List<VehicleClassInfo>.from(nativeDriverLicenseDetailedInfo['vehicleClassesInfo'].map ((v) => VehicleClassInfo(v))) : null;
-    }
+  /// The type of vehicle the driver license owner has privilege to drive.
+  StringResult? vehicleClass;
+
+  /// The driver license conditions.
+  StringResult? conditions;
+
+  /// The additional information on vehicle class.
+  List<VehicleClassInfo>? vehicleClassesInfo;
+
+  DriverLicenseDetailedInfo(Map<String, dynamic> nativeDriverLicenseDetailedInfo) {
+    this.restrictions = createStringResult(nativeDriverLicenseDetailedInfo, 'restrictions');
+    this.endorsements = createStringResult(nativeDriverLicenseDetailedInfo, 'endorsements');
+    this.vehicleClass = createStringResult(nativeDriverLicenseDetailedInfo, 'vehicleClass');
+    this.conditions = createStringResult(nativeDriverLicenseDetailedInfo, 'conditions');
+    this.vehicleClassesInfo = nativeDriverLicenseDetailedInfo['vehicleClassesInfo'] != null
+        ? List<VehicleClassInfo>.from(
+            nativeDriverLicenseDetailedInfo['vehicleClassesInfo'].map((v) => VehicleClassInfo(v)))
+        : null;
+  }
 }
 
-class BarcodeVehicleClassInfo{
+class BarcodeVehicleClassInfo {
   /// The type of driver licence.
   String? licenceType;
+
   /// The type of vehicle the driver license owner has privilege to drive.
   String? vehicleClass;
+
   /// The date since licence is effective.
   Date? effectiveDate;
+
   /// The date of expiry of licence.
   Date? expiryDate;
 
-   BarcodeVehicleClassInfo(Map<String, dynamic> nativeVehicleClassInfo) {
-        this.licenceType = nativeVehicleClassInfo['licenceType'];
-        this.vehicleClass = nativeVehicleClassInfo['vehicleClass'];
-        this.effectiveDate = nativeVehicleClassInfo['effectiveDate'] != null ? Date(Map<String, dynamic>.from(nativeVehicleClassInfo['effectiveDate'])) : null;
-        this.expiryDate = nativeVehicleClassInfo['expiryDate'] != null ? Date(Map<String, dynamic>.from(nativeVehicleClassInfo['expiryDate'])) : null;
-    }
-
+  BarcodeVehicleClassInfo(Map<String, dynamic> nativeVehicleClassInfo) {
+    this.licenceType = nativeVehicleClassInfo['licenceType'];
+    this.vehicleClass = nativeVehicleClassInfo['vehicleClass'];
+    this.effectiveDate = nativeVehicleClassInfo['effectiveDate'] != null
+        ? Date(Map<String, dynamic>.from(nativeVehicleClassInfo['effectiveDate']))
+        : null;
+    this.expiryDate = nativeVehicleClassInfo['expiryDate'] != null
+        ? Date(Map<String, dynamic>.from(nativeVehicleClassInfo['expiryDate']))
+        : null;
+  }
 }
 
-class VehicleClassInfo{
+class VehicleClassInfo {
   /// The type of driver licence.
   StringResult? licenceType;
+
   /// The type of vehicle the driver license owner has privilege to drive.
   StringResult? vehicleClass;
+
   /// The date since licence is effective.
   DateResult? effectiveDate;
+
   /// The date of expiry of licence.
   DateResult? expiryDate;
 
-   VehicleClassInfo(Map<String, dynamic> nativeVehicleClassInfo) {
-        this.licenceType = createStringResult(nativeVehicleClassInfo,'licenceType');
-        this.vehicleClass = createStringResult(nativeVehicleClassInfo,'vehicleClass');
-        this.effectiveDate = nativeVehicleClassInfo['effectiveDate'] != null ? DateResult(Map<String, dynamic>.from(nativeVehicleClassInfo['effectiveDate'])) : null;
-        this.expiryDate = nativeVehicleClassInfo['expiryDate'] != null ? DateResult(Map<String, dynamic>.from(nativeVehicleClassInfo['expiryDate'])) : null;
-    }
-
+  VehicleClassInfo(Map<String, dynamic> nativeVehicleClassInfo) {
+    this.licenceType = createStringResult(nativeVehicleClassInfo, 'licenceType');
+    this.vehicleClass = createStringResult(nativeVehicleClassInfo, 'vehicleClass');
+    this.effectiveDate = nativeVehicleClassInfo['effectiveDate'] != null
+        ? DateResult(Map<String, dynamic>.from(nativeVehicleClassInfo['effectiveDate']))
+        : null;
+    this.expiryDate = nativeVehicleClassInfo['expiryDate'] != null
+        ? DateResult(Map<String, dynamic>.from(nativeVehicleClassInfo['expiryDate']))
+        : null;
+  }
 }
 
 /// Represents the classification information.
@@ -1221,514 +1305,991 @@ enum ImageAnalysisDetectionStatus {
 
 /// Defines possible document card rotation positions
 enum CardRotation {
-    /// Zero degrees
-    Zero,
-    /// Clockwise 90 degrees
-    Clockwise90,
-    /// Counter clockwise 90 degrees
-    CounterClockwise90,
-    ///Upside down
-    UpsideDown,
-    ///Card rotation was not performed
-    None
+  /// Zero degrees
+  Zero,
+
+  /// Clockwise 90 degrees
+  Clockwise90,
+
+  /// Counter clockwise 90 degrees
+  CounterClockwise90,
+
+  ///Upside down
+  UpsideDown,
+
+  ///Card rotation was not performed
+  None
 }
 
 /// Defines possible card orientations
 enum CardOrientation {
-    /// Horizontal card orientation 
-    Horizontal,
-    /// Vertical card orientation
-    Vertical,
-    /// Detection was not performed
-    NotAvailable
+  /// Horizontal card orientation
+  Horizontal,
+
+  /// Vertical card orientation
+  Vertical,
+
+  /// Detection was not performed
+  NotAvailable
 }
 
 /// Defines possible strictness levels for blur are glare detection.
 enum StrictnessLevel {
-    /// The most strict level for blur are glare detection.
-    @JsonValue(0) Strict,
-    /// The default strictness level for blur are glare detection.
-    @JsonValue(1) Normal,
-    /// The least strict level for blur are glare detection.
-    @JsonValue(2) Relaxed
+  /// The most strict level for blur are glare detection.
+  @JsonValue(0)
+  Strict,
+
+  /// The default strictness level for blur are glare detection.
+  @JsonValue(1)
+  Normal,
+
+  /// The least strict level for blur are glare detection.
+  @JsonValue(2)
+  Relaxed
 }
 
 /// Defines possible the document country from ClassInfo scanned with BlinkID or BlinkID MultiSide Recognizer
 enum Country {
-    @JsonValue(0) None,
-    @JsonValue(1) Albania,
-    @JsonValue(2) Algeria,
-    @JsonValue(3) Argentina,
-    @JsonValue(4) Australia,
-    @JsonValue(5) Austria,
-    @JsonValue(6) Azerbaijan,
-    @JsonValue(7) Bahrain,
-    @JsonValue(8) Bangladesh,
-    @JsonValue(9) Belgium,
-    @JsonValue(10) BosniaAndHerzegovina,
-    @JsonValue(11) Brunei,
-    @JsonValue(12) Bulgaria,
-    @JsonValue(13) Cambodia,
-    @JsonValue(14) Canada,
-    @JsonValue(15) Chile,
-    @JsonValue(16) Colombia,
-    @JsonValue(17) CostaRica,
-    @JsonValue(18) Croatia,
-    @JsonValue(19) Cyprus,
-    @JsonValue(20) Czechia,
-    @JsonValue(21) Denmark,
-    @JsonValue(22) DominicanRepublic,
-    @JsonValue(23) Egypt,
-    @JsonValue(24) Estonia,
-    @JsonValue(25) Finland,
-    @JsonValue(26) France,
-    @JsonValue(27) Georgia,
-    @JsonValue(28) Germany,
-    @JsonValue(29) Ghana,
-    @JsonValue(30) Greece,
-    @JsonValue(31) Guatemala,
-    @JsonValue(32) HongKong,
-    @JsonValue(33) Hungary,
-    @JsonValue(34) India,
-    @JsonValue(35) Indonesia,
-    @JsonValue(36) Ireland,
-    @JsonValue(37) Israel,
-    @JsonValue(38) Italy,
-    @JsonValue(39) Jordan,
-    @JsonValue(40) Kazakhstan,
-    @JsonValue(41) Kenya,
-    @JsonValue(42) Kosovo,
-    @JsonValue(43) Kuwait,
-    @JsonValue(44) Latvia,
-    @JsonValue(45) Lithuania,
-    @JsonValue(46) Malaysia,
-    @JsonValue(47) Maldives,
-    @JsonValue(48) Malta,
-    @JsonValue(49) Mauritius,
-    @JsonValue(50) Mexico,
-    @JsonValue(51) Morocco,
-    @JsonValue(52) Netherlands,
-    @JsonValue(53) NewZealand,
-    @JsonValue(54) Nigeria,
-    @JsonValue(55) Pakistan,
-    @JsonValue(56) Panama,
-    @JsonValue(57) Paraguay,
-    @JsonValue(58) Philippines,
-    @JsonValue(59) Poland,
-    @JsonValue(60) Portugal,
-    @JsonValue(61) PuertoRico,
-    @JsonValue(62) Qatar,
-    @JsonValue(63) Romania,
-    @JsonValue(64) Russia,
-    @JsonValue(65) SaudiArabia,
-    @JsonValue(66) Serbia,
-    @JsonValue(67) Singapore,
-    @JsonValue(68) Slovakia,
-    @JsonValue(69) Slovenia,
-    @JsonValue(70) SouthAfrica,
-    @JsonValue(71) Spain,
-    @JsonValue(72) Sweden,
-    @JsonValue(73) Switzerland,
-    @JsonValue(74) Taiwan,
-    @JsonValue(75) Thailand,
-    @JsonValue(76) Tunisia,
-    @JsonValue(77) Turkey,
-    @JsonValue(78) UAE,
-    @JsonValue(79) Uganda,
-    @JsonValue(80) UK,
-    @JsonValue(81) Ukraine,
-    @JsonValue(82) Usa,
-    @JsonValue(83) Vietnam,
-    @JsonValue(84) Brazil,
-    @JsonValue(85) Norway,
-    @JsonValue(86) Oman,
-    @JsonValue(87) Ecuador,
-    @JsonValue(88) ElSalvador,
-    @JsonValue(89) SriLanka,
-    @JsonValue(90) Peru,
-    @JsonValue(91) Uruguay,
-    @JsonValue(92) Bahamas,
-    @JsonValue(93) Bermuda,
-    @JsonValue(94) Bolivia,
-    @JsonValue(95) China,
-    @JsonValue(96) EuropeanUnion,
-    @JsonValue(97) Haiti,
-    @JsonValue(98) Honduras,
-    @JsonValue(99) Iceland,
-    @JsonValue(100) Japan,
-    @JsonValue(101) Luxembourg,
-    @JsonValue(102) Montenegro,
-    @JsonValue(103) Nicaragua,
-    @JsonValue(104) SouthKorea,
-    @JsonValue(105) Venezuela,
-    @JsonValue(106) Afghanistan,
-    @JsonValue(107) AlandIslands,
-    @JsonValue(108) AmericanSamoa,
-    @JsonValue(109) Andorra,
-    @JsonValue(110) Angola,
-    @JsonValue(111) Anguilla,
-    @JsonValue(112) Antarctica,
-    @JsonValue(113) AntiguaAndBarbuda,
-    @JsonValue(114) Armenia,
-    @JsonValue(115) Aruba,
-    @JsonValue(116) BailiwickOfGuernsey,
-    @JsonValue(117) BailiwickOfJersey,
-    @JsonValue(118) Barbados,
-    @JsonValue(119) Belarus,
-    @JsonValue(120) Belize,
-    @JsonValue(121) Benin,
-    @JsonValue(122) Bhutan,
-    @JsonValue(123) BonaireSaintEustatiusAndSaba,
-    @JsonValue(124) Botswana,
-    @JsonValue(125) BouvetIsland,
-    @JsonValue(126) BritishIndianOceanTerritory,
-    @JsonValue(127) BurkinaFaso,
-    @JsonValue(128) Burundi,
-    @JsonValue(129) Cameroon,
-    @JsonValue(130) CapeVerde,
-    @JsonValue(131) CaribbeanNetherlands,
-    @JsonValue(132) CaymanIslands,
-    @JsonValue(133) CentralAfricanRepublic,
-    @JsonValue(134) Chad,
-    @JsonValue(135) ChristmasIsland,
-    @JsonValue(136) CocosIslands,
-    @JsonValue(137) Comoros,
-    @JsonValue(138) Congo,
-    @JsonValue(139) CookIslands,
-    @JsonValue(140) Cuba,
-    @JsonValue(141) Curacao,
-    @JsonValue(142) DemocraticRepublicOfTheCongo,
-    @JsonValue(143) Djibouti,
-    @JsonValue(144) Dominica,
-    @JsonValue(145) EastTimor,
-    @JsonValue(146) EquatorialGuinea,
-    @JsonValue(147) Eritrea,
-    @JsonValue(148) Ethiopia,
-    @JsonValue(149) FalklandIslands,
-    @JsonValue(150) FaroeIslands,
-    @JsonValue(151) FederatedStatesOfMicronesia,
-    @JsonValue(152) Fiji,
-    @JsonValue(153) FrenchGuiana,
-    @JsonValue(154) FrenchPolynesia,
-    @JsonValue(155) FrenchSouthernTerritories,
-    @JsonValue(156) Gabon,
-    @JsonValue(157) Gambia,
-    @JsonValue(158) Gibraltar,
-    @JsonValue(159) Greenland,
-    @JsonValue(160) Grenada,
-    @JsonValue(161) Guadeloupe,
-    @JsonValue(162) Guam,
-    @JsonValue(163) Guinea,
-    @JsonValue(164) GuineaBissau,
-    @JsonValue(165) Guyana,
-    @JsonValue(166) HeardIslandAndMcdonaldIslands,
-    @JsonValue(167) Iran,
-    @JsonValue(168) Iraq,
-    @JsonValue(169) IsleOfMan,
-    @JsonValue(170) IvoryCoast,
-    @JsonValue(171) Jamaica,
-    @JsonValue(172) Kiribati,
-    @JsonValue(173) Kyrgyzstan,
-    @JsonValue(183) Laos,
-    @JsonValue(184) Lebanon,
-    @JsonValue(185) Lesotho,
-    @JsonValue(186) Liberia,
-    @JsonValue(187) Libya,
-    @JsonValue(188) Liechtenstein,
-    @JsonValue(189) Macau,
-    @JsonValue(190) Madagascar,
-    @JsonValue(191) Malawi,
-    @JsonValue(192) Mali,
-    @JsonValue(193) MarshallIslands,
-    @JsonValue(194) Martinique,
-    @JsonValue(195) Mauritania,
-    @JsonValue(196) Mayotte,
-    @JsonValue(197) Moldova,
-    @JsonValue(198) Monaco,
-    @JsonValue(199) Mongolia,
-    @JsonValue(200) Montserrat,
-    @JsonValue(201) Mozambique,
-    @JsonValue(202) Myanmar,
-    @JsonValue(203) Namibia,
-    @JsonValue(204) Nauru,
-    @JsonValue(205) Nepal,
-    @JsonValue(206) NewCaledonia,
-    @JsonValue(207) Niger,
-    @JsonValue(208) Niue,
-    @JsonValue(209) NorfolkIsland,
-    @JsonValue(210) NorthernCyprus,
-    @JsonValue(211) NorthernMarianaIslands,
-    @JsonValue(212) NorthKorea,
-    @JsonValue(213) NorthMacedonia,
-    @JsonValue(214) Palau,
-    @JsonValue(215) Palestine,
-    @JsonValue(216) PapuaNewGuinea,
-    @JsonValue(217) Pitcairn,
-    @JsonValue(218) Reunion,
-    @JsonValue(219) Rwanda,
-    @JsonValue(220) SaintBarthelemy,
-    @JsonValue(221) SaintHelenaAscensionAndTristianDaCunha,
-    @JsonValue(222) SaintKittsAndNevis,
-    @JsonValue(223) SaintLucia,
-    @JsonValue(224) SaintMartin,
-    @JsonValue(225) SaintPierreAndMiquelon,
-    @JsonValue(226) SaintVincentAndTheGrenadines,
-    @JsonValue(227) Samoa,
-    @JsonValue(228) SanMarino,
-    @JsonValue(229) SaoTomeAndPrincipe,
-    @JsonValue(230) Senegal,
-    @JsonValue(231) Seychelles,
-    @JsonValue(232) SierraLeone,
-    @JsonValue(233) SintMaarten,
-    @JsonValue(234) SolomonIslands,
-    @JsonValue(235) Somalia,
-    @JsonValue(236) SouthGeorgiaAndTheSouthSandwichIslands,
-    @JsonValue(237) SouthSudan,
-    @JsonValue(238) Sudan,
-    @JsonValue(239) Suriname,
-    @JsonValue(240) SvalbardAndJanMayen,
-    @JsonValue(241) Eswatini,
-    @JsonValue(242) Syria,
-    @JsonValue(243) Tajikistan,
-    @JsonValue(244) Tanzania,
-    @JsonValue(245) Togo,
-    @JsonValue(246) Tokelau,
-    @JsonValue(247) Tonga,
-    @JsonValue(248) TrinidadAndTobago,
-    @JsonValue(249) Turkmenistan,
-    @JsonValue(250) TurksAndCaicosIslands,
-    @JsonValue(251) Tuvalu,
-    @JsonValue(252) UnitedStatesMinorOutlyingIslands,
-    @JsonValue(253) Uzbekistan,
-    @JsonValue(254) Vanuatu,
-    @JsonValue(255) VaticanCity,
-    @JsonValue(256) VirginIslandsBritish,
-    @JsonValue(257) VirginIslandsUs,
-    @JsonValue(258) WallisAndFutuna,
-    @JsonValue(259) WesternSahara,
-    @JsonValue(260) Yemen,
-    @JsonValue(261) Yugoslavia,
-    @JsonValue(262) Zambia,
-    @JsonValue(263) Zimbabwe,
-    @JsonValue(264) SchengenArea
+  @JsonValue(0)
+  None,
+  @JsonValue(1)
+  Albania,
+  @JsonValue(2)
+  Algeria,
+  @JsonValue(3)
+  Argentina,
+  @JsonValue(4)
+  Australia,
+  @JsonValue(5)
+  Austria,
+  @JsonValue(6)
+  Azerbaijan,
+  @JsonValue(7)
+  Bahrain,
+  @JsonValue(8)
+  Bangladesh,
+  @JsonValue(9)
+  Belgium,
+  @JsonValue(10)
+  BosniaAndHerzegovina,
+  @JsonValue(11)
+  Brunei,
+  @JsonValue(12)
+  Bulgaria,
+  @JsonValue(13)
+  Cambodia,
+  @JsonValue(14)
+  Canada,
+  @JsonValue(15)
+  Chile,
+  @JsonValue(16)
+  Colombia,
+  @JsonValue(17)
+  CostaRica,
+  @JsonValue(18)
+  Croatia,
+  @JsonValue(19)
+  Cyprus,
+  @JsonValue(20)
+  Czechia,
+  @JsonValue(21)
+  Denmark,
+  @JsonValue(22)
+  DominicanRepublic,
+  @JsonValue(23)
+  Egypt,
+  @JsonValue(24)
+  Estonia,
+  @JsonValue(25)
+  Finland,
+  @JsonValue(26)
+  France,
+  @JsonValue(27)
+  Georgia,
+  @JsonValue(28)
+  Germany,
+  @JsonValue(29)
+  Ghana,
+  @JsonValue(30)
+  Greece,
+  @JsonValue(31)
+  Guatemala,
+  @JsonValue(32)
+  HongKong,
+  @JsonValue(33)
+  Hungary,
+  @JsonValue(34)
+  India,
+  @JsonValue(35)
+  Indonesia,
+  @JsonValue(36)
+  Ireland,
+  @JsonValue(37)
+  Israel,
+  @JsonValue(38)
+  Italy,
+  @JsonValue(39)
+  Jordan,
+  @JsonValue(40)
+  Kazakhstan,
+  @JsonValue(41)
+  Kenya,
+  @JsonValue(42)
+  Kosovo,
+  @JsonValue(43)
+  Kuwait,
+  @JsonValue(44)
+  Latvia,
+  @JsonValue(45)
+  Lithuania,
+  @JsonValue(46)
+  Malaysia,
+  @JsonValue(47)
+  Maldives,
+  @JsonValue(48)
+  Malta,
+  @JsonValue(49)
+  Mauritius,
+  @JsonValue(50)
+  Mexico,
+  @JsonValue(51)
+  Morocco,
+  @JsonValue(52)
+  Netherlands,
+  @JsonValue(53)
+  NewZealand,
+  @JsonValue(54)
+  Nigeria,
+  @JsonValue(55)
+  Pakistan,
+  @JsonValue(56)
+  Panama,
+  @JsonValue(57)
+  Paraguay,
+  @JsonValue(58)
+  Philippines,
+  @JsonValue(59)
+  Poland,
+  @JsonValue(60)
+  Portugal,
+  @JsonValue(61)
+  PuertoRico,
+  @JsonValue(62)
+  Qatar,
+  @JsonValue(63)
+  Romania,
+  @JsonValue(64)
+  Russia,
+  @JsonValue(65)
+  SaudiArabia,
+  @JsonValue(66)
+  Serbia,
+  @JsonValue(67)
+  Singapore,
+  @JsonValue(68)
+  Slovakia,
+  @JsonValue(69)
+  Slovenia,
+  @JsonValue(70)
+  SouthAfrica,
+  @JsonValue(71)
+  Spain,
+  @JsonValue(72)
+  Sweden,
+  @JsonValue(73)
+  Switzerland,
+  @JsonValue(74)
+  Taiwan,
+  @JsonValue(75)
+  Thailand,
+  @JsonValue(76)
+  Tunisia,
+  @JsonValue(77)
+  Turkey,
+  @JsonValue(78)
+  UAE,
+  @JsonValue(79)
+  Uganda,
+  @JsonValue(80)
+  UK,
+  @JsonValue(81)
+  Ukraine,
+  @JsonValue(82)
+  Usa,
+  @JsonValue(83)
+  Vietnam,
+  @JsonValue(84)
+  Brazil,
+  @JsonValue(85)
+  Norway,
+  @JsonValue(86)
+  Oman,
+  @JsonValue(87)
+  Ecuador,
+  @JsonValue(88)
+  ElSalvador,
+  @JsonValue(89)
+  SriLanka,
+  @JsonValue(90)
+  Peru,
+  @JsonValue(91)
+  Uruguay,
+  @JsonValue(92)
+  Bahamas,
+  @JsonValue(93)
+  Bermuda,
+  @JsonValue(94)
+  Bolivia,
+  @JsonValue(95)
+  China,
+  @JsonValue(96)
+  EuropeanUnion,
+  @JsonValue(97)
+  Haiti,
+  @JsonValue(98)
+  Honduras,
+  @JsonValue(99)
+  Iceland,
+  @JsonValue(100)
+  Japan,
+  @JsonValue(101)
+  Luxembourg,
+  @JsonValue(102)
+  Montenegro,
+  @JsonValue(103)
+  Nicaragua,
+  @JsonValue(104)
+  SouthKorea,
+  @JsonValue(105)
+  Venezuela,
+  @JsonValue(106)
+  Afghanistan,
+  @JsonValue(107)
+  AlandIslands,
+  @JsonValue(108)
+  AmericanSamoa,
+  @JsonValue(109)
+  Andorra,
+  @JsonValue(110)
+  Angola,
+  @JsonValue(111)
+  Anguilla,
+  @JsonValue(112)
+  Antarctica,
+  @JsonValue(113)
+  AntiguaAndBarbuda,
+  @JsonValue(114)
+  Armenia,
+  @JsonValue(115)
+  Aruba,
+  @JsonValue(116)
+  BailiwickOfGuernsey,
+  @JsonValue(117)
+  BailiwickOfJersey,
+  @JsonValue(118)
+  Barbados,
+  @JsonValue(119)
+  Belarus,
+  @JsonValue(120)
+  Belize,
+  @JsonValue(121)
+  Benin,
+  @JsonValue(122)
+  Bhutan,
+  @JsonValue(123)
+  BonaireSaintEustatiusAndSaba,
+  @JsonValue(124)
+  Botswana,
+  @JsonValue(125)
+  BouvetIsland,
+  @JsonValue(126)
+  BritishIndianOceanTerritory,
+  @JsonValue(127)
+  BurkinaFaso,
+  @JsonValue(128)
+  Burundi,
+  @JsonValue(129)
+  Cameroon,
+  @JsonValue(130)
+  CapeVerde,
+  @JsonValue(131)
+  CaribbeanNetherlands,
+  @JsonValue(132)
+  CaymanIslands,
+  @JsonValue(133)
+  CentralAfricanRepublic,
+  @JsonValue(134)
+  Chad,
+  @JsonValue(135)
+  ChristmasIsland,
+  @JsonValue(136)
+  CocosIslands,
+  @JsonValue(137)
+  Comoros,
+  @JsonValue(138)
+  Congo,
+  @JsonValue(139)
+  CookIslands,
+  @JsonValue(140)
+  Cuba,
+  @JsonValue(141)
+  Curacao,
+  @JsonValue(142)
+  DemocraticRepublicOfTheCongo,
+  @JsonValue(143)
+  Djibouti,
+  @JsonValue(144)
+  Dominica,
+  @JsonValue(145)
+  EastTimor,
+  @JsonValue(146)
+  EquatorialGuinea,
+  @JsonValue(147)
+  Eritrea,
+  @JsonValue(148)
+  Ethiopia,
+  @JsonValue(149)
+  FalklandIslands,
+  @JsonValue(150)
+  FaroeIslands,
+  @JsonValue(151)
+  FederatedStatesOfMicronesia,
+  @JsonValue(152)
+  Fiji,
+  @JsonValue(153)
+  FrenchGuiana,
+  @JsonValue(154)
+  FrenchPolynesia,
+  @JsonValue(155)
+  FrenchSouthernTerritories,
+  @JsonValue(156)
+  Gabon,
+  @JsonValue(157)
+  Gambia,
+  @JsonValue(158)
+  Gibraltar,
+  @JsonValue(159)
+  Greenland,
+  @JsonValue(160)
+  Grenada,
+  @JsonValue(161)
+  Guadeloupe,
+  @JsonValue(162)
+  Guam,
+  @JsonValue(163)
+  Guinea,
+  @JsonValue(164)
+  GuineaBissau,
+  @JsonValue(165)
+  Guyana,
+  @JsonValue(166)
+  HeardIslandAndMcdonaldIslands,
+  @JsonValue(167)
+  Iran,
+  @JsonValue(168)
+  Iraq,
+  @JsonValue(169)
+  IsleOfMan,
+  @JsonValue(170)
+  IvoryCoast,
+  @JsonValue(171)
+  Jamaica,
+  @JsonValue(172)
+  Kiribati,
+  @JsonValue(173)
+  Kyrgyzstan,
+  @JsonValue(183)
+  Laos,
+  @JsonValue(184)
+  Lebanon,
+  @JsonValue(185)
+  Lesotho,
+  @JsonValue(186)
+  Liberia,
+  @JsonValue(187)
+  Libya,
+  @JsonValue(188)
+  Liechtenstein,
+  @JsonValue(189)
+  Macau,
+  @JsonValue(190)
+  Madagascar,
+  @JsonValue(191)
+  Malawi,
+  @JsonValue(192)
+  Mali,
+  @JsonValue(193)
+  MarshallIslands,
+  @JsonValue(194)
+  Martinique,
+  @JsonValue(195)
+  Mauritania,
+  @JsonValue(196)
+  Mayotte,
+  @JsonValue(197)
+  Moldova,
+  @JsonValue(198)
+  Monaco,
+  @JsonValue(199)
+  Mongolia,
+  @JsonValue(200)
+  Montserrat,
+  @JsonValue(201)
+  Mozambique,
+  @JsonValue(202)
+  Myanmar,
+  @JsonValue(203)
+  Namibia,
+  @JsonValue(204)
+  Nauru,
+  @JsonValue(205)
+  Nepal,
+  @JsonValue(206)
+  NewCaledonia,
+  @JsonValue(207)
+  Niger,
+  @JsonValue(208)
+  Niue,
+  @JsonValue(209)
+  NorfolkIsland,
+  @JsonValue(210)
+  NorthernCyprus,
+  @JsonValue(211)
+  NorthernMarianaIslands,
+  @JsonValue(212)
+  NorthKorea,
+  @JsonValue(213)
+  NorthMacedonia,
+  @JsonValue(214)
+  Palau,
+  @JsonValue(215)
+  Palestine,
+  @JsonValue(216)
+  PapuaNewGuinea,
+  @JsonValue(217)
+  Pitcairn,
+  @JsonValue(218)
+  Reunion,
+  @JsonValue(219)
+  Rwanda,
+  @JsonValue(220)
+  SaintBarthelemy,
+  @JsonValue(221)
+  SaintHelenaAscensionAndTristianDaCunha,
+  @JsonValue(222)
+  SaintKittsAndNevis,
+  @JsonValue(223)
+  SaintLucia,
+  @JsonValue(224)
+  SaintMartin,
+  @JsonValue(225)
+  SaintPierreAndMiquelon,
+  @JsonValue(226)
+  SaintVincentAndTheGrenadines,
+  @JsonValue(227)
+  Samoa,
+  @JsonValue(228)
+  SanMarino,
+  @JsonValue(229)
+  SaoTomeAndPrincipe,
+  @JsonValue(230)
+  Senegal,
+  @JsonValue(231)
+  Seychelles,
+  @JsonValue(232)
+  SierraLeone,
+  @JsonValue(233)
+  SintMaarten,
+  @JsonValue(234)
+  SolomonIslands,
+  @JsonValue(235)
+  Somalia,
+  @JsonValue(236)
+  SouthGeorgiaAndTheSouthSandwichIslands,
+  @JsonValue(237)
+  SouthSudan,
+  @JsonValue(238)
+  Sudan,
+  @JsonValue(239)
+  Suriname,
+  @JsonValue(240)
+  SvalbardAndJanMayen,
+  @JsonValue(241)
+  Eswatini,
+  @JsonValue(242)
+  Syria,
+  @JsonValue(243)
+  Tajikistan,
+  @JsonValue(244)
+  Tanzania,
+  @JsonValue(245)
+  Togo,
+  @JsonValue(246)
+  Tokelau,
+  @JsonValue(247)
+  Tonga,
+  @JsonValue(248)
+  TrinidadAndTobago,
+  @JsonValue(249)
+  Turkmenistan,
+  @JsonValue(250)
+  TurksAndCaicosIslands,
+  @JsonValue(251)
+  Tuvalu,
+  @JsonValue(252)
+  UnitedStatesMinorOutlyingIslands,
+  @JsonValue(253)
+  Uzbekistan,
+  @JsonValue(254)
+  Vanuatu,
+  @JsonValue(255)
+  VaticanCity,
+  @JsonValue(256)
+  VirginIslandsBritish,
+  @JsonValue(257)
+  VirginIslandsUs,
+  @JsonValue(258)
+  WallisAndFutuna,
+  @JsonValue(259)
+  WesternSahara,
+  @JsonValue(260)
+  Yemen,
+  @JsonValue(261)
+  Yugoslavia,
+  @JsonValue(262)
+  Zambia,
+  @JsonValue(263)
+  Zimbabwe,
+  @JsonValue(264)
+  SchengenArea
 }
 
 /// Defines possible the document country's region from ClassInfo scanned with BlinkID or BlinkID MultiSide Recognizer
 enum Region {
-    @JsonValue(0) None,
-    @JsonValue(1) Alabama,
-    @JsonValue(2) Alaska,
-    @JsonValue(3) Alberta,
-    @JsonValue(4) Arizona,
-    @JsonValue(5) Arkansas,
-    @JsonValue(6) AustralianCapitalTerritory,
-    @JsonValue(7) BritishColumbia,
-    @JsonValue(8) California,
-    @JsonValue(9) Colorado,
-    @JsonValue(10) Connecticut,
-    @JsonValue(11) Delaware,
-    @JsonValue(12) DistrictOfColumbia,
-    @JsonValue(13) Florida,
-    @JsonValue(14) Georgia,
-    @JsonValue(15) Hawaii,
-    @JsonValue(16) Idaho,
-    @JsonValue(17) Illinois,
-    @JsonValue(18) Indiana,
-    @JsonValue(19) Iowa,
-    @JsonValue(20) Kansas,
-    @JsonValue(21) Kentucky,
-    @JsonValue(22) Louisiana,
-    @JsonValue(23) Maine,
-    @JsonValue(24) Manitoba,
-    @JsonValue(25) Maryland,
-    @JsonValue(26) Massachusetts,
-    @JsonValue(27) Michigan,
-    @JsonValue(28) Minnesota,
-    @JsonValue(29) Mississippi,
-    @JsonValue(30) Missouri,
-    @JsonValue(31) Montana,
-    @JsonValue(32) Nebraska,
-    @JsonValue(33) Nevada,
-    @JsonValue(34) NewBrunswick,
-    @JsonValue(35) NewHampshire,
-    @JsonValue(36) NewJersey,
-    @JsonValue(37) NewMexico,
-    @JsonValue(38) NewSouthWales,
-    @JsonValue(39) NewYork,
-    @JsonValue(40) NorthernTerritory,
-    @JsonValue(41) NorthCarolina,
-    @JsonValue(42) NorthDakota,
-    @JsonValue(43) NovaScotia,
-    @JsonValue(44) Ohio,
-    @JsonValue(45) Oklahoma,
-    @JsonValue(46) Ontario,
-    @JsonValue(47) Oregon,
-    @JsonValue(48) Pennsylvania,
-    @JsonValue(49) Quebec,
-    @JsonValue(50) Queensland,
-    @JsonValue(51) RhodeIsland,
-    @JsonValue(52) Saskatchewan,
-    @JsonValue(53) SouthAustralia,
-    @JsonValue(54) SouthCarolina,
-    @JsonValue(55) SouthDakota,
-    @JsonValue(56) Tasmania,
-    @JsonValue(57) Tennessee,
-    @JsonValue(58) Texas,
-    @JsonValue(59) Utah,
-    @JsonValue(60) Vermont,
-    @JsonValue(61) Victoria,
-    @JsonValue(62) Virginia,
-    @JsonValue(63) Washington,
-    @JsonValue(64) WesternAustralia,
-    @JsonValue(65) WestVirginia,
-    @JsonValue(66) Wisconsin,
-    @JsonValue(67) Wyoming,
-    @JsonValue(68) Yukon,
-    @JsonValue(69) CiudadDeMexico,
-    @JsonValue(70) Jalisco,
-    @JsonValue(71) NewfoundlandAndLabrador,
-    @JsonValue(72) NuevoLeon,
-    @JsonValue(73) BajaCalifornia,
-    @JsonValue(74) Chihuahua,
-    @JsonValue(75) Guanajuato,
-    @JsonValue(76) Guerrero,
-    @JsonValue(77) Mexico,
-    @JsonValue(78) Michoacan,
-    @JsonValue(79) NewYorkCity,
-    @JsonValue(80) Tamaulipas,
-    @JsonValue(81) Veracruz,
-    @JsonValue(82) Chiapas,
-    @JsonValue(83) Coahuila,
-    @JsonValue(84) Durango,
-    @JsonValue(85) GuerreroCocula,
-    @JsonValue(86) GuerreroJuchitan,
-    @JsonValue(87) GuerreroTepecoacuilco,
-    @JsonValue(88) GuerreroTlacoapa,
-    @JsonValue(89) Gujarat,
-    @JsonValue(90) Hidalgo,
-    @JsonValue(91) Karnataka,
-    @JsonValue(92) Kerala,
-    @JsonValue(93) KhyberPakhtunkhwa,
-    @JsonValue(94) MadhyaPradesh,
-    @JsonValue(95) Maharashtra,
-    @JsonValue(96) Morelos,
-    @JsonValue(97) Nayarit,
-    @JsonValue(98) Oaxaca,
-    @JsonValue(99) Puebla,
-    @JsonValue(100) Punjab,
-    @JsonValue(101) Queretaro,
-    @JsonValue(102) SanLuisPotosi,
-    @JsonValue(103) Sinaloa,
-    @JsonValue(104) Sonora,
-    @JsonValue(105) Tabasco,
-    @JsonValue(106) TamilNadu,
-    @JsonValue(107) Yucatan,
-    @JsonValue(108) Zacatecas,
-    @JsonValue(109) Aguascalientes,
-    @JsonValue(110) BajaCaliforniaSur,
-    @JsonValue(111) Campeche,
-    @JsonValue(112) Colima,
-    @JsonValue(113) QuintanaRooBenitoJuarez,
-    @JsonValue(114) QuintanaRoo,
-    @JsonValue(115) QuintanaRooSolidaridad,
-    @JsonValue(116) Tlaxcala,
-    @JsonValue(117) QuintanaRooCozumel,
-    @JsonValue(118) SaoPaolo,
-    @JsonValue(119) RioDeJaneiro,
-    @JsonValue(120) RioGrandeDoSul,
-    @JsonValue(121) NorthWestTerritories,
-    @JsonValue(122) Nunavut,
-    @JsonValue(123) PrinceEdwardIsland,
-    @JsonValue(124) DistritoFederal,
-    @JsonValue(125) Maranhao,
-    @JsonValue(126) MatoGrosso,
-    @JsonValue(127) MinasGerais,
-    @JsonValue(128) Para,
-    @JsonValue(129) Parana,
-    @JsonValue(130) Pernambuco,
-    @JsonValue(131) SantaCatarina,
-    @JsonValue(132) AndhraPradesh,
-    @JsonValue(133) Ceara,
-    @JsonValue(134) Goias,
-    @JsonValue(135) GuerreroAcapulcoDeJuarez,
-    @JsonValue(136) Haryana,
-    @JsonValue(137) Sergipe,
-    @JsonValue(138) Alagos,
+  @JsonValue(0)
+  None,
+  @JsonValue(1)
+  Alabama,
+  @JsonValue(2)
+  Alaska,
+  @JsonValue(3)
+  Alberta,
+  @JsonValue(4)
+  Arizona,
+  @JsonValue(5)
+  Arkansas,
+  @JsonValue(6)
+  AustralianCapitalTerritory,
+  @JsonValue(7)
+  BritishColumbia,
+  @JsonValue(8)
+  California,
+  @JsonValue(9)
+  Colorado,
+  @JsonValue(10)
+  Connecticut,
+  @JsonValue(11)
+  Delaware,
+  @JsonValue(12)
+  DistrictOfColumbia,
+  @JsonValue(13)
+  Florida,
+  @JsonValue(14)
+  Georgia,
+  @JsonValue(15)
+  Hawaii,
+  @JsonValue(16)
+  Idaho,
+  @JsonValue(17)
+  Illinois,
+  @JsonValue(18)
+  Indiana,
+  @JsonValue(19)
+  Iowa,
+  @JsonValue(20)
+  Kansas,
+  @JsonValue(21)
+  Kentucky,
+  @JsonValue(22)
+  Louisiana,
+  @JsonValue(23)
+  Maine,
+  @JsonValue(24)
+  Manitoba,
+  @JsonValue(25)
+  Maryland,
+  @JsonValue(26)
+  Massachusetts,
+  @JsonValue(27)
+  Michigan,
+  @JsonValue(28)
+  Minnesota,
+  @JsonValue(29)
+  Mississippi,
+  @JsonValue(30)
+  Missouri,
+  @JsonValue(31)
+  Montana,
+  @JsonValue(32)
+  Nebraska,
+  @JsonValue(33)
+  Nevada,
+  @JsonValue(34)
+  NewBrunswick,
+  @JsonValue(35)
+  NewHampshire,
+  @JsonValue(36)
+  NewJersey,
+  @JsonValue(37)
+  NewMexico,
+  @JsonValue(38)
+  NewSouthWales,
+  @JsonValue(39)
+  NewYork,
+  @JsonValue(40)
+  NorthernTerritory,
+  @JsonValue(41)
+  NorthCarolina,
+  @JsonValue(42)
+  NorthDakota,
+  @JsonValue(43)
+  NovaScotia,
+  @JsonValue(44)
+  Ohio,
+  @JsonValue(45)
+  Oklahoma,
+  @JsonValue(46)
+  Ontario,
+  @JsonValue(47)
+  Oregon,
+  @JsonValue(48)
+  Pennsylvania,
+  @JsonValue(49)
+  Quebec,
+  @JsonValue(50)
+  Queensland,
+  @JsonValue(51)
+  RhodeIsland,
+  @JsonValue(52)
+  Saskatchewan,
+  @JsonValue(53)
+  SouthAustralia,
+  @JsonValue(54)
+  SouthCarolina,
+  @JsonValue(55)
+  SouthDakota,
+  @JsonValue(56)
+  Tasmania,
+  @JsonValue(57)
+  Tennessee,
+  @JsonValue(58)
+  Texas,
+  @JsonValue(59)
+  Utah,
+  @JsonValue(60)
+  Vermont,
+  @JsonValue(61)
+  Victoria,
+  @JsonValue(62)
+  Virginia,
+  @JsonValue(63)
+  Washington,
+  @JsonValue(64)
+  WesternAustralia,
+  @JsonValue(65)
+  WestVirginia,
+  @JsonValue(66)
+  Wisconsin,
+  @JsonValue(67)
+  Wyoming,
+  @JsonValue(68)
+  Yukon,
+  @JsonValue(69)
+  CiudadDeMexico,
+  @JsonValue(70)
+  Jalisco,
+  @JsonValue(71)
+  NewfoundlandAndLabrador,
+  @JsonValue(72)
+  NuevoLeon,
+  @JsonValue(73)
+  BajaCalifornia,
+  @JsonValue(74)
+  Chihuahua,
+  @JsonValue(75)
+  Guanajuato,
+  @JsonValue(76)
+  Guerrero,
+  @JsonValue(77)
+  Mexico,
+  @JsonValue(78)
+  Michoacan,
+  @JsonValue(79)
+  NewYorkCity,
+  @JsonValue(80)
+  Tamaulipas,
+  @JsonValue(81)
+  Veracruz,
+  @JsonValue(82)
+  Chiapas,
+  @JsonValue(83)
+  Coahuila,
+  @JsonValue(84)
+  Durango,
+  @JsonValue(85)
+  GuerreroCocula,
+  @JsonValue(86)
+  GuerreroJuchitan,
+  @JsonValue(87)
+  GuerreroTepecoacuilco,
+  @JsonValue(88)
+  GuerreroTlacoapa,
+  @JsonValue(89)
+  Gujarat,
+  @JsonValue(90)
+  Hidalgo,
+  @JsonValue(91)
+  Karnataka,
+  @JsonValue(92)
+  Kerala,
+  @JsonValue(93)
+  KhyberPakhtunkhwa,
+  @JsonValue(94)
+  MadhyaPradesh,
+  @JsonValue(95)
+  Maharashtra,
+  @JsonValue(96)
+  Morelos,
+  @JsonValue(97)
+  Nayarit,
+  @JsonValue(98)
+  Oaxaca,
+  @JsonValue(99)
+  Puebla,
+  @JsonValue(100)
+  Punjab,
+  @JsonValue(101)
+  Queretaro,
+  @JsonValue(102)
+  SanLuisPotosi,
+  @JsonValue(103)
+  Sinaloa,
+  @JsonValue(104)
+  Sonora,
+  @JsonValue(105)
+  Tabasco,
+  @JsonValue(106)
+  TamilNadu,
+  @JsonValue(107)
+  Yucatan,
+  @JsonValue(108)
+  Zacatecas,
+  @JsonValue(109)
+  Aguascalientes,
+  @JsonValue(110)
+  BajaCaliforniaSur,
+  @JsonValue(111)
+  Campeche,
+  @JsonValue(112)
+  Colima,
+  @JsonValue(113)
+  QuintanaRooBenitoJuarez,
+  @JsonValue(114)
+  QuintanaRoo,
+  @JsonValue(115)
+  QuintanaRooSolidaridad,
+  @JsonValue(116)
+  Tlaxcala,
+  @JsonValue(117)
+  QuintanaRooCozumel,
+  @JsonValue(118)
+  SaoPaolo,
+  @JsonValue(119)
+  RioDeJaneiro,
+  @JsonValue(120)
+  RioGrandeDoSul,
+  @JsonValue(121)
+  NorthWestTerritories,
+  @JsonValue(122)
+  Nunavut,
+  @JsonValue(123)
+  PrinceEdwardIsland,
+  @JsonValue(124)
+  DistritoFederal,
+  @JsonValue(125)
+  Maranhao,
+  @JsonValue(126)
+  MatoGrosso,
+  @JsonValue(127)
+  MinasGerais,
+  @JsonValue(128)
+  Para,
+  @JsonValue(129)
+  Parana,
+  @JsonValue(130)
+  Pernambuco,
+  @JsonValue(131)
+  SantaCatarina,
+  @JsonValue(132)
+  AndhraPradesh,
+  @JsonValue(133)
+  Ceara,
+  @JsonValue(134)
+  Goias,
+  @JsonValue(135)
+  GuerreroAcapulcoDeJuarez,
+  @JsonValue(136)
+  Haryana,
+  @JsonValue(137)
+  Sergipe,
+  @JsonValue(138)
+  Alagos,
 }
 
 /// Defines possible the document type from ClassInfo scanned with BlinkID or BlinkID MultiSide Recognizer
 enum Type {
-    @JsonValue(0) None,
-    @JsonValue(1) ConsularId,
-    @JsonValue(2) Dl,
-    @JsonValue(3) DlPublicServicesCard,
-    @JsonValue(4) EmploymentPass,
-    @JsonValue(5) FinCard,
-    @JsonValue(6) Id,
-    @JsonValue(7) MultipurposeId,
-    @JsonValue(8) MyKad,
-    @JsonValue(9) MyKid,
-    @JsonValue(10) MyPR,
-    @JsonValue(11) MyTentera,
-    @JsonValue(12) PanCard,
-    @JsonValue(13) ProfessionalId,
-    @JsonValue(14) PublicServicesCard,
-    @JsonValue(15) ResidencePermit,
-    @JsonValue(16) ResidentId,
-    @JsonValue(17) TemporaryResidencePermit,
-    @JsonValue(18) VoterId,
-    @JsonValue(19) WorkPermit,
-    @JsonValue(20) iKad,
-    @JsonValue(21) MilitaryId,
-    @JsonValue(22) MyKas,
-    @JsonValue(23) SocialSecurityCard,
-    @JsonValue(24) HealthInsuranceCard,
-    @JsonValue(25) Passport,
-    @JsonValue(26) SPass,
-    @JsonValue(27) AddressCard,
-    @JsonValue(28) AlienId,
-    @JsonValue(29) AlienPassport,
-    @JsonValue(30) GreenCard,
-    @JsonValue(31) MinorsId,
-    @JsonValue(32) PostalId,
-    @JsonValue(33) ProfessionalDl,
-    @JsonValue(34) TaxId,
-    @JsonValue(35) WeaponPermit,
-    @JsonValue(36) Visa,
-    @JsonValue(37) BorderCrossingCard,
-    @JsonValue(38) DriverCard,
-    @JsonValue(39) GlobalEntryCard,
-    @JsonValue(40) Mypolis,
-    @JsonValue(41) NexusCard,
-    @JsonValue(42) PassportCard,
-    @JsonValue(43) ProofOfAgeCard,
-    @JsonValue(44) RefugeeId,
-    @JsonValue(45) TribalId,
-    @JsonValue(46) VeteranId,
-    @JsonValue(47) CitizenshipCertificate,
-    @JsonValue(48) MyNumberCard,
-    @JsonValue(49) ConsularPassport,
-    @JsonValue(50) MinorsPassport,
-    @JsonValue(51) MinorsPublicServicesCard,
-    @JsonValue(52) DrivingPriviligeCard,
-    @JsonValue(53) AsylumRequest,
-    @JsonValue(54) DriverQualificationCard,
-    @JsonValue(55) ProvisionalDl,
-    @JsonValue(56) RefugeePassport,
-    @JsonValue(57) SpecialId,
-    @JsonValue(58) UniformedServicesId,
-    @JsonValue(59) ImmigrantVisa,
-    @JsonValue(60) ConsularVoterId,
-    @JsonValue(61) TwicCard,
-    @JsonValue(62) ExitEntryPermit,
-    @JsonValue(63) MainlandTravelPermitTaiwan,
-    @JsonValue(64) NbiClearance,
-    @JsonValue(65) ProofOfRegistration,
-    @JsonValue(66) TemporaryProtectionPermit,
-    @JsonValue(67) AfghanCitizenCard,
-    @JsonValue(68) EId,
-    @JsonValue(69) Pass,
-    @JsonValue(70) SisId,
+  @JsonValue(0)
+  None,
+  @JsonValue(1)
+  ConsularId,
+  @JsonValue(2)
+  Dl,
+  @JsonValue(3)
+  DlPublicServicesCard,
+  @JsonValue(4)
+  EmploymentPass,
+  @JsonValue(5)
+  FinCard,
+  @JsonValue(6)
+  Id,
+  @JsonValue(7)
+  MultipurposeId,
+  @JsonValue(8)
+  MyKad,
+  @JsonValue(9)
+  MyKid,
+  @JsonValue(10)
+  MyPR,
+  @JsonValue(11)
+  MyTentera,
+  @JsonValue(12)
+  PanCard,
+  @JsonValue(13)
+  ProfessionalId,
+  @JsonValue(14)
+  PublicServicesCard,
+  @JsonValue(15)
+  ResidencePermit,
+  @JsonValue(16)
+  ResidentId,
+  @JsonValue(17)
+  TemporaryResidencePermit,
+  @JsonValue(18)
+  VoterId,
+  @JsonValue(19)
+  WorkPermit,
+  @JsonValue(20)
+  iKad,
+  @JsonValue(21)
+  MilitaryId,
+  @JsonValue(22)
+  MyKas,
+  @JsonValue(23)
+  SocialSecurityCard,
+  @JsonValue(24)
+  HealthInsuranceCard,
+  @JsonValue(25)
+  Passport,
+  @JsonValue(26)
+  SPass,
+  @JsonValue(27)
+  AddressCard,
+  @JsonValue(28)
+  AlienId,
+  @JsonValue(29)
+  AlienPassport,
+  @JsonValue(30)
+  GreenCard,
+  @JsonValue(31)
+  MinorsId,
+  @JsonValue(32)
+  PostalId,
+  @JsonValue(33)
+  ProfessionalDl,
+  @JsonValue(34)
+  TaxId,
+  @JsonValue(35)
+  WeaponPermit,
+  @JsonValue(36)
+  Visa,
+  @JsonValue(37)
+  BorderCrossingCard,
+  @JsonValue(38)
+  DriverCard,
+  @JsonValue(39)
+  GlobalEntryCard,
+  @JsonValue(40)
+  Mypolis,
+  @JsonValue(41)
+  NexusCard,
+  @JsonValue(42)
+  PassportCard,
+  @JsonValue(43)
+  ProofOfAgeCard,
+  @JsonValue(44)
+  RefugeeId,
+  @JsonValue(45)
+  TribalId,
+  @JsonValue(46)
+  VeteranId,
+  @JsonValue(47)
+  CitizenshipCertificate,
+  @JsonValue(48)
+  MyNumberCard,
+  @JsonValue(49)
+  ConsularPassport,
+  @JsonValue(50)
+  MinorsPassport,
+  @JsonValue(51)
+  MinorsPublicServicesCard,
+  @JsonValue(52)
+  DrivingPriviligeCard,
+  @JsonValue(53)
+  AsylumRequest,
+  @JsonValue(54)
+  DriverQualificationCard,
+  @JsonValue(55)
+  ProvisionalDl,
+  @JsonValue(56)
+  RefugeePassport,
+  @JsonValue(57)
+  SpecialId,
+  @JsonValue(58)
+  UniformedServicesId,
+  @JsonValue(59)
+  ImmigrantVisa,
+  @JsonValue(60)
+  ConsularVoterId,
+  @JsonValue(61)
+  TwicCard,
+  @JsonValue(62)
+  ExitEntryPermit,
+  @JsonValue(63)
+  MainlandTravelPermitTaiwan,
+  @JsonValue(64)
+  NbiClearance,
+  @JsonValue(65)
+  ProofOfRegistration,
+  @JsonValue(66)
+  TemporaryProtectionPermit,
+  @JsonValue(67)
+  AfghanCitizenCard,
+  @JsonValue(68)
+  EId,
+  @JsonValue(69)
+  Pass,
+  @JsonValue(70)
+  SisId,
 }
 
 /// Represents data extracted from MRZ (Machine Readable Zone) of Machine Readable Travel Document (MRTD).
@@ -1864,12 +2425,17 @@ class MrzResult {
 
 /// Possible supported detectors for documents containing face image
 enum DocumentFaceDetectorType {
-    /// Uses document detector for TD1 size identity cards
-    @JsonValue(0) TD1,
-    /// Uses document detector for TD2 size identity cards
-    @JsonValue(1) TD2,
-    /// Uses MRTD detector for detecting documents with MRZ
-    @JsonValue(2) PassportsAndVisas
+  /// Uses document detector for TD1 size identity cards
+  @JsonValue(0)
+  TD1,
+
+  /// Uses document detector for TD2 size identity cards
+  @JsonValue(1)
+  TD2,
+
+  /// Uses MRTD detector for detecting documents with MRZ
+  @JsonValue(2)
+  PassportsAndVisas
 }
 
 /// RecognitionModeFilter is used to enable/disable recognition of specific document groups.
@@ -1896,25 +2462,28 @@ class RecognitionModeFilter {
 
   RecognitionModeFilter();
 
-    factory RecognitionModeFilter.fromJson(Map<String, dynamic> json) => _$RecognitionModeFilterFromJson(json);
-    Map<String, dynamic> toJson() => _$RecognitionModeFilterToJson(this);
+  factory RecognitionModeFilter.fromJson(Map<String, dynamic> json) => _$RecognitionModeFilterFromJson(json);
+  Map<String, dynamic> toJson() => _$RecognitionModeFilterToJson(this);
 }
 
-
 /// ClassAnonymizationSettings is used to anonymize specific documents and fields.
-/// It can be modified with countries, regions, document types, document fields and the partial document number anonymization. 
+/// It can be modified with countries, regions, document types, document fields and the partial document number anonymization.
 /// See Country, Region, Type, FieldType and DocumentNumberAnonymizationSettings objects to get more information which settings can be anonymized.
 /// Setting is taken into account if AnonymizationMode is set to ImageOnly,ResultFieldsOnly or FullResult.
 @JsonSerializable()
 class ClassAnonymizationSettings {
   /// Documents from the set country will be anonymized
   Country? country;
+
   /// Documents from the set region will be anonymized
   Region? region;
+
   /// Documents with this type will be anonymized
   Type? type;
+
   /// Document fields that will be anonymized
   List<FieldType> fields = [];
+
   /// Partial document number anonymization
   DocumentNumberAnonymizationSettings? documentNumberAnonymizationSettings;
 
@@ -1930,12 +2499,14 @@ class ClassAnonymizationSettings {
 class DocumentNumberAnonymizationSettings {
   /// Set how many digits will be visible at the beggining of the document number. */
   int? prefixDigitsVisible = 0;
+
   /// Set how many digits will be visible at the end of the document number. */
   int? suffixDigitsVisible = 0;
 
   DocumentNumberAnonymizationSettings();
 
-  factory DocumentNumberAnonymizationSettings.fromJson(Map<String, dynamic> json) => _$DocumentNumberAnonymizationSettingsFromJson(json);
+  factory DocumentNumberAnonymizationSettings.fromJson(Map<String, dynamic> json) =>
+      _$DocumentNumberAnonymizationSettingsFromJson(json);
   Map<String, dynamic> toJson() => _$DocumentNumberAnonymizationSettingsToJson(this);
 }
 
@@ -1944,47 +2515,57 @@ class DocumentNumberAnonymizationSettings {
 /// If CustomClassRules is not set, all of the default fields are mandatory.
 @JsonSerializable()
 class CustomClassRules {
-    /// Documents from the set country will be used with CustomClassRules
-    Country? country;
-    /// Documents from the set region will be used with CustomClassRules
-    Region? region;
-    /// Document type that will be used with CustomClassRules
-    Type? type;
-    /// An array of the document fields and alphabets that will be used with CustomClassRules. See DetailedFieldType for more information.
-    List<DetailedFieldType> detailedFieldTypes = [];
+  /// Documents from the set country will be used with CustomClassRules
+  Country? country;
 
-    CustomClassRules();
+  /// Documents from the set region will be used with CustomClassRules
+  Region? region;
 
-    factory CustomClassRules.fromJson(Map<String, dynamic> json) => _$CustomClassRulesFromJson(json);
-    Map<String, dynamic> toJson() => _$CustomClassRulesToJson(this);
+  /// Document type that will be used with CustomClassRules
+  Type? type;
+
+  /// An array of the document fields and alphabets that will be used with CustomClassRules. See DetailedFieldType for more information.
+  List<DetailedFieldType> detailedFieldTypes = [];
+
+  CustomClassRules();
+
+  factory CustomClassRules.fromJson(Map<String, dynamic> json) => _$CustomClassRulesFromJson(json);
+  Map<String, dynamic> toJson() => _$CustomClassRulesToJson(this);
 }
-
 
 /// DetailedFieldType represents a detailed field type used for custom mandatory fields.
 /// Used with CustomClassRules. A field type (see FieldType for all fields) along with Alphabet type (see AlphabetType for all alphabets) is required.
 @JsonSerializable()
-class DetailedFieldType { 
-    /// Field type that will be mandatory for extraction for CustomClassRules.
-    FieldType? fieldType;
-    /// Alphabet type connected with the field type that will be optional for extraction for CustomClassRules. */
-    AlphabetType? alphabetType;
+class DetailedFieldType {
+  /// Field type that will be mandatory for extraction for CustomClassRules.
+  FieldType? fieldType;
 
-    DetailedFieldType();
+  /// Alphabet type connected with the field type that will be optional for extraction for CustomClassRules. */
+  AlphabetType? alphabetType;
 
-    factory DetailedFieldType.fromJson(Map<String, dynamic> json) => _$DetailedFieldTypeFromJson(json);
-    Map<String, dynamic> toJson() => _$DetailedFieldTypeToJson(this);
+  DetailedFieldType();
+
+  factory DetailedFieldType.fromJson(Map<String, dynamic> json) => _$DetailedFieldTypeFromJson(json);
+  Map<String, dynamic> toJson() => _$DetailedFieldTypeToJson(this);
 }
 
 /// Define level of anonymization performed on recognizer result
 enum AnonymizationMode {
-    /// Anonymization will not be performed.
-    @JsonValue(0) None,
-    /// FullDocumentImage is anonymized with black boxes covering sensitive data.
-    @JsonValue(1) ImageOnly,
-    /// Result fields containing sensitive data are removed from result.
-    @JsonValue(2) ResultFieldsOnly,
-    /// This mode is combination of ImageOnly and ResultFieldsOnly modes.
-    @JsonValue(3) FullResult
+  /// Anonymization will not be performed.
+  @JsonValue(0)
+  None,
+
+  /// FullDocumentImage is anonymized with black boxes covering sensitive data.
+  @JsonValue(1)
+  ImageOnly,
+
+  /// Result fields containing sensitive data are removed from result.
+  @JsonValue(2)
+  ResultFieldsOnly,
+
+  /// This mode is combination of ImageOnly and ResultFieldsOnly modes.
+  @JsonValue(3)
+  FullResult
 }
 
 /// Defines status of the last recognition process.
@@ -2035,12 +2616,10 @@ enum ProcessingStatus {
   AwaitingOtherSide,
 
   /// Side not scanned.
-  NotScanned
-    /// Side not scanned.
-    NotScanned,
-    
-    /// Detection of the barcode failed.
-    BarcodeDetectionFailed
+  NotScanned,
+
+  /// Detection of the barcode failed.
+  BarcodeDetectionFailed
 }
 
 /// Define level of anonymization performed on recognizer result
@@ -2098,241 +2677,313 @@ class ImageAnalysisResult {
 
   /// TBarcode detection status determined from the scanned image.
   ImageAnalysisDetectionStatus? barcodeDetectionStatus;
-    /// The color status determined from scanned image.
-    DocumentImageColorStatus? documentImageColorStatus;
-    /// The Moire pattern detection status determined from the scanned image.
-    ImageAnalysisDetectionStatus? documentImageMoireStatus;
-    /// Face detection status determined from the scanned image.
-    ImageAnalysisDetectionStatus? faceDetectionStatus;
-    /// Mrz detection status determined from the scanned image.
-    ImageAnalysisDetectionStatus? mrzDetectionStatus;
-    /// Barcode detection status determined from the scanned image.
-    ImageAnalysisDetectionStatus? barcodeDetectionStatus;
-    /// Document card rotation status determined from the scanned image.
-    CardRotation? cardRotation;
-    /// Orientation determined from the scanned image.
-    CardOrientation? cardOrientation;
-    /// RealID detection status determined from the scanned image.
-    ImageAnalysisDetectionStatus? realIdDetectionStatus;
-    /// Indicates if blur was detected on the scanned image.
-    bool? blurDetected;
-    /// Indicates if glare was detected on the scanned image.
-    bool? glareDetected;
 
-    ImageAnalysisResult(Map<String, dynamic> nativeImageAnalysisResult) {
-        this.documentImageColorStatus = DocumentImageColorStatus.values[nativeImageAnalysisResult['documentImageColorStatus']];
-        this.documentImageMoireStatus = ImageAnalysisDetectionStatus.values[nativeImageAnalysisResult['documentImageMoireStatus']];
-        this.faceDetectionStatus = ImageAnalysisDetectionStatus.values[nativeImageAnalysisResult['faceDetectionStatus']];
-        this.mrzDetectionStatus = ImageAnalysisDetectionStatus.values[nativeImageAnalysisResult['mrzDetectionStatus']];
-        this.barcodeDetectionStatus = ImageAnalysisDetectionStatus.values[nativeImageAnalysisResult['barcodeDetectionStatus']];
-        this.cardRotation = CardRotation.values[nativeImageAnalysisResult['cardRotation']];
-        this.cardOrientation = CardOrientation.values[nativeImageAnalysisResult['cardOrientation']];
-        this.realIdDetectionStatus = ImageAnalysisDetectionStatus.values[nativeImageAnalysisResult['realIdDetectionStatus']];
-        this.blurDetected = nativeImageAnalysisResult['blurDetected'];
-        this.glareDetected = nativeImageAnalysisResult['glareDetected'];
-    }
+  /// The color status determined from scanned image.
+  /// Document card rotation status determined from the scanned image.
+  CardRotation? cardRotation;
+
+  /// Orientation determined from the scanned image.
+  CardOrientation? cardOrientation;
+
+  /// RealID detection status determined from the scanned image.
+  ImageAnalysisDetectionStatus? realIdDetectionStatus;
+
+  /// Indicates if blur was detected on the scanned image.
+  bool? blurDetected;
+
+  /// Indicates if glare was detected on the scanned image.
+  bool? glareDetected;
+
+  ImageAnalysisResult(Map<String, dynamic> nativeImageAnalysisResult) {
+    this.documentImageColorStatus =
+        DocumentImageColorStatus.values[nativeImageAnalysisResult['documentImageColorStatus']];
+    this.documentImageMoireStatus =
+        ImageAnalysisDetectionStatus.values[nativeImageAnalysisResult['documentImageMoireStatus']];
+    this.faceDetectionStatus = ImageAnalysisDetectionStatus.values[nativeImageAnalysisResult['faceDetectionStatus']];
+    this.mrzDetectionStatus = ImageAnalysisDetectionStatus.values[nativeImageAnalysisResult['mrzDetectionStatus']];
+    this.barcodeDetectionStatus =
+        ImageAnalysisDetectionStatus.values[nativeImageAnalysisResult['barcodeDetectionStatus']];
+    this.cardRotation = CardRotation.values[nativeImageAnalysisResult['cardRotation']];
+    this.cardOrientation = CardOrientation.values[nativeImageAnalysisResult['cardOrientation']];
+    this.realIdDetectionStatus =
+        ImageAnalysisDetectionStatus.values[nativeImageAnalysisResult['realIdDetectionStatus']];
+    this.blurDetected = nativeImageAnalysisResult['blurDetected'];
+    this.glareDetected = nativeImageAnalysisResult['glareDetected'];
+  }
 }
 
 /// Defines the data extracted from the barcode.
 class BarcodeResult {
+  /// Type of the barcode scanned
+  BarcodeType? barcodeType;
 
-    /// Type of the barcode scanned
-    BarcodeType? barcodeType;
-    /// Byte array with result of the scan
-    String? rawData;
-    /// Retrieves string content of scanned data
-    String? stringData;
-    /// Flag indicating uncertain scanning data
-    bool? uncertain;
-    /// The first name of the document owner.
-    String? firstName;
-    /// The middle name of the document owner.
-    String? middleName;
-    /// The last name of the document owner.
-    String? lastName;
-    /// The full name of the document owner.
-    String? fullName;
-    /// The additional name information of the document owner.
-    String? additionalNameInformation;
-    /// The address of the document owner.
-    String? address;
-    /// The place of birth of the document owner.
-    String? placeOfBirth;
-    /// The nationality of the documet owner.
-    String? nationality;
-    /// The race of the document owner.
-    String? race;
-    /// The religion of the document owner.
-    String? religion;
-    /// The profession of the document owner.
-    String? profession;
-    /// The marital status of the document owner.
-    String? maritalStatus;
-    /// The residential stauts of the document owner.
-    String? residentialStatus;
-    /// The employer of the document owner.
-    String? employer;
-    /// The sex of the document owner.
-    String? sex;
-    /// The date of birth of the document owner.
-    Date? dateOfBirth;
-    /// The date of issue of the document.
-    Date? dateOfIssue;
-    /// The date of expiry of the document.
-    Date? dateOfExpiry;
-    /// The document number.
-    String? documentNumber;
-    ///  The personal identification number.
-    String? personalIdNumber;
-    /// The additional number of the document.
-    String? documentAdditionalNumber;
-    /// The issuing authority of the document.
-    String? issuingAuthority;
-    /// The street address portion of the document owner.
-    String? street;
-    /// The postal code address portion of the document owner.
-    String? postalCode;
-    /// The city address portion of the document owner.
-    String? city;
-    /// The jurisdiction code address portion of the document owner.
-    String? jurisdiction;
-    /// The driver license detailed info.
-    BarcodeDriverLicenseDetailedInfo? driverLicenseDetailedInfo;
-    /// Flag that indicates if barcode result is empty
-    bool? empty;
-    /// Document specific extended elements that contain all barcode fields in their original form. Currently this is only filled for AAMVACompliant documents.
-    BarcodeElements? extendedElements;
+  /// Byte array with result of the scan
+  String? rawData;
 
-    BarcodeResult(Map<String, dynamic> nativeBarcodeResult) {
-        this.barcodeType = BarcodeType.values[nativeBarcodeResult['barcodeType']];
-        this.rawData = nativeBarcodeResult['rawData'];
-        this.stringData = nativeBarcodeResult['stringData'];
-        this.uncertain = nativeBarcodeResult['uncertain'];
-        this.firstName = nativeBarcodeResult['firstName'];
-        this.middleName = nativeBarcodeResult['middleName'];
-        this.lastName = nativeBarcodeResult['lastName'];
-        this.fullName = nativeBarcodeResult['fullName'];
-        this.additionalNameInformation = nativeBarcodeResult['additionalNameInformation'];
-        this.address = nativeBarcodeResult['address'];
-        this.placeOfBirth = nativeBarcodeResult['placeOfBirth'];
-        this.nationality = nativeBarcodeResult['nationality'];
-        this.race = nativeBarcodeResult['race'];
-        this.religion = nativeBarcodeResult['religion'];
-        this.profession = nativeBarcodeResult['profession'];
-        this.maritalStatus = nativeBarcodeResult['maritalStatus'];
-        this.residentialStatus = nativeBarcodeResult['residentialStatus'];
-        this.employer = nativeBarcodeResult['employer'];
-        this.sex = nativeBarcodeResult['sex'];
-        this.dateOfBirth = nativeBarcodeResult['dateOfBirth'] != null ? Date(Map<String, dynamic>.from(nativeBarcodeResult['dateOfBirth'])) : null;
-        this.dateOfBirth = nativeBarcodeResult['dateOfIssue'] != null ? Date(Map<String, dynamic>.from(nativeBarcodeResult['dateOfIssue'])) : null;
-        this.dateOfBirth = nativeBarcodeResult['dateOfExpiry'] != null ? Date(Map<String, dynamic>.from(nativeBarcodeResult['dateOfExpiry'])) : null;
-        this.documentNumber = nativeBarcodeResult['documentNumber'];
-        this.personalIdNumber = nativeBarcodeResult['personalIdNumber'];
-        this.documentAdditionalNumber = nativeBarcodeResult['documentAdditionalNumber'];
-        this.issuingAuthority = nativeBarcodeResult['issuingAuthority'];
-        this.street = nativeBarcodeResult['street'];
-        this.postalCode = nativeBarcodeResult['postalCode'];
-        this.city = nativeBarcodeResult['city'];
-        this.jurisdiction = nativeBarcodeResult['jurisdiction'];
-        this.driverLicenseDetailedInfo = nativeBarcodeResult['driverLicenseDetailedInfo'] != null ? BarcodeDriverLicenseDetailedInfo(Map<String, dynamic>.from(nativeBarcodeResult['driverLicenseDetailedInfo'])) : null;
-        this.empty = nativeBarcodeResult['empty'];
-        this.extendedElements = nativeBarcodeResult['extendedElements'] != null ? BarcodeElements(Map<String, dynamic>.from(nativeBarcodeResult['extendedElements'])) : null;
-    }
+  /// Retrieves string content of scanned data
+  String? stringData;
+
+  /// Flag indicating uncertain scanning data
+  bool? uncertain;
+
+  /// The first name of the document owner.
+  String? firstName;
+
+  /// The middle name of the document owner.
+  String? middleName;
+
+  /// The last name of the document owner.
+  String? lastName;
+
+  /// The full name of the document owner.
+  String? fullName;
+
+  /// The additional name information of the document owner.
+  String? additionalNameInformation;
+
+  /// The address of the document owner.
+  String? address;
+
+  /// The place of birth of the document owner.
+  String? placeOfBirth;
+
+  /// The nationality of the documet owner.
+  String? nationality;
+
+  /// The race of the document owner.
+  String? race;
+
+  /// The religion of the document owner.
+  String? religion;
+
+  /// The profession of the document owner.
+  String? profession;
+
+  /// The marital status of the document owner.
+  String? maritalStatus;
+
+  /// The residential stauts of the document owner.
+  String? residentialStatus;
+
+  /// The employer of the document owner.
+  String? employer;
+
+  /// The sex of the document owner.
+  String? sex;
+
+  /// The date of birth of the document owner.
+  Date? dateOfBirth;
+
+  /// The date of issue of the document.
+  Date? dateOfIssue;
+
+  /// The date of expiry of the document.
+  Date? dateOfExpiry;
+
+  /// The document number.
+  String? documentNumber;
+
+  ///  The personal identification number.
+  String? personalIdNumber;
+
+  /// The additional number of the document.
+  String? documentAdditionalNumber;
+
+  /// The issuing authority of the document.
+  String? issuingAuthority;
+
+  /// The street address portion of the document owner.
+  String? street;
+
+  /// The postal code address portion of the document owner.
+  String? postalCode;
+
+  /// The city address portion of the document owner.
+  String? city;
+
+  /// The jurisdiction code address portion of the document owner.
+  String? jurisdiction;
+
+  /// The driver license detailed info.
+  BarcodeDriverLicenseDetailedInfo? driverLicenseDetailedInfo;
+
+  /// Flag that indicates if barcode result is empty
+  bool? empty;
+
+  /// Document specific extended elements that contain all barcode fields in their original form. Currently this is only filled for AAMVACompliant documents.
+  BarcodeElements? extendedElements;
+
+  BarcodeResult(Map<String, dynamic> nativeBarcodeResult) {
+    this.barcodeType = BarcodeType.values[nativeBarcodeResult['barcodeType']];
+    this.rawData = nativeBarcodeResult['rawData'];
+    this.stringData = nativeBarcodeResult['stringData'];
+    this.uncertain = nativeBarcodeResult['uncertain'];
+    this.firstName = nativeBarcodeResult['firstName'];
+    this.middleName = nativeBarcodeResult['middleName'];
+    this.lastName = nativeBarcodeResult['lastName'];
+    this.fullName = nativeBarcodeResult['fullName'];
+    this.additionalNameInformation = nativeBarcodeResult['additionalNameInformation'];
+    this.address = nativeBarcodeResult['address'];
+    this.placeOfBirth = nativeBarcodeResult['placeOfBirth'];
+    this.nationality = nativeBarcodeResult['nationality'];
+    this.race = nativeBarcodeResult['race'];
+    this.religion = nativeBarcodeResult['religion'];
+    this.profession = nativeBarcodeResult['profession'];
+    this.maritalStatus = nativeBarcodeResult['maritalStatus'];
+    this.residentialStatus = nativeBarcodeResult['residentialStatus'];
+    this.employer = nativeBarcodeResult['employer'];
+    this.sex = nativeBarcodeResult['sex'];
+    this.dateOfBirth = nativeBarcodeResult['dateOfBirth'] != null
+        ? Date(Map<String, dynamic>.from(nativeBarcodeResult['dateOfBirth']))
+        : null;
+    this.dateOfBirth = nativeBarcodeResult['dateOfIssue'] != null
+        ? Date(Map<String, dynamic>.from(nativeBarcodeResult['dateOfIssue']))
+        : null;
+    this.dateOfBirth = nativeBarcodeResult['dateOfExpiry'] != null
+        ? Date(Map<String, dynamic>.from(nativeBarcodeResult['dateOfExpiry']))
+        : null;
+    this.documentNumber = nativeBarcodeResult['documentNumber'];
+    this.personalIdNumber = nativeBarcodeResult['personalIdNumber'];
+    this.documentAdditionalNumber = nativeBarcodeResult['documentAdditionalNumber'];
+    this.issuingAuthority = nativeBarcodeResult['issuingAuthority'];
+    this.street = nativeBarcodeResult['street'];
+    this.postalCode = nativeBarcodeResult['postalCode'];
+    this.city = nativeBarcodeResult['city'];
+    this.jurisdiction = nativeBarcodeResult['jurisdiction'];
+    this.driverLicenseDetailedInfo = nativeBarcodeResult['driverLicenseDetailedInfo'] != null
+        ? BarcodeDriverLicenseDetailedInfo(Map<String, dynamic>.from(nativeBarcodeResult['driverLicenseDetailedInfo']))
+        : null;
+    this.empty = nativeBarcodeResult['empty'];
+    this.extendedElements = nativeBarcodeResult['extendedElements'] != null
+        ? BarcodeElements(Map<String, dynamic>.from(nativeBarcodeResult['extendedElements']))
+        : null;
+  }
 }
 
 class VizResult {
+  /// The first name of the document owner.
+  StringResult? firstName;
 
-    /// The first name of the document owner.
-    StringResult? firstName;
-    /// The last name of the document owner.
-    StringResult? lastName;
-    /// The full name of the document owner.
-    StringResult? fullName;
-    /// The additional name information of the document owner.
-    StringResult? additionalNameInformation;
-    /// The localized name of the document owner.
-    StringResult? localizedName;
-    /// The address of the document owner.
-    StringResult? address;
-    /// The additional address information of the document owner.
-    StringResult? additionalAddressInformation;
-    /// The place of birth of the document owner.
-    StringResult? placeOfBirth;
-    /// The nationality of the documet owner.
-    StringResult? nationality;
-    /// The race of the document owner.
-    StringResult? race;
-    /// The religion of the document owner.
-    StringResult? religion;
-    /// The profession of the document owner.
-    StringResult? profession;
-    /// The marital status of the document owner.
-    StringResult? maritalStatus;
-    /// The residential stauts of the document owner.
-    StringResult? residentialStatus;
-    /// The employer of the document owner.
-    StringResult? employer;
-    /// The sex of the document owner.
-    StringResult? sex;
-    /// The date of birth of the document owner.
-    DateResult? dateOfBirth;
-    /// The date of issue of the document.
-    DateResult? dateOfIssue;
-    /// The date of expiry of the document.
-    DateResult? dateOfExpiry;
-    /// The document number.
-    StringResult? documentNumber;
-    /// The personal identification number.
-    StringResult? personalIdNumber;
-    /// The additional number of the document.
-    StringResult? documentAdditionalNumber;
-    /// The additional personal identification number.
-    StringResult? additionalPersonalIdNumber;
-    /// The issuing authority of the document.
-    StringResult? issuingAuthority;
-    /// The driver license detailed info.
-    DriverLicenseDetailedInfo? driverLicenseDetailedInfo;
-    /// Flag that indicates if barcode result is empty
-    bool? empty;
-    /// The one more additional number of the document.
-    StringResult? documentOptionalAdditionalNumber;
+  /// The last name of the document owner.
+  StringResult? lastName;
 
-    VizResult(Map<String, dynamic> nativeVizResult) {
-        this.firstName = createStringResult(nativeVizResult, 'firstName');
-        this.lastName = createStringResult(nativeVizResult, 'lastName');
-        this.fullName = createStringResult(nativeVizResult, 'fullName');
-        this.additionalNameInformation = createStringResult(nativeVizResult, 'additionalNameInformation');
-        this.localizedName = createStringResult(nativeVizResult, 'localizedName');
-        this.address = createStringResult(nativeVizResult, 'address');
-        this.additionalAddressInformation = createStringResult(nativeVizResult, 'additionalAddressInformation');
-        this.placeOfBirth = createStringResult(nativeVizResult, 'placeOfBirth');
-        this.nationality = createStringResult(nativeVizResult, 'nationality');
-        this.race = createStringResult(nativeVizResult, 'race');
-        this.religion = createStringResult(nativeVizResult, 'religion');
-        this.profession = createStringResult(nativeVizResult, 'profession');
-        this.maritalStatus = createStringResult(nativeVizResult, 'maritalStatus');
-        this.residentialStatus = createStringResult(nativeVizResult, 'residentialStatus');
-        this.employer = createStringResult(nativeVizResult, 'employer');
-        this.sex = createStringResult(nativeVizResult, 'sex');
-        this.dateOfBirth = nativeVizResult['dateOfBirth'] != null ? DateResult(Map<String, dynamic>.from(nativeVizResult['dateOfBirth'])) : null;
-        this.dateOfIssue = nativeVizResult['dateOfIssue'] != null ? DateResult(Map<String, dynamic>.from(nativeVizResult['dateOfIssue'])) : null;
-        this.dateOfExpiry = nativeVizResult['dateOfExpiry'] != null ? DateResult(Map<String, dynamic>.from(nativeVizResult['dateOfExpiry'])) : null;
-        this.documentNumber = createStringResult(nativeVizResult, 'documentNumber');
-        this.personalIdNumber = createStringResult(nativeVizResult, 'personalIdNumber');
-        this.documentAdditionalNumber = createStringResult(nativeVizResult, 'documentAdditionalNumber');
-        this.additionalPersonalIdNumber = createStringResult(nativeVizResult, 'additionalPersonalIdNumber');
-        this.issuingAuthority = createStringResult(nativeVizResult, 'issuingAuthority');
-        this.driverLicenseDetailedInfo = nativeVizResult['driverLicenseDetailedInfo'] != null ? DriverLicenseDetailedInfo(Map<String, dynamic>.from(nativeVizResult['driverLicenseDetailedInfo'])) : null;
-        this.empty = nativeVizResult['empty'];
-        this.documentOptionalAdditionalNumber = createStringResult(nativeVizResult, 'documentOptionalAdditionalNumber');
-    }
+  /// The full name of the document owner.
+  StringResult? fullName;
+
+  /// The additional name information of the document owner.
+  StringResult? additionalNameInformation;
+
+  /// The localized name of the document owner.
+  StringResult? localizedName;
+
+  /// The address of the document owner.
+  StringResult? address;
+
+  /// The additional address information of the document owner.
+  StringResult? additionalAddressInformation;
+
+  /// The place of birth of the document owner.
+  StringResult? placeOfBirth;
+
+  /// The nationality of the documet owner.
+  StringResult? nationality;
+
+  /// The race of the document owner.
+  StringResult? race;
+
+  /// The religion of the document owner.
+  StringResult? religion;
+
+  /// The profession of the document owner.
+  StringResult? profession;
+
+  /// The marital status of the document owner.
+  StringResult? maritalStatus;
+
+  /// The residential stauts of the document owner.
+  StringResult? residentialStatus;
+
+  /// The employer of the document owner.
+  StringResult? employer;
+
+  /// The sex of the document owner.
+  StringResult? sex;
+
+  /// The date of birth of the document owner.
+  DateResult? dateOfBirth;
+
+  /// The date of issue of the document.
+  DateResult? dateOfIssue;
+
+  /// The date of expiry of the document.
+  DateResult? dateOfExpiry;
+
+  /// The document number.
+  StringResult? documentNumber;
+
+  /// The personal identification number.
+  StringResult? personalIdNumber;
+
+  /// The additional number of the document.
+  StringResult? documentAdditionalNumber;
+
+  /// The additional personal identification number.
+  StringResult? additionalPersonalIdNumber;
+
+  /// The issuing authority of the document.
+  StringResult? issuingAuthority;
+
+  /// The driver license detailed info.
+  DriverLicenseDetailedInfo? driverLicenseDetailedInfo;
+
+  /// Flag that indicates if barcode result is empty
+  bool? empty;
+
+  /// The one more additional number of the document.
+  StringResult? documentOptionalAdditionalNumber;
+
+  VizResult(Map<String, dynamic> nativeVizResult) {
+    this.firstName = createStringResult(nativeVizResult, 'firstName');
+    this.lastName = createStringResult(nativeVizResult, 'lastName');
+    this.fullName = createStringResult(nativeVizResult, 'fullName');
+    this.additionalNameInformation = createStringResult(nativeVizResult, 'additionalNameInformation');
+    this.localizedName = createStringResult(nativeVizResult, 'localizedName');
+    this.address = createStringResult(nativeVizResult, 'address');
+    this.additionalAddressInformation = createStringResult(nativeVizResult, 'additionalAddressInformation');
+    this.placeOfBirth = createStringResult(nativeVizResult, 'placeOfBirth');
+    this.nationality = createStringResult(nativeVizResult, 'nationality');
+    this.race = createStringResult(nativeVizResult, 'race');
+    this.religion = createStringResult(nativeVizResult, 'religion');
+    this.profession = createStringResult(nativeVizResult, 'profession');
+    this.maritalStatus = createStringResult(nativeVizResult, 'maritalStatus');
+    this.residentialStatus = createStringResult(nativeVizResult, 'residentialStatus');
+    this.employer = createStringResult(nativeVizResult, 'employer');
+    this.sex = createStringResult(nativeVizResult, 'sex');
+    this.dateOfBirth = nativeVizResult['dateOfBirth'] != null
+        ? DateResult(Map<String, dynamic>.from(nativeVizResult['dateOfBirth']))
+        : null;
+    this.dateOfIssue = nativeVizResult['dateOfIssue'] != null
+        ? DateResult(Map<String, dynamic>.from(nativeVizResult['dateOfIssue']))
+        : null;
+    this.dateOfExpiry = nativeVizResult['dateOfExpiry'] != null
+        ? DateResult(Map<String, dynamic>.from(nativeVizResult['dateOfExpiry']))
+        : null;
+    this.documentNumber = createStringResult(nativeVizResult, 'documentNumber');
+    this.personalIdNumber = createStringResult(nativeVizResult, 'personalIdNumber');
+    this.documentAdditionalNumber = createStringResult(nativeVizResult, 'documentAdditionalNumber');
+    this.additionalPersonalIdNumber = createStringResult(nativeVizResult, 'additionalPersonalIdNumber');
+    this.issuingAuthority = createStringResult(nativeVizResult, 'issuingAuthority');
+    this.driverLicenseDetailedInfo = nativeVizResult['driverLicenseDetailedInfo'] != null
+        ? DriverLicenseDetailedInfo(Map<String, dynamic>.from(nativeVizResult['driverLicenseDetailedInfo']))
+        : null;
+    this.empty = nativeVizResult['empty'];
+    this.documentOptionalAdditionalNumber = createStringResult(nativeVizResult, 'documentOptionalAdditionalNumber');
+  }
 }
 
 StringResult? createStringResult(Map<String, dynamic> result, String propertyName) {
-    return result[propertyName] != null ? StringResult(Map<String, dynamic>.from(result[propertyName])) : null;
+  return result[propertyName] != null ? StringResult(Map<String, dynamic>.from(result[propertyName])) : null;
 }
-
-
 
 /// Extension factors relative to corresponding dimension of the full image. For example,
 /// upFactor and downFactor define extensions relative to image height, e.g.
@@ -2354,50 +3005,76 @@ class ImageExtensionFactors {
 
   ImageExtensionFactors();
 
-    factory ImageExtensionFactors.fromJson(Map<String, dynamic> json) => _$ImageExtensionFactorsFromJson(json);
-    Map<String, dynamic> toJson() => _$ImageExtensionFactorsToJson(this);
+  factory ImageExtensionFactors.fromJson(Map<String, dynamic> json) => _$ImageExtensionFactorsFromJson(json);
+  Map<String, dynamic> toJson() => _$ImageExtensionFactorsToJson(this);
 }
 
 /// Result of the data matching algorithm for scanned parts/sides of the document.
 enum DataMatchState {
-    /// Data matching has not been performed.
-    NotPerformed,
-    /// Data does not match.
-    Failed,
-    /// Data match.
-    Success
+  /// Data matching has not been performed.
+  NotPerformed,
+
+  /// Data does not match.
+  Failed,
+
+  /// Data match.
+  Success
 }
 
-/// Defines possible Android device camera video resolution preset 
+/// Defines possible Android device camera video resolution preset
 enum AndroidCameraResolutionPreset {
-    /// Will choose camera video resolution which is best for current device.
-    @JsonValue(0) PresetDefault,
-    /// Attempts to choose camera video resolution as closely as 480p.
-    @JsonValue(1) Preset480p,
-    /// Attempts to choose camera video resolution as closely as 720p.
-    @JsonValue(2) Preset720p,
-    /// Attempts to choose camera video resolution as closely as 1080p.
-    @JsonValue(3) Preset1080p,
-    /// Attempts to choose camera video resolution as closely as 2160p.
-    @JsonValue(4) Preset2160p,
-    /// Will choose max available camera video resolution.
-    @JsonValue(5) PresetMaxAvailable
+  /// Will choose camera video resolution which is best for current device.
+  @JsonValue(0)
+  PresetDefault,
+
+  /// Attempts to choose camera video resolution as closely as 480p.
+  @JsonValue(1)
+  Preset480p,
+
+  /// Attempts to choose camera video resolution as closely as 720p.
+  @JsonValue(2)
+  Preset720p,
+
+  /// Attempts to choose camera video resolution as closely as 1080p.
+  @JsonValue(3)
+  Preset1080p,
+
+  /// Attempts to choose camera video resolution as closely as 2160p.
+  @JsonValue(4)
+  Preset2160p,
+
+  /// Will choose max available camera video resolution.
+  @JsonValue(5)
+  PresetMaxAvailable
 }
 
-/// Define possible iOS device camera video resolution preset 
+/// Define possible iOS device camera video resolution preset
 enum iOSCameraResolutionPreset {
-    /// 480p video will always be used.
-    @JsonValue(0) Preset480p,
-    /// 720p video will always be used.
-    @JsonValue(1) Preset720p,
-    /// 1080p video will always be used.
-    @JsonValue(2) Preset1080p,
-    /// 4K video will always be used.
-    @JsonValue(3) Preset4K,
-    /// The library will calculate optimal resolution based on the use case and device used.
-    @JsonValue(4) PresetOptimal,
-    /// Device's maximal video resolution will be used.
-    @JsonValue(5) PresetMax,
-    /// Device's photo preview resolution will be used.
-    @JsonValue(6) PresetPhoto
+  /// 480p video will always be used.
+  @JsonValue(0)
+  Preset480p,
+
+  /// 720p video will always be used.
+  @JsonValue(1)
+  Preset720p,
+
+  /// 1080p video will always be used.
+  @JsonValue(2)
+  Preset1080p,
+
+  /// 4K video will always be used.
+  @JsonValue(3)
+  Preset4K,
+
+  /// The library will calculate optimal resolution based on the use case and device used.
+  @JsonValue(4)
+  PresetOptimal,
+
+  /// Device's maximal video resolution will be used.
+  @JsonValue(5)
+  PresetMax,
+
+  /// Device's photo preview resolution will be used.
+  @JsonValue(6)
+  PresetPhoto
 }

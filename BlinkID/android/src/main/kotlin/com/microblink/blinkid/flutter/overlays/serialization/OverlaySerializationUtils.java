@@ -4,11 +4,7 @@ import com.microblink.blinkid.uisettings.UISettings;
 import com.microblink.blinkid.uisettings.options.BeepSoundUIOptions;
 import com.microblink.blinkid.uisettings.CameraSettings;
 import com.microblink.blinkid.hardware.camera.CameraType;
-<<<<<<<< HEAD:BlinkID/android/src/main/kotlin/com/microblink/blinkid/flutter/overlays/serialization/OverlaySerializationUtils.java
-import com.microblink.flutter.R;
-========
 import com.microblink.blinkid.flutter.R;
->>>>>>>> master:BlinkID/android/src/main/java/com/microblink/blinkid/flutter/overlays/serialization/OverlaySerializationUtils.java
 
 import org.json.JSONObject;
 

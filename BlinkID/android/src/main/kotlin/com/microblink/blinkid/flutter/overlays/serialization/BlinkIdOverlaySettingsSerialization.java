@@ -7,13 +7,6 @@ import com.microblink.blinkid.fragment.overlay.blinkid.reticleui.ReticleOverlayS
 import com.microblink.blinkid.uisettings.BlinkIdUISettings;
 import com.microblink.blinkid.uisettings.UISettings;
 import com.microblink.blinkid.flutter.overlays.OverlaySettingsSerialization;
-<<<<<<<< HEAD:BlinkID/android/src/main/kotlin/com/microblink/blinkid/flutter/overlays/serialization/BlinkIdOverlaySettingsSerialization.java
-========
-import com.microblink.blinkid.flutter.SerializationUtils;
-import com.microblink.blinkid.locale.LanguageUtils;
-import com.microblink.blinkid.hardware.camera.VideoResolutionPreset;
-import com.microblink.blinkid.uisettings.CameraSettings;
->>>>>>>> master:BlinkID/android/src/main/java/com/microblink/blinkid/flutter/overlays/serialization/BlinkIdOverlaySettingsSerialization.java
 
 import org.json.JSONObject;
 
@@ -44,15 +37,12 @@ public final class BlinkIdOverlaySettingsSerialization implements OverlaySetting
         boolean showIntroductionDialog = jsonUISettings.optBoolean("showIntroductionDialog", false);
         settings.setShowIntroductionDialog(showIntroductionDialog);
 
-<<<<<<<< HEAD:BlinkID/android/src/main/kotlin/com/microblink/blinkid/flutter/overlays/serialization/BlinkIdOverlaySettingsSerialization.java
-========
         boolean showTorchButton = jsonUISettings.optBoolean("showTorchButton", true);
         settings.setShowTorchButton(showTorchButton);
 
         boolean showCancelButton = jsonUISettings.optBoolean("showCancelButton", true);
         settings.setShowCancelButton(showCancelButton);
 
->>>>>>>> master:BlinkID/android/src/main/java/com/microblink/blinkid/flutter/overlays/serialization/BlinkIdOverlaySettingsSerialization.java
         long onboardingButtonTooltipDelay = jsonUISettings.optLong("onboardingButtonTooltipDelay", 1200);
         settings.setShowTooltipTimeIntervalMs(onboardingButtonTooltipDelay);
 

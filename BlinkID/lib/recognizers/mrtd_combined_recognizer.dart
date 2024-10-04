@@ -29,7 +29,7 @@ class MrtdCombinedRecognizerResult extends RecognizerResult {
   bool? scanningFirstSideDone;
 
   MrtdCombinedRecognizerResult(Map<String, dynamic> nativeResult)
-      : super(RecognizerResultState.values[nativeResult['resultState']]) {
+      : super(RecognizerResultState.values[nativeResult['resultState']], nativeResult: nativeResult) {
     this.documentDataMatch =
         nativeResult["documentDataMatch"] != null ? DataMatchState.values[nativeResult["documentDataMatch"]] : null;
 
@@ -119,8 +119,6 @@ class MrtdCombinedRecognizer extends Recognizer {
   bool returnFullDocumentImage = false;
 
   MrtdCombinedRecognizer() : super('MrtdCombinedRecognizer');
-
-  bool allowSpecialCharacters = false;
 
   factory MrtdCombinedRecognizer.fromJson(Map<String, dynamic> json) => _$MrtdCombinedRecognizerFromJson(json);
   Map<String, dynamic> toJson() => _$MrtdCombinedRecognizerToJson(this);

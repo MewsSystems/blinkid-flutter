@@ -30,13 +30,6 @@ public abstract class SerializationUtils {
         jsonObject.put("resultState", serializeEnum(result.getResultState()));
     }
 
-<<<<<<<< HEAD:BlinkID/android/src/main/kotlin/com/microblink/blinkid/flutter/SerializationUtils.java
-========
-    /*public static <T extends Parser.Result> void addCommonParserResultData(JSONObject jsonObject, T result) throws JSONException {
-        jsonObject.put("resultState", serializeEnum(result.getResultState()));
-    }*/
-
->>>>>>>> master:BlinkID/android/src/main/java/com/microblink/blinkid/flutter/SerializationUtils.java
     public static JSONObject serializeSimpleDate( @Nullable  SimpleDate date ) throws JSONException {
         if (date != null ) {
             JSONObject jsonDate = new JSONObject();

@@ -90,8 +90,6 @@ class DocumentFaceRecognizer extends Recognizer {
 
   DocumentFaceRecognizer() : super('DocumentFaceRecognizer');
 
-  DocumentFaceDetectorType detectorType = DocumentFaceDetectorType.TD1;
-
   factory DocumentFaceRecognizer.fromJson(Map<String, dynamic> json) => _$DocumentFaceRecognizerFromJson(json);
   Map<String, dynamic> toJson() => _$DocumentFaceRecognizerToJson(this);
 }

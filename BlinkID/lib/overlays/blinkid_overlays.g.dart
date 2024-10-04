@@ -12,10 +12,7 @@ DocumentOverlaySettings _$DocumentOverlaySettingsFromJson(
       ..overlaySettingsType = json['overlaySettingsType'] as String?
       ..useFrontCamera = json['useFrontCamera'] as bool
       ..enableBeep = json['enableBeep'] as bool
-<<<<<<< HEAD
       ..flipFrontCamera = json['flipFrontCamera'] as bool
-=======
->>>>>>> master
       ..language = json['language'] as String?
       ..country = json['country'] as String?;
 
@@ -36,12 +33,7 @@ BlinkIdOverlaySettings _$BlinkIdOverlaySettingsFromJson(
       ..overlaySettingsType = json['overlaySettingsType'] as String?
       ..useFrontCamera = json['useFrontCamera'] as bool
       ..enableBeep = json['enableBeep'] as bool
-<<<<<<< HEAD
       ..flipFrontCamera = json['flipFrontCamera'] as bool
-      ..language = json['language'] as String?
-      ..country = json['country'] as String?
-=======
->>>>>>> master
       ..firstSideInstructionsText = json['firstSideInstructionsText'] as String?
       ..flipInstructions = json['flipInstructions'] as String?
       ..errorMoveCloser = json['errorMoveCloser'] as String?
@@ -67,9 +59,6 @@ BlinkIdOverlaySettings _$BlinkIdOverlaySettingsFromJson(
           (json['backSideScanningTimeoutMilliseconds'] as num).toInt()
       ..scanBarcodeText = json['scanBarcodeText'] as String?
       ..errorDocumentTooCloseToEdge =
-<<<<<<< HEAD
-          json['errorDocumentTooCloseToEdge'] as String?;
-=======
           json['errorDocumentTooCloseToEdge'] as String?
       ..language = json['language'] as String?
       ..country = json['country'] as String?
@@ -84,7 +73,6 @@ BlinkIdOverlaySettings _$BlinkIdOverlaySettingsFromJson(
           _$iOSCameraResolutionPresetEnumMap, json['iosCameraResolutionPreset'])
       ..enableAndroidLegacyCameraApi =
           json['enableAndroidLegacyCameraApi'] as bool;
->>>>>>> master
 
 Map<String, dynamic> _$BlinkIdOverlaySettingsToJson(
         BlinkIdOverlaySettings instance) =>
@@ -92,12 +80,7 @@ Map<String, dynamic> _$BlinkIdOverlaySettingsToJson(
       'overlaySettingsType': instance.overlaySettingsType,
       'useFrontCamera': instance.useFrontCamera,
       'enableBeep': instance.enableBeep,
-<<<<<<< HEAD
       'flipFrontCamera': instance.flipFrontCamera,
-      'language': instance.language,
-      'country': instance.country,
-=======
->>>>>>> master
       'firstSideInstructionsText': instance.firstSideInstructionsText,
       'flipInstructions': instance.flipInstructions,
       'errorMoveCloser': instance.errorMoveCloser,
@@ -158,10 +141,7 @@ DocumentVerificationOverlaySettings
           ..overlaySettingsType = json['overlaySettingsType'] as String?
           ..useFrontCamera = json['useFrontCamera'] as bool
           ..enableBeep = json['enableBeep'] as bool
-<<<<<<< HEAD
           ..flipFrontCamera = json['flipFrontCamera'] as bool
-=======
->>>>>>> master
           ..language = json['language'] as String?
           ..country = json['country'] as String?
           ..firstSideSplashMessage = json['firstSideSplashMessage'] as String?
