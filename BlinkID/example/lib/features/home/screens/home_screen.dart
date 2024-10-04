@@ -42,7 +42,7 @@ extension on BuildContext {
 
                 return ExpansionTile(
                   title: Text(name),
-                  children: item.formatted.entries
+                  children: item.result.entries
                       .map((entry) => ListTile(title: Text('${entry.key}: ${entry.value}')))
                       .toList(),
                 );
@@ -55,21 +55,8 @@ extension on BuildContext {
 }
 
 extension on RecognizerResult {
-  Map<String, dynamic> get formatted => switch (this) {
-        final BlinkIdMultiSideRecognizerResult result => {
-            'First Name': result.firstName?.latin,
-            'Last Name': result.lastName?.latin,
-            'Age': result.age,
-            'Nationality': result.nationality?.latin,
-            'Nationality Code': result.nationalityIsoAlpha2,
-            'Sex': result.sex?.latin,
-            'Document Number': result.documentNumber?.latin,
-            'Document Additional Number': result.documentAdditionalNumber?.latin,
-            'Document Expiry Date': result.dateOfExpiry?.date?.dateTime,
-            'Date of Birth': result.dateOfBirth?.date?.dateTime,
-            'Date of Expiry': result.dateOfExpiry?.date?.dateTime,
-            'Address': result.address?.latin,
-          },
+  Map<String, dynamic> get result => switch (this) {
+        final BlinkIdMultiSideRecognizerResult result => result.nativeResult ?? {},
         _ => toJson(),
       };
 }
