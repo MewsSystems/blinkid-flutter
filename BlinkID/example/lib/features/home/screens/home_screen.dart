@@ -42,7 +42,8 @@ extension on BuildContext {
 
                 return ExpansionTile(
                   title: Text(name),
-                  children: item.result.entries
+                  children: (item.nativeResult ?? {})
+                      .entries
                       .map((entry) => ListTile(title: Text('${entry.key}: ${entry.value}')))
                       .toList(),
                 );
@@ -52,13 +53,6 @@ extension on BuildContext {
           ),
         ),
       );
-}
-
-extension on RecognizerResult {
-  Map<String, dynamic> get result => switch (this) {
-        final BlinkIdMultiSideRecognizerResult result => result.nativeResult ?? {},
-        _ => toJson(),
-      };
 }
 
 extension on Date {
