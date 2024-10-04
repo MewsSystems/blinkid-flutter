@@ -103,7 +103,7 @@ class _DocumentScannerDialogState extends State<_DocumentScannerDialog> {
                     ValueListenableBuilder(
                       valueListenable: _detectionStatusNotifier,
                       builder: (_, detectionStatus, __) => Text(
-                        detectionStatus?.directions ?? '',
+                        detectionStatus?.name ?? '',
                         style: Theme.of(context)
                             .textTheme
                             .headlineMedium
@@ -130,19 +130,6 @@ class _DocumentScannerDialogState extends State<_DocumentScannerDialog> {
           ),
         ),
       );
-}
-
-extension on DetectionStatus {
-  String get directions => switch (this) {
-        DetectionStatus.Failed => 'No document detected.',
-        DetectionStatus.CameraAngleTooSteep => 'Adjust the camera angle.',
-        DetectionStatus.CameraTooClose => 'Move the camera further away.',
-        DetectionStatus.CameraTooFar => 'Move the camera closer.',
-        DetectionStatus.DocumentPartiallyVisible => 'Document is partially visible.',
-        DetectionStatus.DocumentTooCloseToCameraEdge => 'Move the document away from the edge.',
-        DetectionStatus.Success => 'Document detected.',
-        DetectionStatus.FallbackSuccess => 'Fallback success.',
-      };
 }
 
 extension on TargetPlatform {
