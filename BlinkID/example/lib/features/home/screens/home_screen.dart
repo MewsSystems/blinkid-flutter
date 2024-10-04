@@ -54,15 +54,3 @@ extension on BuildContext {
         ),
       );
 }
-
-extension on Date {
-  DateTime? get dateTime {
-    final year = this.year;
-    final month = this.month;
-    final day = this.day;
-
-    if (year == null || month == null || day == null) return null;
-
-    return DateTime(year, month, day);
-  }
-}
