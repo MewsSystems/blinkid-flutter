@@ -6,27 +6,22 @@ part of 'blink_id_single_side_recognizer.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-BlinkIdSingleSideRecognizer _$BlinkIdSingleSideRecognizerFromJson(
-        Map<String, dynamic> json) =>
+BlinkIdSingleSideRecognizer _$BlinkIdSingleSideRecognizerFromJson(Map<String, dynamic> json) =>
     BlinkIdSingleSideRecognizer()
       ..recognizerType = json['recognizerType'] as String
-      ..additionalAnonymization = (json['additionalAnonymization']
-              as List<dynamic>)
-          .map((e) =>
-              ClassAnonymizationSettings.fromJson(e as Map<String, dynamic>))
+      ..additionalAnonymization = (json['additionalAnonymization'] as List<dynamic>)
+          .map((e) => ClassAnonymizationSettings.fromJson(e as Map<String, dynamic>))
           .toList()
       ..allowBlurFilter = json['allowBlurFilter'] as bool
       ..allowUnparsedMrzResults = json['allowUnparsedMrzResults'] as bool
       ..allowUnverifiedMrzResults = json['allowUnverifiedMrzResults'] as bool
-      ..anonymizationMode =
-          $enumDecode(_$AnonymizationModeEnumMap, json['anonymizationMode'])
+      ..anonymizationMode = $enumDecode(_$AnonymizationModeEnumMap, json['anonymizationMode'])
       ..faceImageDpi = (json['faceImageDpi'] as num).toInt()
       ..fullDocumentImageDpi = (json['fullDocumentImageDpi'] as num).toInt()
-      ..fullDocumentImageExtensionFactors = ImageExtensionFactors.fromJson(
-          json['fullDocumentImageExtensionFactors'] as Map<String, dynamic>)
+      ..fullDocumentImageExtensionFactors =
+          ImageExtensionFactors.fromJson(json['fullDocumentImageExtensionFactors'] as Map<String, dynamic>)
       ..paddingEdge = (json['paddingEdge'] as num).toDouble()
-      ..recognitionModeFilter = RecognitionModeFilter.fromJson(
-          json['recognitionModeFilter'] as Map<String, dynamic>)
+      ..recognitionModeFilter = RecognitionModeFilter.fromJson(json['recognitionModeFilter'] as Map<String, dynamic>)
       ..returnFaceImage = json['returnFaceImage'] as bool
       ..returnFullDocumentImage = json['returnFullDocumentImage'] as bool
       ..returnSignatureImage = json['returnSignatureImage'] as bool
@@ -35,21 +30,16 @@ BlinkIdSingleSideRecognizer _$BlinkIdSingleSideRecognizerFromJson(
       ..signatureImageDpi = (json['signatureImageDpi'] as num).toInt()
       ..validateResultCharacters = json['validateResultCharacters'] as bool;
 
-Map<String, dynamic> _$BlinkIdSingleSideRecognizerToJson(
-        BlinkIdSingleSideRecognizer instance) =>
-    <String, dynamic>{
+Map<String, dynamic> _$BlinkIdSingleSideRecognizerToJson(BlinkIdSingleSideRecognizer instance) => <String, dynamic>{
       'recognizerType': instance.recognizerType,
-      'additionalAnonymization':
-          instance.additionalAnonymization.map((e) => e.toJson()).toList(),
+      'additionalAnonymization': instance.additionalAnonymization.map((e) => e.toJson()).toList(),
       'allowBlurFilter': instance.allowBlurFilter,
       'allowUnparsedMrzResults': instance.allowUnparsedMrzResults,
       'allowUnverifiedMrzResults': instance.allowUnverifiedMrzResults,
-      'anonymizationMode':
-          _$AnonymizationModeEnumMap[instance.anonymizationMode]!,
+      'anonymizationMode': _$AnonymizationModeEnumMap[instance.anonymizationMode]!,
       'faceImageDpi': instance.faceImageDpi,
       'fullDocumentImageDpi': instance.fullDocumentImageDpi,
-      'fullDocumentImageExtensionFactors':
-          instance.fullDocumentImageExtensionFactors.toJson(),
+      'fullDocumentImageExtensionFactors': instance.fullDocumentImageExtensionFactors.toJson(),
       'paddingEdge': instance.paddingEdge,
       'recognitionModeFilter': instance.recognitionModeFilter.toJson(),
       'returnFaceImage': instance.returnFaceImage,

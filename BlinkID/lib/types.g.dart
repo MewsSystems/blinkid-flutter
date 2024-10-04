@@ -16,36 +16,29 @@ Map<String, dynamic> _$PointToJson(Point instance) => <String, dynamic>{
       'y': instance.y,
     };
 
-Quadrilateral _$QuadrilateralFromJson(Map<String, dynamic> json) =>
-    Quadrilateral(
+Quadrilateral _$QuadrilateralFromJson(Map<String, dynamic> json) => Quadrilateral(
       upperLeft: Point.fromJson(json['upperLeft'] as Map<String, dynamic>),
       upperRight: Point.fromJson(json['upperRight'] as Map<String, dynamic>),
       lowerLeft: Point.fromJson(json['lowerLeft'] as Map<String, dynamic>),
       lowerRight: Point.fromJson(json['lowerRight'] as Map<String, dynamic>),
     );
 
-Map<String, dynamic> _$QuadrilateralToJson(Quadrilateral instance) =>
-    <String, dynamic>{
+Map<String, dynamic> _$QuadrilateralToJson(Quadrilateral instance) => <String, dynamic>{
       'upperLeft': instance.upperLeft.toJson(),
       'upperRight': instance.upperRight.toJson(),
       'lowerLeft': instance.lowerLeft.toJson(),
       'lowerRight': instance.lowerRight.toJson(),
     };
 
-RecognitionModeFilter _$RecognitionModeFilterFromJson(
-        Map<String, dynamic> json) =>
-    RecognitionModeFilter()
-      ..enableMrzId = json['enableMrzId'] as bool
-      ..enableMrzVisa = json['enableMrzVisa'] as bool
-      ..enableMrzPassport = json['enableMrzPassport'] as bool
-      ..enablePhotoId = json['enablePhotoId'] as bool
-      ..enableBarcodeId = json['enableBarcodeId'] as bool
-      ..enableFullDocumentRecognition =
-          json['enableFullDocumentRecognition'] as bool;
+RecognitionModeFilter _$RecognitionModeFilterFromJson(Map<String, dynamic> json) => RecognitionModeFilter()
+  ..enableMrzId = json['enableMrzId'] as bool
+  ..enableMrzVisa = json['enableMrzVisa'] as bool
+  ..enableMrzPassport = json['enableMrzPassport'] as bool
+  ..enablePhotoId = json['enablePhotoId'] as bool
+  ..enableBarcodeId = json['enableBarcodeId'] as bool
+  ..enableFullDocumentRecognition = json['enableFullDocumentRecognition'] as bool;
 
-Map<String, dynamic> _$RecognitionModeFilterToJson(
-        RecognitionModeFilter instance) =>
-    <String, dynamic>{
+Map<String, dynamic> _$RecognitionModeFilterToJson(RecognitionModeFilter instance) => <String, dynamic>{
       'enableMrzId': instance.enableMrzId,
       'enableMrzVisa': instance.enableMrzVisa,
       'enableMrzPassport': instance.enableMrzPassport,
@@ -54,19 +47,14 @@ Map<String, dynamic> _$RecognitionModeFilterToJson(
       'enableFullDocumentRecognition': instance.enableFullDocumentRecognition,
     };
 
-ClassAnonymizationSettings _$ClassAnonymizationSettingsFromJson(
-        Map<String, dynamic> json) =>
+ClassAnonymizationSettings _$ClassAnonymizationSettingsFromJson(Map<String, dynamic> json) =>
     ClassAnonymizationSettings()
       ..country = $enumDecodeNullable(_$CountryEnumMap, json['country'])
       ..region = $enumDecodeNullable(_$RegionEnumMap, json['region'])
       ..type = $enumDecodeNullable(_$TypeEnumMap, json['type'])
-      ..fields = (json['fields'] as List<dynamic>)
-          .map((e) => $enumDecode(_$FieldTypeEnumMap, e))
-          .toList();
+      ..fields = (json['fields'] as List<dynamic>).map((e) => $enumDecode(_$FieldTypeEnumMap, e)).toList();
 
-Map<String, dynamic> _$ClassAnonymizationSettingsToJson(
-        ClassAnonymizationSettings instance) =>
-    <String, dynamic>{
+Map<String, dynamic> _$ClassAnonymizationSettingsToJson(ClassAnonymizationSettings instance) => <String, dynamic>{
       'country': _$CountryEnumMap[instance.country],
       'region': _$RegionEnumMap[instance.region],
       'type': _$TypeEnumMap[instance.type],
@@ -573,34 +561,25 @@ const _$FieldTypeEnumMap = {
   FieldType.Sponsor: 37,
 };
 
-ImageExtensionFactors _$ImageExtensionFactorsFromJson(
-        Map<String, dynamic> json) =>
-    ImageExtensionFactors()
-      ..upFactor = (json['upFactor'] as num?)?.toDouble()
-      ..rightFactor = (json['rightFactor'] as num?)?.toDouble()
-      ..downFactor = (json['downFactor'] as num?)?.toDouble()
-      ..leftFactor = (json['leftFactor'] as num?)?.toDouble();
+ImageExtensionFactors _$ImageExtensionFactorsFromJson(Map<String, dynamic> json) => ImageExtensionFactors()
+  ..upFactor = (json['upFactor'] as num?)?.toDouble()
+  ..rightFactor = (json['rightFactor'] as num?)?.toDouble()
+  ..downFactor = (json['downFactor'] as num?)?.toDouble()
+  ..leftFactor = (json['leftFactor'] as num?)?.toDouble();
 
-Map<String, dynamic> _$ImageExtensionFactorsToJson(
-        ImageExtensionFactors instance) =>
-    <String, dynamic>{
+Map<String, dynamic> _$ImageExtensionFactorsToJson(ImageExtensionFactors instance) => <String, dynamic>{
       'upFactor': instance.upFactor,
       'rightFactor': instance.rightFactor,
       'downFactor': instance.downFactor,
       'leftFactor': instance.leftFactor,
     };
 
-DetectionUpdate _$DetectionUpdateFromJson(Map<String, dynamic> json) =>
-    DetectionUpdate(
+DetectionUpdate _$DetectionUpdateFromJson(Map<String, dynamic> json) => DetectionUpdate(
       $enumDecode(_$DetectionStatusEnumMap, json['detectionStatus']),
-      json['displayLocation'] == null
-          ? null
-          : Quadrilateral.fromJson(
-              json['displayLocation'] as Map<String, dynamic>),
+      json['displayLocation'] == null ? null : Quadrilateral.fromJson(json['displayLocation'] as Map<String, dynamic>),
     );
 
-Map<String, dynamic> _$DetectionUpdateToJson(DetectionUpdate instance) =>
-    <String, dynamic>{
+Map<String, dynamic> _$DetectionUpdateToJson(DetectionUpdate instance) => <String, dynamic>{
       'detectionStatus': _$DetectionStatusEnumMap[instance.detectionStatus]!,
       'displayLocation': instance.displayLocation?.toJson(),
     };
@@ -613,6 +592,5 @@ const _$DetectionStatusEnumMap = {
   DetectionStatus.DocumentPartiallyVisible: 'DOCUMENT_PARTIALLY_VISIBLE',
   DetectionStatus.CameraAngleTooSteep: 'CAMERA_ANGLE_TOO_STEEP',
   DetectionStatus.CameraTooClose: 'CAMERA_TOO_CLOSE',
-  DetectionStatus.DocumentTooCloseToCameraEdge:
-      'DOCUMENT_TOO_CLOSE_TO_CAMERA_EDGE',
+  DetectionStatus.DocumentTooCloseToCameraEdge: 'DOCUMENT_TOO_CLOSE_TO_CAMERA_EDGE',
 };
