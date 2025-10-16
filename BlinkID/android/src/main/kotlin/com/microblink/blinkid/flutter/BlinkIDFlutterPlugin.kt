@@ -31,7 +31,6 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.PluginRegistry.ActivityResultListener
-import io.flutter.plugin.common.PluginRegistry.Registrar
 import org.json.JSONObject
 
 class BlinkIDFlutterPlugin : FlutterPlugin, MethodCallHandler,
@@ -327,13 +326,6 @@ class BlinkIDFlutterPlugin : FlutterPlugin, MethodCallHandler,
         private const val ARG_FRONT_IMAGE = "frontImage"
         private const val ARG_BACK_IMAGE = "backImage"
 
-        // This static function is optional and equivalent to onAttachedToEngine. It supports the old
-        // pre-Flutter-1.12 Android projects.
-        fun registerWith(registrar: Registrar) {
-            val plugin = BlinkIDFlutterPlugin()
-            plugin.setupPlugin(registrar.activity(), registrar.messenger())
-            registrar.addActivityResultListener(plugin)
-        }
     }
 
 
