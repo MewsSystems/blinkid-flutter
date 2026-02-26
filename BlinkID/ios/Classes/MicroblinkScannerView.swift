@@ -1,4 +1,4 @@
-import Flutter
+@preconcurrency import Flutter
 import UIKit
 
 public class MicroblinkScannerViewFactory: NSObject, FlutterPlatformViewFactory {
@@ -13,6 +13,7 @@ public class MicroblinkScannerViewFactory: NSObject, FlutterPlatformViewFactory 
         return FlutterStandardMessageCodec.sharedInstance()
     }
     
+    @MainActor
     public func create(
         withFrame frame: CGRect,
         viewIdentifier viewId: Int64,
@@ -26,6 +27,7 @@ public class MicroblinkScannerViewFactory: NSObject, FlutterPlatformViewFactory 
     }
 }
 
+@MainActor
 class MicroblinkScannerView: NSObject,
                              FlutterPlatformView {
     
@@ -81,7 +83,7 @@ class MicroblinkScannerView: NSObject,
         recognizerController.didMove(toParent: controller)
     }
     
-    private func methodHandler(_ call: FlutterMethodCall, _ result: @escaping FlutterResult){
+    private func methodHandler(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
         switch(call.method){
         case "resumeScanning":
             self.overlayViewController?.resumeScanning()
@@ -160,6 +162,7 @@ protocol CustomOverlayViewControllerDelegate {
     func onError(error: Error)
 }
 
+@MainActor
 class CustomOverlayViewController : MBCustomOverlayViewController,
                                     MBScanningRecognizerRunnerViewControllerDelegate,
                                     MBFirstSideFinishedRecognizerRunnerViewControllerDelegate,
