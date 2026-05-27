@@ -31,9 +31,6 @@ object BlinkIdSerializationUtils {
     fun serializeBlinkIdScanningResult(scanningResult: BlinkIdScanningResult?): String? {
         val scanningResultDict: MutableMap<String, Any?> = mutableMapOf()
 
-        scanningResult?.mode.let {
-            scanningResultDict["recognitionMode"] = it?.ordinal
-        }
         scanningResult?.documentClassInfo?.let {
             scanningResultDict["documentClassInfo"] = serializeDocumentClassInfo(it)
         }
@@ -233,9 +230,6 @@ object BlinkIdSerializationUtils {
         scanningResult?.inputImage(ScanningSide.Second)?.let {
             scanningResultDict["secondInputImage"] = encodeBase64Image(it.bitmap)
         }
-        scanningResult?.barcodeInputImage()?.let {
-            scanningResultDict["barcodeInputImage"] = encodeBase64Image(it.bitmap)
-        }
         scanningResult?.documentImage(ScanningSide.First)?.let {
             scanningResultDict["firstDocumentImage"] = encodeBase64Image(it.bitmap)
         }
@@ -406,7 +400,7 @@ object BlinkIdSerializationUtils {
     private fun serializeSubResult(subResult: SingleSideScanningResult): Map<String, Any?> {
         return mapOf(
             "barcode" to serializeBarcodeResult(subResult.barcode),
-            "barcodeInputImage" to encodeBase64Image(subResult.barcodeInputImage?.bitmap),
+            "barcodeInputImage" to encodeBase64Image(subResult.barcodeImage?.bitmap),
             "documentImage" to encodeBase64Image(subResult.documentImage?.bitmap),
             "faceImage" to serializeDetailedCroppedImageResult(subResult.faceImage),
             "inputImage" to encodeBase64Image(subResult.inputImage?.bitmap),

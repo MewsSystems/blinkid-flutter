@@ -3,7 +3,6 @@ package com.microblink.blinkid.flutter
 import android.graphics.BitmapFactory
 import android.os.Parcelable
 import com.microblink.blinkid.core.BlinkIdSdkSettings
-import com.microblink.blinkid.core.result.AlphabetType
 import com.microblink.blinkid.core.result.FieldType
 import com.microblink.blinkid.core.result.classinfo.Country
 import com.microblink.blinkid.core.result.classinfo.DocumentClassInfo
@@ -11,15 +10,19 @@ import com.microblink.blinkid.core.result.classinfo.Region
 import com.microblink.blinkid.core.result.classinfo.Type
 import com.microblink.blinkid.core.session.BlinkIdSessionSettings
 import com.microblink.blinkid.core.session.ScanningMode
-import com.microblink.blinkid.core.settings.CroppedImageSettings
-import com.microblink.blinkid.core.settings.DetailedFieldType
 import com.microblink.blinkid.core.settings.DocumentFilter
-import com.microblink.blinkid.core.settings.DocumentRules
-import com.microblink.blinkid.core.settings.RecognitionModeFilter
+import com.microblink.blinkid.core.settings.DocumentNumberRedactionSettings
+import com.microblink.blinkid.core.settings.RedactionSettings
 import com.microblink.blinkid.core.settings.ScanningSettings
+import com.microblink.blinkid.core.settings.scanning.BarcodeModuleSettings
+import com.microblink.blinkid.core.settings.scanning.DocumentCaptureModuleSettings
+import com.microblink.blinkid.core.settings.scanning.MrzModuleSettings
+import com.microblink.blinkid.core.settings.scanning.VizModuleSettings
 import com.microblink.blinkid.ux.settings.BlinkIdUxSettings
-import com.microblink.blinkid.core.settings.DocumentAnonymizationSettings
 import com.microblink.blinkid.ux.settings.ClassFilter
+import com.microblink.core.network.RequestTimeout
+import com.microblink.core.session.InputImageSource
+import com.microblink.core.settings.RedactionMode
 import com.microblink.core.utils.defaultResourceDownloadUrl
 import com.microblink.core.utils.defaultResourcesLocalFolder
 import kotlin.time.Duration.Companion.milliseconds
@@ -27,11 +30,6 @@ import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.RawValue
 import android.graphics.Bitmap
 import android.util.Base64
-import com.microblink.blinkid.core.settings.DocumentNumberAnonymizationSettings
-import com.microblink.core.network.RequestTimeout
-import com.microblink.core.session.InputImageSource
-import com.microblink.core.settings.AnonymizationMode
-import com.microblink.core.settings.DetectionLevel
 import com.microblink.ux.camera.CameraLensFacing
 import com.microblink.ux.camera.CameraSettings
 
@@ -72,57 +70,45 @@ object BlinkIdDeserializationUtils {
     private fun deserializeScanningSettings(scanningSettingsMap: Map<String, Any>?): ScanningSettings {
         if (scanningSettingsMap == null) return ScanningSettings()
         return ScanningSettings(
-            blurDetectionLevel = DetectionLevel.entries[scanningSettingsMap["blurDetectionLevel"] as? Int
-                ?: DetectionLevel.Mid.ordinal],
-            skipImagesWithBlur = scanningSettingsMap["skipImagesWithBlur"] as? Boolean ?: true,
-            glareDetectionLevel = DetectionLevel.entries[scanningSettingsMap["glareDetectionLevel"] as? Int
-                ?: DetectionLevel.Mid.ordinal],
-            skipImagesWithGlare = scanningSettingsMap["skipImagesWithGlare"] as? Boolean ?: true,
-            tiltDetectionLevel = DetectionLevel.entries[scanningSettingsMap["tiltDetectionLevel"] as? Int
-                ?: DetectionLevel.Off.ordinal],
-            skipImagesWithInadequateLightingConditions = scanningSettingsMap["skipImagesWithInadequateLightingConditions"] as? Boolean
-                ?: true,
-            skipImagesOccludedByHand = scanningSettingsMap["skipImagesOccludedByHand"] as? Boolean
-                ?: true,
-            combineResultsFromMultipleInputImages = scanningSettingsMap["combineResultsFromMultipleInputImages"] as? Boolean
-                ?: true,
-            enableBarcodeScanOnly = scanningSettingsMap["enableBarcodeScanOnly"] as? Boolean
-                ?: false,
-            customDocumentRules = deserializeDocumentRules(scanningSettingsMap["customDocumentRules"] as? List<Map<String, Any>>),
-            anonymizationMode = AnonymizationMode.entries[scanningSettingsMap["anonymizationMode"] as? Int
-                ?: AnonymizationMode.FullResult.ordinal],
-            customDocumentAnonymizationSettings = deserializeCustomAnonymizationSetings(
-                scanningSettingsMap["customDocumentAnonymizationSettings"] as? List<Map<String, Any>>
-            ),
-            returnInputImages = scanningSettingsMap["returnInputImages"] as? Boolean ?: false,
-            scanCroppedDocumentImage = scanningSettingsMap["scanCroppedDocumentImage"] as? Boolean
-                ?: false,
-            recognitionModeFilter = deserializeRecognitionModeFilter(scanningSettingsMap["recognitionModeFilter"] as? Map<String, Any>),
-            enableCharacterValidation = scanningSettingsMap["enableCharacterValidation"] as? Boolean
-                ?: true,
-            inputImageMargin = (scanningSettingsMap["inputImageMargin"] as? Number)?.toFloat()
-                ?: 0.02f,
-            scanUnsupportedBack = scanningSettingsMap["scanUnsupportedBack"] as? Boolean ?: false,
-            allowUncertainFrontSideScan = scanningSettingsMap["allowUncertainFrontSideScan"] as? Boolean
-                ?: false,
+            documentCaptureModule = deserializeDocumentCaptureModuleSettings(scanningSettingsMap["documentCaptureModule"] as? Map<String, Any>),
+            barcodeModule = deserializeBarcodeModuleSettings(scanningSettingsMap["barcodeModule"] as? Map<String, Any>),
+            mrzModule = deserializeMrzModuleSettings(scanningSettingsMap["mrzModule"] as? Map<String, Any>),
+            vizModule = deserializeVizModuleSettings(scanningSettingsMap["vizModule"] as? Map<String, Any>),
             maxAllowedMismatchesPerField = (scanningSettingsMap["maxAllowedMismatchesPerField"] as? Int)?.toUInt()
                 ?: 0u,
-            scanPassportDataPageOnly = scanningSettingsMap["scanPassportDataPageOnly"] as? Boolean
-                ?: true,
-            croppedImageSettings = deserializeCroppedImageSettings(scanningSettingsMap["croppedImageSettings"] as? Map<String, Any>),
         )
     }
 
-    private fun deserializeCroppedImageSettings(croppedImageSettingsMap: Map<String, Any>?): CroppedImageSettings {
-        if (croppedImageSettingsMap == null) return CroppedImageSettings()
-        return CroppedImageSettings(
-            dotsPerInch = (croppedImageSettingsMap["dotsPerInch"] as? Int)?.toUShort() ?: 250u,
-            extensionFactor = croppedImageSettingsMap["extensionFactor"] as? Float ?: 0.0f,
-            returnDocumentImage = croppedImageSettingsMap["returnDocumentImage"] as? Boolean
-                ?: false,
-            returnFaceImage = croppedImageSettingsMap["returnFaceImage"] as? Boolean ?: false,
-            returnSignatureImage = croppedImageSettingsMap["returnSignatureImage"] as? Boolean
-                ?: false,
+    private fun deserializeDocumentCaptureModuleSettings(map: Map<String, Any>?): DocumentCaptureModuleSettings {
+        if (map == null) return DocumentCaptureModuleSettings()
+        return DocumentCaptureModuleSettings(
+            documentImageReturnEnabled = map["documentImageReturnEnabled"] as? Boolean ?: false,
+            faceImageExtractionEnabled = map["faceImageExtractionEnabled"] as? Boolean ?: false,
+            inputImageReturnEnabled = map["returnInputImages"] as? Boolean ?: false,
+            inputImageCropped = map["inputImageCropped"] as? Boolean ?: false,
+        )
+    }
+
+    private fun deserializeBarcodeModuleSettings(map: Map<String, Any>?): BarcodeModuleSettings {
+        if (map == null) return BarcodeModuleSettings()
+        return BarcodeModuleSettings(
+            presenceMandatory = map["presenceMandatory"] as? Boolean ?: false,
+            pdf417ScanningEnabled = map["pdf417ScanningEnabled"] as? Boolean ?: true,
+            qrScanningEnabled = map["qrScanningEnabled"] as? Boolean ?: true,
+        )
+    }
+
+    private fun deserializeMrzModuleSettings(map: Map<String, Any>?): MrzModuleSettings {
+        if (map == null) return MrzModuleSettings()
+        return MrzModuleSettings(
+            presenceMandatory = map["presenceMandatory"] as? Boolean ?: false,
+        )
+    }
+
+    private fun deserializeVizModuleSettings(map: Map<String, Any>?): VizModuleSettings {
+        if (map == null) return VizModuleSettings()
+        return VizModuleSettings(
+            presenceMandatory = map["presenceMandatory"] as? Boolean ?: false,
         )
     }
 
@@ -133,38 +119,6 @@ object BlinkIdDeserializationUtils {
             writeTimeoutMillis = resourceRequestTimeoutMap["writeTimeoutMilliseconds"] as? Int ?: 10000,
             readTimeoutMillis = resourceRequestTimeoutMap["readTimeoutMilliseconds"] as? Int ?: 10000
         )
-    }
-
-    private fun deserializeDocumentRules(documentRulesMapArray: List<Map<String, Any>>?): List<DocumentRules> {
-        if (documentRulesMapArray == null) return emptyList()
-        val documentRulesList = mutableListOf<DocumentRules>()
-
-        for (documentRulesMap in documentRulesMapArray) {
-            (documentRulesMap["fields"] as? List<Map<String, Any>>)?.let { fields ->
-                val deserializedFields = fields.mapNotNull { deserializeDetailedFieldType(it) }
-                documentRulesList.add(
-                    DocumentRules(
-                        deserializeDocumentFilter(documentRulesMap["documentFilter"] as? Map<String, Any>),
-                        deserializedFields
-                    )
-                )
-            } ?: continue
-        }
-        return documentRulesList
-    }
-
-    private fun deserializeDetailedFieldType(detailedFieldTypeMap: Map<String, Any>?): DetailedFieldType? {
-        val fieldTypeName = detailedFieldTypeMap?.get("fieldType") as? String
-        val alphabetTypeName = detailedFieldTypeMap?.get("alphabetType") as? String
-
-        return if (fieldTypeName != null && alphabetTypeName != null) {
-            DetailedFieldType(
-                enumValueOf<FieldType>(fieldTypeName.replaceFirstChar { char -> char.uppercase() }),
-                enumValueOf<AlphabetType>(alphabetTypeName.replaceFirstChar { char -> char.uppercase() })
-            )
-        } else {
-            null
-        }
     }
 
     private fun deserializeDocumentFilter(documentFilterMap: Map<String, Any>?): DocumentFilter {
@@ -186,44 +140,28 @@ object BlinkIdDeserializationUtils {
         }
     }
 
-    private fun deserializeCustomAnonymizationSetings(customAnonymizationSettingsMapArray: List<Map<String, Any>>?): List<DocumentAnonymizationSettings> {
-        if (customAnonymizationSettingsMapArray == null) return emptyList()
-
-        val customAnonymizationList = mutableListOf<DocumentAnonymizationSettings>()
-        for (customAnonymizationSettingsMap in customAnonymizationSettingsMapArray) {
-            (customAnonymizationSettingsMap["fields"] as? List<String>)?.let { fields ->
-                val deserializedFields = fields.map { enumValueOf<FieldType>(it.replaceFirstChar { char -> char.uppercase() }) }
-                customAnonymizationList.add(
-                    DocumentAnonymizationSettings(
-                        deserializeDocumentFilter(customAnonymizationSettingsMap["documentFilter"] as? Map<String, Any>),
-                        deserializedFields,
-                        deserializeDocumentNumberAnonymizationSettings(customAnonymizationSettingsMap["documentNumberAnonymizationSettings"] as? Map<String, Any>)
-                    )
-                )
-            } ?: continue
-        }
-        return customAnonymizationList
-    }
-
-    private fun deserializeDocumentNumberAnonymizationSettings(documentNumberAnonymizationSettingsMap: Map<String, Any>?): DocumentNumberAnonymizationSettings? {
-        if (documentNumberAnonymizationSettingsMap == null) return null
-        return DocumentNumberAnonymizationSettings(
-            prefixDigitsVisible = (documentNumberAnonymizationSettingsMap["prefixDigitsVisible"] as? Int)?.toUByte() ?: 0u,
-            suffixDigitsVisible = (documentNumberAnonymizationSettingsMap["suffixDigitsVisible"] as? Int)?.toUByte() ?: 0u,
+    fun deserializeRedactionSettings(redactionSettingsMap: Map<String, Any>?): RedactionSettings? {
+        if (redactionSettingsMap == null) return null
+        val mode = RedactionMode.entries[redactionSettingsMap["mode"] as? Int ?: RedactionMode.FullResult.ordinal]
+        val fields = (redactionSettingsMap["fields"] as? List<String>)?.map {
+            enumValueOf<FieldType>(it.replaceFirstChar { char -> char.uppercase() })
+        } ?: emptyList()
+        val docNumSettings = deserializeDocumentNumberRedactionSettings(
+            redactionSettingsMap["documentNumberRedactionSettings"] as? Map<String, Any>
+        )
+        return RedactionSettings(
+            mode,
+            fields,
+            docNumSettings ?: DocumentNumberRedactionSettings(),
         )
     }
 
-    private fun deserializeRecognitionModeFilter(recognitionModeFilterMap: Map<String, Any>?): RecognitionModeFilter {
-        if (recognitionModeFilterMap == null) return RecognitionModeFilter()
-        val filter = RecognitionModeFilter()
-        filter.enableMrzId = recognitionModeFilterMap["enableMrzId"] as? Boolean ?: true
-        filter.enableMrzVisa = recognitionModeFilterMap["enableMrzVisa"] as? Boolean ?: true
-        filter.enablePhotoId = recognitionModeFilterMap["enablePhotoId"] as? Boolean ?: true
-        filter.enableBarcodeId = recognitionModeFilterMap["enableBarcodeId"] as? Boolean ?: true
-        filter.enableMrzPassport = recognitionModeFilterMap["enableMrzPassport"] as? Boolean ?: true
-        filter.enableFullDocumentRecognition =
-            recognitionModeFilterMap["enableFullDocumentRecognition"] as? Boolean ?: true
-        return filter
+    private fun deserializeDocumentNumberRedactionSettings(documentNumberRedactionSettingsMap: Map<String, Any>?): DocumentNumberRedactionSettings? {
+        if (documentNumberRedactionSettingsMap == null) return null
+        return DocumentNumberRedactionSettings(
+            prefixDigitsVisible = (documentNumberRedactionSettingsMap["prefixDigitsVisible"] as? Int)?.toUByte() ?: 0u,
+            suffixDigitsVisible = (documentNumberRedactionSettingsMap["suffixDigitsVisible"] as? Int)?.toUByte() ?: 0u,
+        )
     }
 
 

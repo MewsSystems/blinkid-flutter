@@ -24,7 +24,7 @@ import kotlinx.coroutines.*
 
 
 /** BlinkidFlutterPlugin */
-class BlinkidFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
+class BlinkIdFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
     ActivityResultListener {
     private val BLINKID_METHOD_PERFORM_SCAN = "performScan"
     private val BLINKID_METHOD_PERFORM_DIRECTAPI_SCAN = "performDirectApiScan"
@@ -177,12 +177,17 @@ class BlinkidFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
             blinkIdSdk?.let {
                 addFlutterPinglet(context)
 
-                    val session = it.createScanningSession(
+                    val sessionResult = it.createScanningSession(
                         BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
                             blinkidSessionSettings,
                             true
                         )
                     )
+                    if (sessionResult.isFailure) {
+                        flutterResult?.error(BLINKID_ERROR_RESULT_CODE, sessionResult.exceptionOrNull()?.message ?: "Could not create scanning session.", null)
+                        return@let
+                    }
+                    val session = sessionResult.getOrThrow()
                     var result: kotlin.Result<BlinkIdProcessResult>? = null
 
                     firstImage?.let { firstImageBase64 ->
@@ -200,12 +205,22 @@ class BlinkidFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
                     }
 
                     if (result?.isSuccess == true) {
-                        val scanningResult = session.getResult()
-                        flutterResult?.success(
-                            BlinkIdSerializationUtils.serializeBlinkIdScanningResult(
-                                scanningResult
+                        val redactionSettingsMap = call.argument<Map<String, Any>>("redactionSettings")
+                        val redactionSettings = BlinkIdDeserializationUtils.deserializeRedactionSettings(redactionSettingsMap)
+                        val scanningResultKotlinResult = session.getResult(redactionSettings)
+                        if (scanningResultKotlinResult.isSuccess) {
+                            flutterResult?.success(
+                                BlinkIdSerializationUtils.serializeBlinkIdScanningResult(
+                                    scanningResultKotlinResult.getOrNull()
+                                )
                             )
-                        )
+                        } else {
+                            flutterResult?.error(
+                                BLINKID_ERROR_RESULT_CODE,
+                                scanningResultKotlinResult.exceptionOrNull()?.message ?: "Could not get the results.",
+                                null
+                            )
+                        }
                     } else {
                         flutterResult?.error(
                             BLINKID_ERROR_RESULT_CODE,
