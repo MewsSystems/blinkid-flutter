@@ -462,7 +462,7 @@ class BlinkIdScanningResult {
             : null;
     firstInputImage = nativeBlinkIdScanningResult["firstInputImage"];
     secondInputImage = nativeBlinkIdScanningResult["secondInputImage"];
-    barcodeInputImage = nativeBlinkIdScanningResult["barcodeInputImage"];
+    barcodeInputImage = nativeBlinkIdScanningResult["barcodeImage"];
     firstDocumentImage = nativeBlinkIdScanningResult["firstDocumentImage"];
     secondDocumentImage = nativeBlinkIdScanningResult["secondDocumentImage"];
     faceImage =

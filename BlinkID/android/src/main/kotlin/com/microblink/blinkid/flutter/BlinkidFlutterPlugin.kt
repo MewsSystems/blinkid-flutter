@@ -97,7 +97,7 @@ class BlinkIdFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
 
             blinkIdSdk?.let { return it }
 
-            val blinkIdSdkSettings = call.argument<Map<String, Any>>("blinkidSdkSettings")
+            val blinkIdSdkSettings = call.argument<Map<String, Any>>("blinkIdSdkSettings")
             val sdkSettings = BlinkIdDeserializationUtils
                 .deserializeBlinkIdSdkSettings(blinkIdSdkSettings)?: throw IllegalStateException("Incorrect SDK Settings.")
 
@@ -122,10 +122,11 @@ class BlinkIdFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
 
     private suspend fun performScan(call: MethodCall, result: Result) {
         try {
-            val blinkIdSdkSettings = call.argument<Map<String, Any>>("blinkidSdkSettings")
-            val blinkidSessionSettings = call.argument<Map<String, Any>>("blinkidSessionSettings")
+            val blinkIdSdkSettings = call.argument<Map<String, Any>>("blinkIdSdkSettings")
+            val blinkIdSessionSettings = call.argument<Map<String, Any>>("blinkIdSessionSettings")
             val blinkIdScanningUxSettings = call.argument<Map<String, Any>>("blinkIdScanningUxSettings")
-            val classFilterMap = call.argument<Map<String, Any>>("blinkidClassFilter")
+            val classFilterMap = call.argument<Map<String, Any>>("blinkIdClassFilter")
+            val redactionSettingsResolverMap = call.argument<Map<String, Any>>("blinkIdRedactionSettingsResolver")
             val sdkSettings = BlinkIdDeserializationUtils
                 .deserializeBlinkIdSdkSettings(blinkIdSdkSettings)
                 ?: return result.error(BLINKID_ERROR_RESULT_CODE, "Incorrect SDK Settings.", null)
@@ -139,12 +140,13 @@ class BlinkIdFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
                         sdkSettings = sdkSettings,
                         cameraSettings = BlinkIdDeserializationUtils.deserializeCameraSettings(blinkIdScanningUxSettings),
                         scanningSessionSettings = BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
-                            blinkidSessionSettings,
+                            blinkIdSessionSettings,
                             false
                         ),
                         uxSettings = BlinkIdDeserializationUtils.deserializeBlinkIdUxSettings(
                             blinkidUxSettingsMap = blinkIdScanningUxSettings,
-                            classFilterMap
+                            classFilterMap = classFilterMap,
+                            redactionSettingsResolverMap = redactionSettingsResolverMap
                         ),
                         showOnboardingDialog = (blinkIdScanningUxSettings?.getOrDefault("showOnboardingDialog", true) as? Boolean) ?: true,
                         showHelpButton = (blinkIdScanningUxSettings?.getOrDefault("showHelpButton", true) as? Boolean) ?: true,
@@ -169,7 +171,7 @@ class BlinkIdFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
 
     private suspend fun performDirectApiScan(call: MethodCall, result: Result) {
         try {
-            val blinkidSessionSettings = call.argument<Map<String, Any>>("blinkidSessionSettings")
+            val blinkIdSessionSettings = call.argument<Map<String, Any>>("blinkIdSessionSettings")
             val firstImage = call.argument<String>("firstImage")
             val secondImage = call.argument<String>("secondImage")
             flutterResult = result
@@ -179,7 +181,7 @@ class BlinkIdFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
 
                     val sessionResult = it.createScanningSession(
                         BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
-                            blinkidSessionSettings,
+                            blinkIdSessionSettings,
                             true
                         )
                     )
@@ -205,7 +207,7 @@ class BlinkIdFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
                     }
 
                     if (result?.isSuccess == true) {
-                        val redactionSettingsMap = call.argument<Map<String, Any>>("redactionSettings")
+                        val redactionSettingsMap = call.argument<Map<String, Any>>("directApiRedactionSettings")
                         val redactionSettings = BlinkIdDeserializationUtils.deserializeRedactionSettings(redactionSettingsMap)
                         val scanningResultKotlinResult = session.getResult(redactionSettings)
                         if (scanningResultKotlinResult.isSuccess) {

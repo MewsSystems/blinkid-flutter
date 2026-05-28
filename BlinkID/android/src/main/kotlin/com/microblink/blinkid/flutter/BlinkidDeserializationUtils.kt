@@ -13,7 +13,9 @@ import com.microblink.blinkid.core.session.ScanningMode
 import com.microblink.blinkid.core.settings.DocumentFilter
 import com.microblink.blinkid.core.settings.DocumentNumberRedactionSettings
 import com.microblink.blinkid.core.settings.RedactionSettings
+import com.microblink.blinkid.core.settings.RedactionSettingsResolver
 import com.microblink.blinkid.core.settings.ScanningSettings
+import com.microblink.blinkid.core.settings.SensitivityLevel
 import com.microblink.blinkid.core.settings.scanning.BarcodeModuleSettings
 import com.microblink.blinkid.core.settings.scanning.DocumentCaptureModuleSettings
 import com.microblink.blinkid.core.settings.scanning.MrzModuleSettings
@@ -61,10 +63,17 @@ object BlinkIdDeserializationUtils {
 
         return BlinkIdSessionSettings(
             inputImageSource = if (isDirectApi) InputImageSource.Photo else InputImageSource.Video,
-            scanningMode = ScanningMode.entries[blinkIdSdkSessionSettingsMap["scanningMode"] as? Int
-                ?: ScanningMode.Automatic.ordinal],
+            scanningMode = deserializeScanningMode(blinkIdSdkSessionSettingsMap["scanningMode"] as? String),
             scanningSettings = deserializeScanningSettings(blinkIdSdkSessionSettingsMap["scanningSettings"] as? Map<String, Any>),
         )
+    }
+
+    private fun deserializeScanningMode(value: String?): ScanningMode {
+        return when (value?.lowercase()) {
+            "single" -> ScanningMode.Single
+            "automatic" -> ScanningMode.Automatic
+            else -> ScanningMode.Automatic
+        }
     }
 
     private fun deserializeScanningSettings(scanningSettingsMap: Map<String, Any>?): ScanningSettings {
@@ -82,19 +91,52 @@ object BlinkIdDeserializationUtils {
     private fun deserializeDocumentCaptureModuleSettings(map: Map<String, Any>?): DocumentCaptureModuleSettings {
         if (map == null) return DocumentCaptureModuleSettings()
         return DocumentCaptureModuleSettings(
-            documentImageReturnEnabled = map["documentImageReturnEnabled"] as? Boolean ?: false,
-            faceImageExtractionEnabled = map["faceImageExtractionEnabled"] as? Boolean ?: false,
-            inputImageReturnEnabled = map["returnInputImages"] as? Boolean ?: false,
             inputImageCropped = map["inputImageCropped"] as? Boolean ?: false,
+            unsupportedDocumentsAllowed = map["unsupportedDocumentsAllowed"] as? Boolean ?: false,
+            secondSideWithNoExtractableDataSkipped = map["secondSideWithNoExtractableDataSkipped"] as? Boolean ?: true,
+            passportDataPageScanOnly = map["passportDataPageScanOnly"] as? Boolean ?: true,
+            faceImageExtractionEnabled = map["faceImageExtractionEnabled"] as? Boolean ?: false,
+            faceImagePresenceMandatory = map["faceImagePresenceMandatory"] as? Boolean ?: false,
+            inputImageReturnEnabled = map["inputImageReturnEnabled"] as? Boolean ?: false,
+            documentImageReturnEnabled = map["documentImageReturnEnabled"] as? Boolean ?: false,
+            inputImageMargin = (map["inputImageMargin"] as? Number)?.toFloat(),
+            dotsPerInch = map["dotsPerInch"] as? Int ?: 250,
+            extensionFactor = (map["extensionFactor"] as? Number)?.toFloat() ?: 0.0f,
+            blurSensitivityLevel = deserializeSensitivityLevel(map["blurSensitivityLevel"] as? String),
+            imageWithBlurRejected = map["imageWithBlurRejected"] as? Boolean ?: true,
+            glareSensitivityLevel = deserializeSensitivityLevel(map["glareSensitivityLevel"] as? String),
+            imageWithGlareRejected = map["imageWithGlareRejected"] as? Boolean ?: true,
+            tiltSensitivityLevel = deserializeSensitivityLevel(map["tiltSensitivityLevel"] as? String),
+            imageWithPoorLightingRejected = map["imageWithPoorLightingRejected"] as? Boolean ?: true,
+            imageWithHandOcclusionRejected = map["imageWithHandOcclusionRejected"] as? Boolean ?: true,
         )
+    }
+
+    private fun deserializeSensitivityLevel(value: String?): SensitivityLevel {
+        return when (value?.lowercase()) {
+            "off" -> SensitivityLevel.Off
+            "low" -> SensitivityLevel.Low
+            "mid" -> SensitivityLevel.Mid
+            "high" -> SensitivityLevel.High
+            else -> SensitivityLevel.Mid
+        }
     }
 
     private fun deserializeBarcodeModuleSettings(map: Map<String, Any>?): BarcodeModuleSettings {
         if (map == null) return BarcodeModuleSettings()
         return BarcodeModuleSettings(
             presenceMandatory = map["presenceMandatory"] as? Boolean ?: false,
+            barcodeImageReturnEnabled = map["barcodeImageReturnEnabled"] as? Boolean ?: false,
             pdf417ScanningEnabled = map["pdf417ScanningEnabled"] as? Boolean ?: true,
             qrScanningEnabled = map["qrScanningEnabled"] as? Boolean ?: true,
+            upceScanningEnabled = map["upceScanningEnabled"] as? Boolean ?: false,
+            upcaScanningEnabled = map["upcaScanningEnabled"] as? Boolean ?: false,
+            code128ScanningEnabled = map["code128ScanningEnabled"] as? Boolean ?: false,
+            code39ScanningEnabled = map["code39ScanningEnabled"] as? Boolean ?: false,
+            ean8ScanningEnabled = map["ean8ScanningEnabled"] as? Boolean ?: false,
+            ean13ScanningEnabled = map["ean13ScanningEnabled"] as? Boolean ?: false,
+            itfScanningEnabled = map["itfScanningEnabled"] as? Boolean ?: false,
+            dataMatrixScanningEnabled = map["dataMatrixScanningEnabled"] as? Boolean ?: false,
         )
     }
 
@@ -109,6 +151,9 @@ object BlinkIdDeserializationUtils {
         if (map == null) return VizModuleSettings()
         return VizModuleSettings(
             presenceMandatory = map["presenceMandatory"] as? Boolean ?: false,
+            signatureImageExtractionEnabled = map["signatureImageExtractionEnabled"] as? Boolean ?: false,
+            characterValidationEnabled = map["characterValidationEnabled"] as? Boolean ?: true,
+            resultAggregationEnabled = map["resultAggregationEnabled"] as? Boolean ?: true,
         )
     }
 
@@ -140,19 +185,33 @@ object BlinkIdDeserializationUtils {
         }
     }
 
+    private fun deserializeRedactionMode(value: String?): RedactionMode {
+        return when (value?.lowercase()) {
+            "none" -> RedactionMode.None
+            "imageonly" -> RedactionMode.ImageOnly
+            "resultfieldsonly" -> RedactionMode.ResultFieldsOnly
+            "fullresult" -> RedactionMode.FullResult
+            else -> RedactionMode.FullResult
+        }
+    }
+
     fun deserializeRedactionSettings(redactionSettingsMap: Map<String, Any>?): RedactionSettings? {
         if (redactionSettingsMap == null) return null
-        val mode = RedactionMode.entries[redactionSettingsMap["mode"] as? Int ?: RedactionMode.FullResult.ordinal]
+        val mode = deserializeRedactionMode(redactionSettingsMap["mode"] as? String)
         val fields = (redactionSettingsMap["fields"] as? List<String>)?.map {
             enumValueOf<FieldType>(it.replaceFirstChar { char -> char.uppercase() })
         } ?: emptyList()
         val docNumSettings = deserializeDocumentNumberRedactionSettings(
             redactionSettingsMap["documentNumberRedactionSettings"] as? Map<String, Any>
         )
+        val redactMrz = redactionSettingsMap["redactMrzResult"] as? Boolean ?: false
+        val redactBarcode = redactionSettingsMap["redactBarcodeResult"] as? Boolean ?: false
         return RedactionSettings(
             mode,
             fields,
             docNumSettings ?: DocumentNumberRedactionSettings(),
+            redactMrz,
+            redactBarcode,
         )
     }
 
@@ -164,18 +223,28 @@ object BlinkIdDeserializationUtils {
         )
     }
 
+    fun deserializeRedactionSettingsResolver(
+        redactionSettingsResolverMap: Map<String, Any>?
+    ): RedactionSettingsResolver? {
+        if (redactionSettingsResolverMap == null) return null
+        val documentRedactionList = redactionSettingsResolverMap["documentRedactionList"] as? List<Map<String, Any>> ?: return null
+        return CustomRedactionSettingsResolver(documentRedactionList)
+    }
 
     fun deserializeBlinkIdUxSettings(
         blinkidUxSettingsMap: Map<String, Any>?,
-        classFilterMap: Map<String, Any>?
+        classFilterMap: Map<String, Any>?,
+        redactionSettingsResolverMap: Map<String, Any>? = null
     ): BlinkIdUxSettings {
         if (blinkidUxSettingsMap == null) return BlinkIdUxSettings()
         return BlinkIdUxSettings(
             stepTimeoutDuration = (blinkidUxSettingsMap["stepTimeoutDuration"] as? Int
                 ?: 15000).milliseconds,
-            allowHapticFeedback = (blinkidUxSettingsMap["allowHapticFeedback"] as? Boolean)?: true,
+            stateBasedTimeoutDuration = (blinkidUxSettingsMap["inactivityTimeoutDuration"] as? Int
+                ?: 10000).milliseconds,
+            allowHapticFeedback = (blinkidUxSettingsMap["allowHapticFeedback"] as? Boolean) ?: true,
             classFilter = CustomClassFilter(classFilterMap),
-
+            redactionSettingsResolver = deserializeRedactionSettingsResolver(redactionSettingsResolverMap),
         )
     }
 
@@ -252,3 +321,35 @@ private class CustomClassFilter(
         return BlinkIdDeserializationUtils.deserializeClassFilter(classFilterMap, documentClass)
     }
 }
+
+@Parcelize
+private class CustomRedactionSettingsResolver(
+    private val documentRedactionList: @RawValue List<Map<String, Any>>
+) : RedactionSettingsResolver, Parcelable {
+
+    override fun resolveRedactionSettings(classInfo: DocumentClassInfo): RedactionSettings? {
+        for (redactionDict in documentRedactionList) {
+            if (shouldUseRedactionSettings(redactionDict, classInfo)) {
+                return BlinkIdDeserializationUtils.deserializeRedactionSettings(redactionDict)
+            }
+        }
+        return null
+    }
+
+    private fun shouldUseRedactionSettings(
+        redactionDict: Map<String, Any>,
+        classInfo: DocumentClassInfo
+    ): Boolean {
+        val documentFilters = redactionDict["documentFilter"] as? List<Map<String, Any>> ?: return true
+        if (documentFilters.isEmpty()) return true
+        return documentFilters.any { filterDict ->
+            BlinkIdDeserializationUtils.deserializeClassFilter(
+                mapOf(
+                    "includeDocuments" to listOf(filterDict)
+                ),
+                classInfo
+            )
+        }
+    }
+}
+
