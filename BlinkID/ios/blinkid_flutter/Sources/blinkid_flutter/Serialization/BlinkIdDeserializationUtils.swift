@@ -287,33 +287,36 @@ struct BlinkIdDeserializationUtils {
     }
     
     static func deserializeRedactionSettings(_ redactionDict: Dictionary<String, Any>) -> RedactionSettings? {
-        var redactionSettings: RedactionSettings?
-        if let fieldsRaw = redactionDict["fields"] as? [String] {
-            let fieldTypes: [FieldType] = fieldsRaw.compactMap { FieldType(rawValue: $0) }
-            redactionSettings = RedactionSettings(fields: fieldTypes)
-        } else {
+        guard let fieldsRaw = redactionDict["fields"] as? [String] else {
             return nil
         }
+        let fieldTypes: [FieldType] = fieldsRaw.compactMap { FieldType(rawValue: $0) }
 
+        let mode: RedactionMode
         if let modeRaw = redactionDict["mode"] as? String,
-           let mode = RedactionMode(rawValue: modeRaw) {
-            redactionSettings?.mode = mode
+           let parsedMode = RedactionMode(rawValue: modeRaw) {
+            mode = parsedMode
+        } else {
+            mode = .none
         }
 
-        if let redactBarcodeResult = redactionDict["redactBarcodeResult"] as? Bool {
-            redactionSettings?.redactBarcodeResult = redactBarcodeResult
-        }
+        let redactBarcode = redactionDict["redactBarcodeResult"] as? Bool ?? false
+        let redactMrz = redactionDict["redactMrzResult"] as? Bool ?? false
 
-        if let redactMrzResult = redactionDict["redactMrzResult"] as? Bool {
-            redactionSettings?.redactMrzResult = redactMrzResult
-        }
-
+        let documentNumberRedaction: DocumentNumberRedactionSettings?
         if let documentNumberRedactionDict = redactionDict["documentNumberRedactionSettings"] as? Dictionary<String, Any> {
-            redactionSettings?.documentNumberRedactionSettings =
-                deserializeDocumentNumberRedactionSettings(documentNumberRedactionDict)
+            documentNumberRedaction = deserializeDocumentNumberRedactionSettings(documentNumberRedactionDict)
+        } else {
+            documentNumberRedaction = nil
         }
 
-        return redactionSettings
+        return RedactionSettings(
+            mode: mode,
+            fields: fieldTypes,
+            documentNumberRedactionSettings: documentNumberRedaction,
+            redactMrz: redactMrz,
+            redactBarcode: redactBarcode
+        )
     }
     
     static func deserializeDocumentNumberRedactionSettings(_ documentNumberRedactionSettingsDict: Dictionary<String, Any>) -> DocumentNumberRedactionSettings {

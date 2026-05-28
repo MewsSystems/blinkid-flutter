@@ -193,10 +193,10 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
                 throw BlinkIdFlutterError.frontImageError
             }
             
-            await session.process(inputImage: InputImage(uiImage: frontUIImage))
-            
+            try await session.process(inputImage: InputImage(uiImage: frontUIImage))
+
             if let backUIImage = BlinkIdDeserializationUtils.deserializeBase64Image(argumentsClean["secondImage"] as? String) {
-                await session.process(inputImage: InputImage(uiImage: backUIImage))
+                try await session.process(inputImage: InputImage(uiImage: backUIImage))
             }
             
             var redactionSettings: RedactionSettings?
