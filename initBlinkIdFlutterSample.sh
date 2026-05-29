@@ -31,8 +31,18 @@ pushd android
 # The BlinkID SDK uses minSdk 24. Replace 'minSdk = flutter.minSdkVersion' with 'minSdk = 24' in app/build.gradle.kts
 sed -i '' 's/minSdk = flutter\.minSdkVersion/minSdk = 24/' app/build.gradle.kts
 
-# The BlinkID SDK uses Kotlin 2.1.0. Replace Kotlin Android plugin version in settings.gradle.kts
-sed -i '' 's/id("org.jetbrains.kotlin.android") version "[^"]*" apply false/id("org.jetbrains.kotlin.android") version "2.1.0" apply false/' settings.gradle.kts
+# Kotlin 2.3.x removes the kotlinOptions DSL. Replace it with tasks.withType<KotlinCompile> block.
+perl -i'' -0pe 's/\n\n    kotlinOptions \{\n        jvmTarget = JavaVersion\.VERSION_17\.toString\(\)\n    \}//' app/build.gradle.kts
+perl -i'' -0pe 's/(\nandroid \{)/\ntasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {\n    compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)\n}$1/' app/build.gradle.kts
+
+# Update AGP and KGP versions in settings.gradle.kts
+# Note: AGP 9.0 is NOT supported by Flutter 3.41.x (requires Flutter 3.44.0+).
+# Use AGP 8.9.1 which is the latest compatible version.
+sed -i '' 's/id("com.android.application") version "[^"]*" apply false/id("com.android.application") version "8.9.1" apply false/' settings.gradle.kts
+sed -i '' 's/id("org.jetbrains.kotlin.android") version "[^"]*" apply false/id("org.jetbrains.kotlin.android") version "2.3.20" apply false/' settings.gradle.kts
+
+# AGP 8.9.1 works with Gradle 8.11.1+. Update the Gradle wrapper distribution URL.
+sed -i '' 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-8.11.1-bin.zip|' gradle/wrapper/gradle-wrapper.properties
 
 # go to flutter root project
 popd
