@@ -14,20 +14,31 @@ class ScanningModulesConfig {
   bool showOnboardingDialog = true;
 
   bool barcodeEnabled = true;
-  BarcodeModuleSettings barcode = BarcodeModuleSettings(
-    presenceMandatory: true,
-    pdf417ScanningEnabled: true,
-  );
+  BarcodeModuleSettings barcode = ScanningModulesConfig.defaultBarcodeModule;
 
   bool documentCaptureEnabled = true;
   DocumentCaptureModuleSettings documentCapture =
-      DocumentCaptureModuleSettings(documentImageReturnEnabled: true);
+      ScanningModulesConfig.defaultDocumentCaptureModule;
 
   bool mrzEnabled = true;
-  MrzModuleSettings mrz = MrzModuleSettings(presenceMandatory: true);
+  MrzModuleSettings mrz = ScanningModulesConfig.defaultMrzModule;
 
   bool vizEnabled = true;
-  VizModuleSettings viz = VizModuleSettings(presenceMandatory: true);
+  VizModuleSettings viz = ScanningModulesConfig.defaultVizModule;
+
+  /// SDK defaults from [BarcodeModuleSettings] constructor in `types.dart`.
+  static BarcodeModuleSettings get defaultBarcodeModule =>
+      BarcodeModuleSettings();
+
+  /// SDK defaults from [DocumentCaptureModuleSettings] constructor in `types.dart`.
+  static DocumentCaptureModuleSettings get defaultDocumentCaptureModule =>
+      DocumentCaptureModuleSettings();
+
+  /// SDK defaults from [MrzModuleSettings] constructor in `types.dart`.
+  static MrzModuleSettings get defaultMrzModule => MrzModuleSettings();
+
+  /// SDK defaults from [VizModuleSettings] constructor in `types.dart`.
+  static VizModuleSettings get defaultVizModule => VizModuleSettings();
 
   BlinkIdScanningSettings toScanningSettings() {
     return BlinkIdScanningSettings(
@@ -63,20 +74,15 @@ class ScanningModulesConfig {
     inactivityTimeoutDuration = 10000;
     showOnboardingDialog = true;
     barcodeEnabled = true;
-    barcode = BarcodeModuleSettings(
-      presenceMandatory: true,
-      pdf417ScanningEnabled: true,
-    );
+    barcode = defaultBarcodeModule;
 
     documentCaptureEnabled = true;
-    documentCapture = DocumentCaptureModuleSettings(
-      documentImageReturnEnabled: true,
-    );
+    documentCapture = defaultDocumentCaptureModule;
 
     mrzEnabled = true;
-    mrz = MrzModuleSettings(presenceMandatory: true);
+    mrz = defaultMrzModule;
 
     vizEnabled = true;
-    viz = VizModuleSettings(presenceMandatory: true);
+    viz = defaultVizModule;
   }
 }
