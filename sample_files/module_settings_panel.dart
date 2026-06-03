@@ -173,23 +173,6 @@ class _BarcodeModuleCard extends StatelessWidget {
     onChanged();
   }
 
-  void _setPdf417(bool value) {
-    _updateBarcode((s) {
-      s.pdf417ScanningEnabled = value;
-      if (value) s.qrScanningEnabled = true;
-    });
-  }
-
-  void _setQr(bool value) {
-    _updateBarcode((s) {
-      s.qrScanningEnabled = value;
-      if (value) s.pdf417ScanningEnabled = true;
-      if (!value && s.pdf417ScanningEnabled) {
-        s.pdf417ScanningEnabled = false;
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final b = config.barcode;
@@ -216,25 +199,16 @@ class _BarcodeModuleCard extends StatelessWidget {
               _updateBarcode((s) => s.barcodeImageReturnEnabled = v),
         ),
         _SectionLabel('Document barcodes'),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: Text(
-            'PDF417 and QR should be enabled together to avoid scan hangs.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.primary,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ),
         _BoolSettingTile(
           title: 'PDF417 scanning',
           value: b.pdf417ScanningEnabled,
-          onChanged: _setPdf417,
+          onChanged: (v) =>
+              _updateBarcode((s) => s.pdf417ScanningEnabled = v),
         ),
         _BoolSettingTile(
           title: 'QR scanning',
           value: b.qrScanningEnabled,
-          onChanged: _setQr,
+          onChanged: (v) => _updateBarcode((s) => s.qrScanningEnabled = v),
         ),
         _SectionLabel('Retail formats'),
         Padding(
