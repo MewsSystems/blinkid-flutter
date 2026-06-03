@@ -149,16 +149,13 @@ Map<String, dynamic> _$VizModuleSettingsToJson(
   'resultAggregationEnabled': instance.resultAggregationEnabled,
 };
 
-ClassFilter _$ClassFilterFromJson(Map<String, dynamic> json) =>
-    ClassFilter()
-      ..includeDocuments =
-          (json['includeDocuments'] as List<dynamic>?)
-              ?.map((e) => DocumentFilter.fromJson(e as Map<String, dynamic>))
-              .toList()
-      ..excludeDocuments =
-          (json['excludeDocuments'] as List<dynamic>?)
-              ?.map((e) => DocumentFilter.fromJson(e as Map<String, dynamic>))
-              .toList();
+ClassFilter _$ClassFilterFromJson(Map<String, dynamic> json) => ClassFilter()
+  ..includeDocuments = (json['includeDocuments'] as List<dynamic>?)
+      ?.map((e) => DocumentFilter.fromJson(e as Map<String, dynamic>))
+      .toList()
+  ..excludeDocuments = (json['excludeDocuments'] as List<dynamic>?)
+      ?.map((e) => DocumentFilter.fromJson(e as Map<String, dynamic>))
+      .toList();
 
 Map<String, dynamic> _$ClassFilterToJson(ClassFilter instance) =>
     <String, dynamic>{
@@ -168,25 +165,23 @@ Map<String, dynamic> _$ClassFilterToJson(ClassFilter instance) =>
 
 RedactionSettings _$RedactionSettingsFromJson(Map<String, dynamic> json) =>
     RedactionSettings(
-      fields:
-          (json['fields'] as List<dynamic>)
-              .map((e) => $enumDecode(_$FieldTypeEnumMap, e))
-              .toList(),
+      fields: (json['fields'] as List<dynamic>)
+          .map((e) => $enumDecode(_$FieldTypeEnumMap, e))
+          .toList(),
       mode:
           $enumDecodeNullable(_$RedactionModeEnumMap, json['mode']) ??
           RedactionMode.fullResult,
       documentNumberRedactionSettings:
           json['documentNumberRedactionSettings'] == null
-              ? null
-              : DocumentNumberRedactionSettings.fromJson(
-                json['documentNumberRedactionSettings'] as Map<String, dynamic>,
-              ),
+          ? null
+          : DocumentNumberRedactionSettings.fromJson(
+              json['documentNumberRedactionSettings'] as Map<String, dynamic>,
+            ),
       redactBarcodeResult: json['redactBarcodeResult'] as bool? ?? false,
       redactMrzResult: json['redactMrzResult'] as bool? ?? false,
-      documentFilter:
-          (json['documentFilter'] as List<dynamic>?)
-              ?.map((e) => DocumentFilter.fromJson(e as Map<String, dynamic>))
-              .toList(),
+      documentFilter: (json['documentFilter'] as List<dynamic>?)
+          ?.map((e) => DocumentFilter.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
 
 Map<String, dynamic> _$RedactionSettingsToJson(

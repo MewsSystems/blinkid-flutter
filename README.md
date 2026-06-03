@@ -31,7 +31,8 @@ A valid license key is required to initialize the BlinkID plugin. A free trial l
 
 | Requirement        | Flutter                | iOS                    | Android                   |
 |:------------------:|:----------------------:|:----------------------:|:-------------------------:|
-| OS/API version     | Flutter 3.29 and newer  | iOS 16.0 and newer      | API version 24 and newer   |
+| OS/API version     | Flutter 3.44 and newer | iOS 16.0 and newer      | API version 24 and newer   |
+| Compile SDK version| -                      | -                      | 36 and newer              |
 | Camera quality     | -                       | At least 1080p          | At least 1080p             |
 
 

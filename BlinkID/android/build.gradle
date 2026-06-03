@@ -2,7 +2,7 @@ group = "com.microblink.blinkid_flutter"
 version = "1.0"
 
 buildscript {
-    ext.kotlin_version = "2.3.20"
+    ext.kotlin_version = "2.1.20"
     repositories {
         google()
         mavenCentral()
@@ -11,7 +11,7 @@ buildscript {
     }
 
     dependencies {
-        classpath("com.android.tools.build:gradle:8.9.1")
+        classpath("com.android.tools.build:gradle:9.0.1")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version")
     }
 }
@@ -28,20 +28,18 @@ apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
 apply plugin: 'kotlin-parcelize'
 
-tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-    compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
-    }
-}
-
 android {
     namespace = "com.microblink.blinkid.flutter"
 
-    compileSdk = 35
+    compileSdk = 36
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
     }
 
 
@@ -52,12 +50,14 @@ android {
 
     defaultConfig {
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 36
     }
 
     dependencies {
         testImplementation("org.jetbrains.kotlin:kotlin-test")
         testImplementation("org.mockito:mockito-core:5.1.1")
+
+        implementation platform("androidx.compose:compose-bom:2026.05.01")
         implementation("com.microblink:blinkid-ux:8000.0.0")
     }
 

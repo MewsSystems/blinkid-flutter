@@ -118,7 +118,7 @@ class BlinkIdScanningSettings {
   /// (such as face and document images), and image quality validation (blur, glare,
   /// and lighting checks).
   /// See [DocumentCaptureModuleSettings] for more information.
-  DocumentCaptureModuleSettings documentCaptureModule;
+  DocumentCaptureModuleSettings? documentCaptureModule;
 
   /// Settings for the MRZ (Machine Readable Zone) extraction module.
   ///
@@ -126,7 +126,7 @@ class BlinkIdScanningSettings {
   /// zone typically found on passports, visas, and identity cards.
   ///
   /// See [MrzModuleSettings] for more information.
-  MrzModuleSettings mrzModule;
+  MrzModuleSettings? mrzModule;
 
   /// Settings for the barcode extraction module.
   ///
@@ -136,7 +136,7 @@ class BlinkIdScanningSettings {
   /// It can operate as a standalone module or in combination with document capture.
   ///
   /// See [BarcodeModuleSettings] for more information.
-  BarcodeModuleSettings barcodeModule;
+  BarcodeModuleSettings? barcodeModule;
 
   /// Settings for the VIZ (Visual Inspection Zone) extraction module.
   ///
@@ -147,7 +147,7 @@ class BlinkIdScanningSettings {
   /// signature image extraction, and data aggregation across multiple video frames.
   ///
   /// See [VizModuleSettings] for more information.
-  VizModuleSettings vizModule;
+  VizModuleSettings? vizModule;
 
   /// The maximum allowed mismatches per field during data matching.
   ///
@@ -157,16 +157,12 @@ class BlinkIdScanningSettings {
   int maxAllowedMismatchesPerField;
 
   BlinkIdScanningSettings({
-    DocumentCaptureModuleSettings? documentCaptureModule,
-    MrzModuleSettings? mrzModule,
-    BarcodeModuleSettings? barcodeModule,
-    VizModuleSettings? vizModule,
+    this.documentCaptureModule,
+    this.mrzModule,
+    this.barcodeModule,
+    this.vizModule,
     this.maxAllowedMismatchesPerField = 0,
-  }) : documentCaptureModule =
-           documentCaptureModule ?? DocumentCaptureModuleSettings(),
-       mrzModule = mrzModule ?? MrzModuleSettings(),
-       barcodeModule = barcodeModule ?? BarcodeModuleSettings(),
-       vizModule = vizModule ?? VizModuleSettings();
+  });
 
   factory BlinkIdScanningSettings.fromJson(Map<String, dynamic> json) =>
       _$BlinkIdScanningSettingsFromJson(json);

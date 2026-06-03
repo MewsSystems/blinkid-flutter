@@ -8,6 +8,8 @@ import 'package:image_picker/image_picker.dart';
 /// import the blinkid_flutter package
 import 'package:blinkid_flutter/blinkid_flutter.dart';
 import 'blinkid_result_builder.dart';
+import 'module_settings_panel.dart';
+import 'scanning_modules_config.dart';
 
 void main() {
   runApp(MyApp());
@@ -39,6 +41,21 @@ class _MyAppState extends State<MyApp> {
   /// and the DirectAPI scan (directApiMultiSideScan and directApiSingleSideScan methods).
   final blinkIdPlugin = BlinkIdFlutter();
 
+  final _modulesConfig = ScanningModulesConfig();
+
+  BlinkIdSdkSettings _buildSdkSettings() {
+    final sdkSettings = BlinkIdSdkSettings(licenseKey: sdkLicenseKey);
+    sdkSettings.downloadResources = true;
+    return sdkSettings;
+  }
+
+  BlinkIdSessionSettings _buildSessionSettings() {
+    final sessionSettings = BlinkIdSessionSettings();
+    sessionSettings.scanningMode = _modulesConfig.scanningMode;
+    sessionSettings.scanningSettings = _modulesConfig.toScanningSettings();
+    return sessionSettings;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -61,36 +78,8 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> performScan() async {
     try {
-      /// Set the BlinkID SDK settings
-      final sdkSettings = BlinkIdSdkSettings(licenseKey: sdkLicenseKey);
-      sdkSettings.downloadResources = true;
-
-      /// Create and modify the Session Settings
-      final sessionSettings = BlinkIdSessionSettings();
-      sessionSettings.scanningMode = ScanningMode.automatic;
-
-      /// Create and modify the scanning settings
-      final scanningSettings = BlinkIdScanningSettings();
-
-      /// Modify the barcode module settings
-      scanningSettings.barcodeModule = BarcodeModuleSettings(
-        presenceMandatory: true,
-        pdf417ScanningEnabled: true,
-      );
-
-      /// Modify the document capture settings
-      scanningSettings.documentCaptureModule = DocumentCaptureModuleSettings(
-        documentImageReturnEnabled: true,
-      );
-
-      /// Modify the MRZ settings
-      scanningSettings.mrzModule = MrzModuleSettings(presenceMandatory: true);
-
-      /// Modify the VIZ settings
-      scanningSettings.vizModule = VizModuleSettings(presenceMandatory: true);
-
-      /// Place the Scanning settings in the Session settings
-      sessionSettings.scanningSettings = scanningSettings;
+      final sdkSettings = _buildSdkSettings();
+      final sessionSettings = _buildSessionSettings();
 
       /// Create and modify the UX settings
       /// This paramater is optional
@@ -180,44 +169,8 @@ class _MyAppState extends State<MyApp> {
       /// Convert the picked image to the Base64 format
       String backImageBase64 = base64Encode(await images[1].readAsBytes());
 
-      /// Set the BlinkID SDK settings
-      final sdkSettings = BlinkIdSdkSettings(licenseKey: sdkLicenseKey);
-      sdkSettings.downloadResources = true;
-
-      /// Create and modify the Session Settings
-      final sessionSettings = BlinkIdSessionSettings();
-      sessionSettings.scanningMode = ScanningMode.automatic;
-
-      /// Create and modify the scanning settings
-      final scanningSettings = BlinkIdScanningSettings();
-
-      /// Modify the barcode module settings
-      scanningSettings.barcodeModule = BarcodeModuleSettings(
-        presenceMandatory: true,
-        pdf417ScanningEnabled: true,
-      );
-
-      /// Modify the document capture settings
-      scanningSettings.documentCaptureModule = DocumentCaptureModuleSettings(
-        documentImageReturnEnabled: true,
-      );
-
-      /// Modify the MRZ settings
-      scanningSettings.mrzModule = MrzModuleSettings(presenceMandatory: true);
-
-      /// Modify the VIZ settings
-      scanningSettings.vizModule = VizModuleSettings(presenceMandatory: true);
-
-      /// Place the Scanning settings in the Session settings
-      sessionSettings.scanningSettings = scanningSettings;
-
-      /// Uncomment the following line if you are passing input images
-      /// that consist solely of the cropped document image.
-      ///
-      /// scanningSettings.documentCaptureModule.inputImageCropped = true;
-
-      /// Place the Scanning settings in the Session settings
-      sessionSettings.scanningSettings = scanningSettings;
+      final sdkSettings = _buildSdkSettings();
+      final sessionSettings = _buildSessionSettings();
 
       /// Call the 'performDirectApiScan' method and handle the results
       /// Check how the results are handled in the blinkid_result_builder.dart file
@@ -266,36 +219,8 @@ class _MyAppState extends State<MyApp> {
       /// Convert the picked image to the Base64 format
       String imageBase64 = base64Encode(await image.readAsBytes());
 
-      /// Set the BlinkID SDK settings
-      final sdkSettings = BlinkIdSdkSettings(licenseKey: sdkLicenseKey);
-      sdkSettings.downloadResources = true;
-
-      /// Create and modify the Session Settings
-      final sessionSettings = BlinkIdSessionSettings();
-      sessionSettings.scanningMode = ScanningMode.automatic;
-
-      /// Create and modify the scanning settings
-      final scanningSettings = BlinkIdScanningSettings();
-
-      /// Modify the barcode module settings
-      scanningSettings.barcodeModule = BarcodeModuleSettings(
-        presenceMandatory: true,
-        pdf417ScanningEnabled: true,
-      );
-
-      /// Modify the document capture settings
-      scanningSettings.documentCaptureModule = DocumentCaptureModuleSettings(
-        documentImageReturnEnabled: true,
-      );
-
-      /// Modify the MRZ settings
-      scanningSettings.mrzModule = MrzModuleSettings(presenceMandatory: true);
-
-      /// Modify the VIZ settings
-      scanningSettings.vizModule = VizModuleSettings(presenceMandatory: true);
-
-      /// Place the Scanning settings in the Session settings
-      sessionSettings.scanningSettings = scanningSettings;
+      final sdkSettings = _buildSdkSettings();
+      final sessionSettings = _buildSessionSettings();
 
       /// Call the 'performDirectApiScan' method and handle the results
       /// Check how the results are handled in the blinkid_result_builder.dart file
@@ -489,16 +414,24 @@ class _MyAppState extends State<MyApp> {
     }
 
     return MaterialApp(
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1565C0)),
+        useMaterial3: true,
+      ),
       home: Scaffold(
         appBar: AppBar(title: const Text("BlinkID Sample")),
         body: SingleChildScrollView(
-          padding: EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16.0),
           child: Builder(
             builder: (BuildContext context) {
               return Column(
                 children: <Widget>[
+                  ModuleSettingsPanel(
+                    config: _modulesConfig,
+                    onChanged: () => setState(() {}),
+                  ),
                   Padding(
-                    padding: EdgeInsets.only(bottom: 16.0),
+                    padding: const EdgeInsets.only(bottom: 16.0),
                     child: ElevatedButton(
                       onPressed: () => performScan(),
                       child: Text("Scan with camera"),

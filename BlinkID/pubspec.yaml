@@ -4,8 +4,8 @@ version: 8000.0.0
 homepage: https://microblink.com
 
 environment:
-  sdk: ^3.7.2
-  flutter: '>=3.3.0'
+  sdk: ^3.12.1
+  flutter: '>=3.44.1'
 
 dependencies:
   flutter:

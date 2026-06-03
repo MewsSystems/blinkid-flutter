@@ -36,12 +36,11 @@ BlinkIdSessionSettings _$BlinkIdSessionSettingsFromJson(
   scanningMode:
       $enumDecodeNullable(_$ScanningModeEnumMap, json['scanningMode']) ??
       ScanningMode.automatic,
-  scanningSettings:
-      json['scanningSettings'] == null
-          ? null
-          : BlinkIdScanningSettings.fromJson(
-            json['scanningSettings'] as Map<String, dynamic>,
-          ),
+  scanningSettings: json['scanningSettings'] == null
+      ? null
+      : BlinkIdScanningSettings.fromJson(
+          json['scanningSettings'] as Map<String, dynamic>,
+        ),
   stepTimeoutDuration: (json['stepTimeoutDuration'] as num?)?.toInt() ?? 15000,
   inactivityTimeoutDuration:
       (json['inactivityTimeoutDuration'] as num?)?.toInt() ?? 10000,
@@ -64,30 +63,22 @@ const _$ScanningModeEnumMap = {
 BlinkIdScanningSettings _$BlinkIdScanningSettingsFromJson(
   Map<String, dynamic> json,
 ) => BlinkIdScanningSettings(
-  documentCaptureModule:
-      json['documentCaptureModule'] == null
-          ? null
-          : DocumentCaptureModuleSettings.fromJson(
-            json['documentCaptureModule'] as Map<String, dynamic>,
-          ),
-  mrzModule:
-      json['mrzModule'] == null
-          ? null
-          : MrzModuleSettings.fromJson(
-            json['mrzModule'] as Map<String, dynamic>,
-          ),
-  barcodeModule:
-      json['barcodeModule'] == null
-          ? null
-          : BarcodeModuleSettings.fromJson(
-            json['barcodeModule'] as Map<String, dynamic>,
-          ),
-  vizModule:
-      json['vizModule'] == null
-          ? null
-          : VizModuleSettings.fromJson(
-            json['vizModule'] as Map<String, dynamic>,
-          ),
+  documentCaptureModule: json['documentCaptureModule'] == null
+      ? null
+      : DocumentCaptureModuleSettings.fromJson(
+          json['documentCaptureModule'] as Map<String, dynamic>,
+        ),
+  mrzModule: json['mrzModule'] == null
+      ? null
+      : MrzModuleSettings.fromJson(json['mrzModule'] as Map<String, dynamic>),
+  barcodeModule: json['barcodeModule'] == null
+      ? null
+      : BarcodeModuleSettings.fromJson(
+          json['barcodeModule'] as Map<String, dynamic>,
+        ),
+  vizModule: json['vizModule'] == null
+      ? null
+      : VizModuleSettings.fromJson(json['vizModule'] as Map<String, dynamic>),
   maxAllowedMismatchesPerField:
       (json['maxAllowedMismatchesPerField'] as num?)?.toInt() ?? 0,
 );

@@ -11,7 +11,7 @@ flutter create --org com.microblink -a kotlin $appName
 # enter into demo project folder
 pushd $appName
 
-IS_LOCAL_BUILD=false || exit 1
+IS_LOCAL_BUILD=true || exit 1
 if [ "$IS_LOCAL_BUILD" = true ]; then
   # add blinkid_flutter dependency with local path to pubspec.yaml
   perl -i~ -pe "BEGIN{$/ = undef;} s/dependencies:\n  flutter:\n    sdk: flutter/dependencies:\n  flutter:\n    sdk: flutter\n  blinkid_flutter:\n    path: ..\/BlinkID\n  image_picker: 1.1.2/" pubspec.yaml
@@ -28,21 +28,25 @@ flutter pub get
 # go to the android project folder
 pushd android
 
+# Fix settings.gradle.kts to use Kotlin 2.1.20 and add Compose plugin
+sed -i '' 's/id("org.jetbrains.kotlin.android") version "[0-9.]*"/id("org.jetbrains.kotlin.android") version "2.1.20"/' settings.gradle.kts
+sed -i '' '/id("org.jetbrains.kotlin.android")/a\
+\    id("org.jetbrains.kotlin.plugin.compose") version "2.1.20" apply false
+' settings.gradle.kts
+
 # The BlinkID SDK uses minSdk 24. Replace 'minSdk = flutter.minSdkVersion' with 'minSdk = 24' in app/build.gradle.kts
 sed -i '' 's/minSdk = flutter\.minSdkVersion/minSdk = 24/' app/build.gradle.kts
 
-# Kotlin 2.3.x removes the kotlinOptions DSL. Replace it with tasks.withType<KotlinCompile> block.
-perl -i'' -0pe 's/\n\n    kotlinOptions \{\n        jvmTarget = JavaVersion\.VERSION_17\.toString\(\)\n    \}//' app/build.gradle.kts
-perl -i'' -0pe 's/(\nandroid \{)/\ntasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {\n    compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)\n}$1/' app/build.gradle.kts
+# Add Compose plugin to app/build.gradle.kts
+sed -i '' '/id("com.android.application")/a\
+\    id("org.jetbrains.kotlin.plugin.compose")
+' app/build.gradle.kts
 
-# Update AGP and KGP versions in settings.gradle.kts
-# Note: AGP 9.0 is NOT supported by Flutter 3.41.x (requires Flutter 3.44.0+).
-# Use AGP 8.9.1 which is the latest compatible version.
-sed -i '' 's/id("com.android.application") version "[^"]*" apply false/id("com.android.application") version "8.9.1" apply false/' settings.gradle.kts
-sed -i '' 's/id("org.jetbrains.kotlin.android") version "[^"]*" apply false/id("org.jetbrains.kotlin.android") version "2.3.20" apply false/' settings.gradle.kts
+# Add buildFeatures and configurations to force Compose 1.11.2 (fixes $stable field crash)
+perl -i -pe 'BEGIN{$/=undef;} s/android \{/android {\n    buildFeatures {\n        compose = true\n    }\n    composeCompiler {\n        enableStrongSkippingMode = true\n    }\n/' app/build.gradle.kts
 
-# AGP 8.9.1 works with Gradle 8.11.1+. Update the Gradle wrapper distribution URL.
-sed -i '' 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-8.11.1-bin.zip|' gradle/wrapper/gradle-wrapper.properties
+# Append resolution strategy and dependencies before the flutter block
+perl -i -pe 'BEGIN{$/=undef;} s/flutter \{/configurations.all {\n    resolutionStrategy {\n        force("androidx.compose.ui:ui-graphics:1.11.2")\n        force("androidx.compose.ui:ui:1.11.2")\n        force("androidx.compose.runtime:runtime:1.11.2")\n        force("androidx.compose.foundation:foundation:1.11.2")\n        force("androidx.compose.material3:material3:1.4.0")\n    }\n}\n\ndependencies {\n    implementation(platform("androidx.compose:compose-bom:2026.05.01"))\n    implementation("androidx.compose.ui:ui")\n    implementation("androidx.compose.ui:ui-graphics")\n    implementation("androidx.compose.material3:material3")\n}\n\nflutter \{/' app/build.gradle.kts
 
 # go to flutter root project
 popd
@@ -82,6 +86,8 @@ popd
 # copy the BlinkID sample app implementation files
 cp ../sample_files/main.dart lib/
 cp ../sample_files/blinkid_result_builder.dart lib/
+cp ../sample_files/scanning_modules_config.dart lib/
+cp ../sample_files/module_settings_panel.dart lib/
 
 echo ""
 echo "Go to Flutter project folder: cd $appName"
