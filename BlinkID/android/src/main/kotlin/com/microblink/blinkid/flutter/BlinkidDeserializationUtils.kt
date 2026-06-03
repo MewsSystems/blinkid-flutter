@@ -265,15 +265,23 @@ object BlinkIdDeserializationUtils {
     fun deserializeBlinkIdUxSettings(
         blinkidUxSettingsMap: Map<String, Any>?,
         classFilterMap: Map<String, Any>?,
-        redactionSettingsResolverMap: Map<String, Any>? = null
+        redactionSettingsResolverMap: Map<String, Any>? = null,
+        sessionSettingsMap: Map<String, Any>? = null,
     ): BlinkIdUxSettings {
-        if (blinkidUxSettingsMap == null) return BlinkIdUxSettings()
+        if (blinkidUxSettingsMap == null && sessionSettingsMap == null) return BlinkIdUxSettings()
+        val uxMap = blinkidUxSettingsMap ?: emptyMap()
+
+        //this handling is needed because on Android, timeouts are taken from UX settings, not session settings
+        val stepTimeoutMs = (uxMap["stepTimeoutDuration"] as? Int)
+            ?: (sessionSettingsMap?.get("stepTimeoutDuration") as? Int)
+            ?: 60000
+        val inactivityTimeoutMs = (uxMap["inactivityTimeoutDuration"] as? Int)
+            ?: (sessionSettingsMap?.get("inactivityTimeoutDuration") as? Int)
+            ?: 10000
         return BlinkIdUxSettings(
-            stepTimeoutDuration = (blinkidUxSettingsMap["stepTimeoutDuration"] as? Int
-                ?: 15000).milliseconds,
-            stateBasedTimeoutDuration = (blinkidUxSettingsMap["inactivityTimeoutDuration"] as? Int
-                ?: 10000).milliseconds,
-            allowHapticFeedback = (blinkidUxSettingsMap["allowHapticFeedback"] as? Boolean) ?: true,
+            stepTimeoutDuration = stepTimeoutMs.milliseconds,
+            stateBasedTimeoutDuration = inactivityTimeoutMs.milliseconds,
+            allowHapticFeedback = (uxMap["allowHapticFeedback"] as? Boolean) ?: true,
             classFilter = CustomClassFilter(classFilterMap),
             redactionSettingsResolver = deserializeRedactionSettingsResolver(redactionSettingsResolverMap),
         )

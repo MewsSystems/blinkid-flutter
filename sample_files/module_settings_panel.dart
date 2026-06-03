@@ -60,6 +60,10 @@ class ModuleSettingsPanel extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
+        _SessionSettingsCard(config: config, onChanged: onChanged),
+        const SizedBox(height: 12),
+        _UxSettingsCard(config: config, onChanged: onChanged),
+        const SizedBox(height: 12),
         _BarcodeModuleCard(config: config, onChanged: onChanged),
         const SizedBox(height: 8),
         _DocumentCaptureModuleCard(config: config, onChanged: onChanged),
@@ -109,7 +113,7 @@ class _ModuleCard extends StatelessWidget {
       child: Theme(
         data: theme.copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          initiallyExpanded: enabled,
+          initiallyExpanded: false,
           enabled: enabled,
           title: Row(
             children: [
@@ -511,6 +515,111 @@ class _VizModuleCard extends StatelessWidget {
   }
 }
 
+class _SessionSettingsCard extends StatelessWidget {
+  final ScanningModulesConfig config;
+  final VoidCallback onChanged;
+
+  const _SessionSettingsCard({required this.config, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Session timeouts',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Duration in milliseconds. Set to 0 to disable timeout.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            _IntSettingField(
+              label: 'Step timeout duration',
+              value: config.stepTimeoutDuration,
+              min: 0,
+              max: 600000,
+              onChanged: (v) {
+                config.stepTimeoutDuration = v;
+                onChanged();
+              },
+            ),
+            _IntSettingField(
+              label: 'Inactivity timeout duration',
+              value: config.inactivityTimeoutDuration,
+              min: 0,
+              max: 600000,
+              onChanged: (v) {
+                config.inactivityTimeoutDuration = v;
+                onChanged();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _UxSettingsCard extends StatelessWidget {
+  final ScanningModulesConfig config;
+  final VoidCallback onChanged;
+
+  const _UxSettingsCard({required this.config, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+              child: Text(
+                'UX settings',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Text(
+              'Apply to Scan with camera.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            _BoolSettingTile(
+              title: 'Show onboarding dialog',
+              subtitle: 'Introduction dialog at the start of scanning',
+              value: config.showOnboardingDialog,
+              onChanged: (v) {
+                config.showOnboardingDialog = v;
+                onChanged();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SectionLabel extends StatelessWidget {
   final String text;
 
@@ -648,6 +757,11 @@ class _IntSettingFieldState extends State<_IntSettingField> {
     }
   }
 
+  void _commitAndDismiss() {
+    _commit();
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -661,8 +775,10 @@ class _IntSettingFieldState extends State<_IntSettingField> {
           border: const OutlineInputBorder(),
         ),
         keyboardType: TextInputType.number,
-        onFieldSubmitted: (_) => _commit(),
-        onEditingComplete: _commit,
+        textInputAction: TextInputAction.done,
+        onTapOutside: (_) => _commitAndDismiss(),
+        onFieldSubmitted: (_) => _commitAndDismiss(),
+        onEditingComplete: _commitAndDismiss,
       ),
     );
   }
@@ -720,6 +836,11 @@ class _DoubleSettingFieldState extends State<_DoubleSettingField> {
     }
   }
 
+  void _commitAndDismiss() {
+    _commit();
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -733,8 +854,10 @@ class _DoubleSettingFieldState extends State<_DoubleSettingField> {
           border: const OutlineInputBorder(),
         ),
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        onFieldSubmitted: (_) => _commit(),
-        onEditingComplete: _commit,
+        textInputAction: TextInputAction.done,
+        onTapOutside: (_) => _commitAndDismiss(),
+        onFieldSubmitted: (_) => _commitAndDismiss(),
+        onEditingComplete: _commitAndDismiss,
       ),
     );
   }

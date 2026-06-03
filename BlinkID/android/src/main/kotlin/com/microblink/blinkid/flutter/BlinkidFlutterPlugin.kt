@@ -150,7 +150,8 @@ class BlinkIdFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
                         uxSettings = BlinkIdDeserializationUtils.deserializeBlinkIdUxSettings(
                             blinkidUxSettingsMap = blinkIdScanningUxSettings,
                             classFilterMap = classFilterMap,
-                            redactionSettingsResolverMap = redactionSettingsResolverMap
+                            redactionSettingsResolverMap = redactionSettingsResolverMap,
+                            sessionSettingsMap = blinkIdSessionSettings,
                         ),
                         showOnboardingDialog = (blinkIdScanningUxSettings?.getOrDefault("showOnboardingDialog", true) as? Boolean) ?: true,
                         showHelpButton = (blinkIdScanningUxSettings?.getOrDefault("showHelpButton", true) as? Boolean) ?: true,

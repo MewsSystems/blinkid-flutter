@@ -49,18 +49,21 @@ class _MyAppState extends State<MyApp> {
     return sdkSettings;
   }
 
-  BlinkIdSessionSettings _buildSessionSettings() {
-    final sessionSettings = BlinkIdSessionSettings();
-    sessionSettings.scanningMode = _modulesConfig.scanningMode;
-    sessionSettings.scanningSettings = _modulesConfig.toScanningSettings();
-    return sessionSettings;
-  }
+  BlinkIdSessionSettings _buildSessionSettings() =>
+      _modulesConfig.toSessionSettings();
 
   void _logScanConfiguration(String action) {
     final sessionSettings = _buildSessionSettings();
     final scanningSettings = sessionSettings.scanningSettings;
     debugPrint('[BlinkIdSample] $action');
     debugPrint('[BlinkIdSample] scanningMode: ${sessionSettings.scanningMode}');
+    debugPrint(
+      '[BlinkIdSample] stepTimeoutDuration: ${sessionSettings.stepTimeoutDuration}, '
+      'inactivityTimeoutDuration: ${sessionSettings.inactivityTimeoutDuration}',
+    );
+    debugPrint(
+      '[BlinkIdSample] showOnboardingDialog: ${_modulesConfig.showOnboardingDialog}',
+    );
     debugPrint(
       '[BlinkIdSample] modules enabled: '
       'documentCapture=${_modulesConfig.documentCaptureEnabled}, '
@@ -102,13 +105,7 @@ class _MyAppState extends State<MyApp> {
       final sdkSettings = _buildSdkSettings();
       final sessionSettings = _buildSessionSettings();
 
-      /// Create and modify the UX settings
-      /// This paramater is optional
-      final uiSettings = BlinkIdScanningUxSettings();
-      uiSettings.showHelpButton = true;
-      uiSettings.showOnboardingDialog = false;
-      uiSettings.allowHapticFeedback = true;
-      uiSettings.preferredCamera = PreferredCamera.back;
+      final uiSettings = _modulesConfig.toUxSettings();
 
       /// Place the optional ClassFilter class
       /// The filter is currently modified to only accept Canada documents, and USA California documents
@@ -443,9 +440,14 @@ class _MyAppState extends State<MyApp> {
       ),
       home: Scaffold(
         appBar: AppBar(title: const Text("BlinkID Sample")),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Builder(
+        body: GestureDetector(
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          behavior: HitTestBehavior.translucent,
+          child: SingleChildScrollView(
+            keyboardDismissBehavior:
+                ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.all(16.0),
+            child: Builder(
             builder: (BuildContext context) {
               return Column(
                 children: <Widget>[
@@ -501,6 +503,7 @@ class _MyAppState extends State<MyApp> {
                 ],
               );
             },
+          ),
           ),
         ),
       ),

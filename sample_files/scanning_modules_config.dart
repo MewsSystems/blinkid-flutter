@@ -1,8 +1,17 @@
 import 'package:blinkid_flutter/blinkid_flutter.dart';
 
-/// Holds UI-driven scanning module configuration for the BlinkID sample app.
+/// Holds UI-driven scanning configuration for the BlinkID sample app.
 class ScanningModulesConfig {
   ScanningMode scanningMode = ScanningMode.automatic;
+
+  /// Milliseconds before a scanning step times out. `0` disables the timeout.
+  int stepTimeoutDuration = 60000;
+
+  /// Milliseconds of UI inactivity before timeout. `0` disables the timeout.
+  int inactivityTimeoutDuration = 10000;
+
+  /// Shown at the start of the camera scanning flow (performScan only).
+  bool showOnboardingDialog = true;
 
   bool barcodeEnabled = true;
   BarcodeModuleSettings barcode = BarcodeModuleSettings(
@@ -30,8 +39,29 @@ class ScanningModulesConfig {
     );
   }
 
+  BlinkIdSessionSettings toSessionSettings() {
+    return BlinkIdSessionSettings(
+      scanningMode: scanningMode,
+      scanningSettings: toScanningSettings(),
+      stepTimeoutDuration: stepTimeoutDuration,
+      inactivityTimeoutDuration: inactivityTimeoutDuration,
+    );
+  }
+
+  BlinkIdScanningUxSettings toUxSettings() {
+    return BlinkIdScanningUxSettings(
+      showHelpButton: true,
+      showOnboardingDialog: showOnboardingDialog,
+      allowHapticFeedback: true,
+      preferredCamera: PreferredCamera.back,
+    );
+  }
+
   void resetToDefaults() {
     scanningMode = ScanningMode.automatic;
+    stepTimeoutDuration = 60000;
+    inactivityTimeoutDuration = 10000;
+    showOnboardingDialog = true;
     barcodeEnabled = true;
     barcode = BarcodeModuleSettings(
       presenceMandatory: true,
