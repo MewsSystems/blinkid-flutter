@@ -80,8 +80,8 @@ class BlinkIdSessionSettings {
 
   /// Duration in seconds before scanning step times out and is cancelled.
   /// If less than zero, scanning will not time out.
-  /// Defaults to 15000 (15 seconds)
-  int stepTimeoutDuration = 15000;
+  /// Defaults to 60000 (60 seconds)
+  int stepTimeoutDuration = 60000;
 
   ///Duration in seconds of UI inactivity (no state change) before timeout.
   ///If less than or equal to zero, the inactivity timer will not fire.
@@ -96,7 +96,7 @@ class BlinkIdSessionSettings {
   BlinkIdSessionSettings({
     this.scanningMode = ScanningMode.automatic,
     BlinkIdScanningSettings? scanningSettings,
-    this.stepTimeoutDuration = 15000,
+    this.stepTimeoutDuration = 60000,
     this.inactivityTimeoutDuration = 10000,
   }) : scanningSettings = scanningSettings ?? BlinkIdScanningSettings();
 
