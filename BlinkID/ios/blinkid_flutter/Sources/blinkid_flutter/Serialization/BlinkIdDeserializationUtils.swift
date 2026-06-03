@@ -59,6 +59,12 @@ struct BlinkIdDeserializationUtils {
         
         if let scanningSettings = sessionSettingsDict?["scanningSettings"] as? Dictionary<String, Any> {
             blinkidSessionSettings.scanningSettings = deserializeBlinkIdScanningSettings(scanningSettings)
+            logSessionSettings(
+                source: isFromDirectApi ? "directApi" : "performScan",
+                sessionSettingsDict: sessionSettingsDict,
+                scanningSettingsDict: scanningSettings,
+                scanningSettings: blinkidSessionSettings.scanningSettings
+            )
         }
         
         if let scanningMode = sessionSettingsDict?["scanningMode"] as? String {
@@ -82,30 +88,77 @@ struct BlinkIdDeserializationUtils {
     
     static func deserializeBlinkIdScanningSettings(_ scanningSettingsDict: Dictionary<String, Any>?) -> ScanningSettings {
         var scanningSettings = ScanningSettings()
-        
-        if let barcodeModuleDict = scanningSettingsDict?["barcodeModule"] as? Dictionary<String, Any> {
-            scanningSettings.barcodeModule = deserializeBarcodeModule(barcodeModuleDict)
+        guard let scanningSettingsDict else {
+            return scanningSettings
+        }
+
+        if scanningSettingsDict.keys.contains("barcodeModule") {
+            if let barcodeModuleDict = scanningSettingsDict["barcodeModule"] as? Dictionary<String, Any> {
+                scanningSettings.barcodeModule = deserializeBarcodeModule(barcodeModuleDict)
+            } else {
+                scanningSettings.barcodeModule = nil
+            }
+        }
+
+        if scanningSettingsDict.keys.contains("documentCaptureModule") {
+            if let documentCaptureDict = scanningSettingsDict["documentCaptureModule"] as? Dictionary<String, Any> {
+                scanningSettings.documentCaptureModule = deserializeDocumentCaptureModule(documentCaptureDict)
+            } else {
+                scanningSettings.documentCaptureModule = nil
+            }
+        }
+
+        if scanningSettingsDict.keys.contains("mrzModule") {
+            if let mrzModuleDict = scanningSettingsDict["mrzModule"] as? Dictionary<String, Any> {
+                scanningSettings.mrzModule = deserializeMrzModule(mrzModuleDict)
+            } else {
+                scanningSettings.mrzModule = nil
+            }
+        }
+
+        if scanningSettingsDict.keys.contains("vizModule") {
+            if let vizModuleDict = scanningSettingsDict["vizModule"] as? Dictionary<String, Any> {
+                scanningSettings.vizModule = deserializeVizModule(vizModuleDict)
+            } else {
+                scanningSettings.vizModule = nil
+            }
         }
         
-        if let documentCaptureDict = scanningSettingsDict?["documentCaptureModule"] as? Dictionary<String, Any> {
-            scanningSettings.documentCaptureModule = deserializeDocumentCaptureModule(documentCaptureDict)
-        }
-        
-        if let mrzModuleDict = scanningSettingsDict?["mrzModule"] as? Dictionary<String, Any> {
-            scanningSettings.mrzModule = deserializeMrzModule(mrzModuleDict)
-        }
-        
-        if let vizModuleDict = scanningSettingsDict?["vizModule"] as? Dictionary<String, Any> {
-            scanningSettings.vizModule = deserializeVizModule(vizModuleDict)
-            
-        }
-        
-        if let maxAllowedMismatchesPerField = scanningSettingsDict?["maxAllowedMismatchesPerField"] as? Int {
+        if let maxAllowedMismatchesPerField = scanningSettingsDict["maxAllowedMismatchesPerField"] as? Int {
             scanningSettings.maxAllowedMismatchesPerField = maxAllowedMismatchesPerField
         }
         
-        
         return scanningSettings
+    }
+
+    private static func logSessionSettings(
+        source: String,
+        sessionSettingsDict: Dictionary<String, Any>?,
+        scanningSettingsDict: Dictionary<String, Any>,
+        scanningSettings: ScanningSettings
+    ) {
+        print("[BlinkIdFlutter][\(source)] scanningMode=\(String(describing: sessionSettingsDict?["scanningMode"]))")
+        print(
+            "[BlinkIdFlutter][\(source)] raw modules: documentCapture=\(String(describing: scanningSettingsDict["documentCaptureModule"])), " +
+            "barcode=\(String(describing: scanningSettingsDict["barcodeModule"])), " +
+            "mrz=\(String(describing: scanningSettingsDict["mrzModule"])), " +
+            "viz=\(String(describing: scanningSettingsDict["vizModule"]))"
+        )
+        print(
+            "[BlinkIdFlutter][\(source)] deserialized modules: documentCapture=\(String(describing: scanningSettings.documentCaptureModule)), " +
+            "barcode=\(String(describing: scanningSettings.barcodeModule)), " +
+            "mrz=\(String(describing: scanningSettings.mrzModule)), " +
+            "viz=\(String(describing: scanningSettings.vizModule))"
+        )
+        if let barcode = scanningSettings.barcodeModule {
+            print("[BlinkIdFlutter][\(source)] barcode.presenceMandatory=\(barcode.presenceMandatory)")
+        }
+        if let mrz = scanningSettings.mrzModule {
+            print("[BlinkIdFlutter][\(source)] mrz.presenceMandatory=\(mrz.presenceMandatory)")
+        }
+        if let viz = scanningSettings.vizModule {
+            print("[BlinkIdFlutter][\(source)] viz.presenceMandatory=\(viz.presenceMandatory)")
+        }
     }
     
     static func deserializeBarcodeModule(_ barcodeModuleDict: Dictionary<String, Any>) -> BarcodeModuleSettings {

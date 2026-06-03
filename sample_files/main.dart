@@ -56,6 +56,26 @@ class _MyAppState extends State<MyApp> {
     return sessionSettings;
   }
 
+  void _logScanConfiguration(String action) {
+    final sessionSettings = _buildSessionSettings();
+    final scanningSettings = sessionSettings.scanningSettings;
+    debugPrint('[BlinkIdSample] $action');
+    debugPrint('[BlinkIdSample] scanningMode: ${sessionSettings.scanningMode}');
+    debugPrint(
+      '[BlinkIdSample] modules enabled: '
+      'documentCapture=${_modulesConfig.documentCaptureEnabled}, '
+      'barcode=${_modulesConfig.barcodeEnabled}, '
+      'mrz=${_modulesConfig.mrzEnabled}, '
+      'viz=${_modulesConfig.vizEnabled}',
+    );
+    debugPrint(
+      '[BlinkIdSample] scanningSettings JSON: ${jsonEncode(scanningSettings.toJson())}',
+    );
+    debugPrint(
+      '[BlinkIdSample] full sessionSettings JSON: ${jsonEncode(sessionSettings.toJson())}',
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -78,6 +98,7 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> performScan() async {
     try {
+      _logScanConfiguration('Scan with camera');
       final sdkSettings = _buildSdkSettings();
       final sessionSettings = _buildSessionSettings();
 
@@ -158,6 +179,7 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> directApiMultiSideScan() async {
     try {
+      _logScanConfiguration('DirectAPI MultiSide');
       /// Get the front and the back side of the document with the pickMultiImage method
       /// First select the front and the then back side of the image
       final images = await ImagePicker().pickMultiImage();
@@ -212,6 +234,7 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> directApiSingleSideScan() async {
     try {
+      _logScanConfiguration('DirectAPI SingleSide');
       /// Get either the front or the back side of the document with the pickImage method
       final image = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (image == null) return;

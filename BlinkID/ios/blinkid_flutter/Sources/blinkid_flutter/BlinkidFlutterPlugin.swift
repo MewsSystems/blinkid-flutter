@@ -112,6 +112,7 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
                   let sessionSettings = BlinkIdDeserializationUtils.sanitizeDictionary(sessionSettingsRaw) else {
                 throw BlinkIdFlutterError.incorrectArgument("BlinkID session settings")
             }
+            print("[BlinkIdFlutter] performScan received blinkIdSessionSettings=\(sessionSettings)")
             
             let uxSettings = BlinkIdDeserializationUtils.deserializeBlinkIdUxScanningSettings(cleanArguments["blinkIdScanningUxSettings"] as? [String: Any])
             

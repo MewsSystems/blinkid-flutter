@@ -32,10 +32,13 @@ import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.RawValue
 import android.graphics.Bitmap
 import android.util.Base64
+import android.util.Log
 import com.microblink.ux.camera.CameraLensFacing
 import com.microblink.ux.camera.CameraSettings
 
 object BlinkIdDeserializationUtils {
+
+    private const val TAG = "BlinkIdFlutter"
 
     fun deserializeBlinkIdSdkSettings(blinkIdSdkSettingsMap: Map<String, Any>?): BlinkIdSdkSettings? {
         val licenseKey = blinkIdSdkSettingsMap?.get("licenseKey") as? String ?: return null
@@ -61,10 +64,20 @@ object BlinkIdDeserializationUtils {
     ): BlinkIdSessionSettings {
         if (blinkIdSdkSessionSettingsMap == null) return BlinkIdSessionSettings()
 
+        val scanningSettingsMap =
+            blinkIdSdkSessionSettingsMap["scanningSettings"] as? Map<String, Any>
+        val scanningSettings = deserializeScanningSettings(scanningSettingsMap)
+        logSessionSettings(
+            source = if (isDirectApi) "directApi" else "performScan",
+            sessionMap = blinkIdSdkSessionSettingsMap,
+            scanningSettingsMap = scanningSettingsMap,
+            scanningSettings = scanningSettings,
+        )
+
         return BlinkIdSessionSettings(
             inputImageSource = if (isDirectApi) InputImageSource.Photo else InputImageSource.Video,
             scanningMode = deserializeScanningMode(blinkIdSdkSessionSettingsMap["scanningMode"] as? String),
-            scanningSettings = deserializeScanningSettings(blinkIdSdkSessionSettingsMap["scanningSettings"] as? Map<String, Any>),
+            scanningSettings = scanningSettings,
         )
     }
 
@@ -79,17 +92,38 @@ object BlinkIdDeserializationUtils {
     private fun deserializeScanningSettings(scanningSettingsMap: Map<String, Any>?): ScanningSettings {
         if (scanningSettingsMap == null) return ScanningSettings()
         return ScanningSettings(
-            documentCaptureModule = deserializeDocumentCaptureModuleSettings(scanningSettingsMap["documentCaptureModule"] as? Map<String, Any>),
-            barcodeModule = deserializeBarcodeModuleSettings(scanningSettingsMap["barcodeModule"] as? Map<String, Any>),
-            mrzModule = deserializeMrzModuleSettings(scanningSettingsMap["mrzModule"] as? Map<String, Any>),
-            vizModule = deserializeVizModuleSettings(scanningSettingsMap["vizModule"] as? Map<String, Any>),
+            documentCaptureModule = optionalDocumentCaptureModuleSettings(
+                scanningSettingsMap["documentCaptureModule"],
+            ),
+            barcodeModule = optionalBarcodeModuleSettings(scanningSettingsMap["barcodeModule"]),
+            mrzModule = optionalMrzModuleSettings(scanningSettingsMap["mrzModule"]),
+            vizModule = optionalVizModuleSettings(scanningSettingsMap["vizModule"]),
             maxAllowedMismatchesPerField = (scanningSettingsMap["maxAllowedMismatchesPerField"] as? Int)?.toUInt()
                 ?: 0u,
         )
     }
 
-    private fun deserializeDocumentCaptureModuleSettings(map: Map<String, Any>?): DocumentCaptureModuleSettings {
-        if (map == null) return DocumentCaptureModuleSettings()
+    private fun optionalDocumentCaptureModuleSettings(value: Any?): DocumentCaptureModuleSettings? {
+        val map = value as? Map<String, Any> ?: return null
+        return deserializeDocumentCaptureModuleSettings(map)
+    }
+
+    private fun optionalBarcodeModuleSettings(value: Any?): BarcodeModuleSettings? {
+        val map = value as? Map<String, Any> ?: return null
+        return deserializeBarcodeModuleSettings(map)
+    }
+
+    private fun optionalMrzModuleSettings(value: Any?): MrzModuleSettings? {
+        val map = value as? Map<String, Any> ?: return null
+        return deserializeMrzModuleSettings(map)
+    }
+
+    private fun optionalVizModuleSettings(value: Any?): VizModuleSettings? {
+        val map = value as? Map<String, Any> ?: return null
+        return deserializeVizModuleSettings(map)
+    }
+
+    private fun deserializeDocumentCaptureModuleSettings(map: Map<String, Any>): DocumentCaptureModuleSettings {
         return DocumentCaptureModuleSettings(
             inputImageCropped = map["inputImageCropped"] as? Boolean ?: false,
             unsupportedDocumentsAllowed = map["unsupportedDocumentsAllowed"] as? Boolean ?: false,
@@ -122,8 +156,7 @@ object BlinkIdDeserializationUtils {
         }
     }
 
-    private fun deserializeBarcodeModuleSettings(map: Map<String, Any>?): BarcodeModuleSettings {
-        if (map == null) return BarcodeModuleSettings()
+    private fun deserializeBarcodeModuleSettings(map: Map<String, Any>): BarcodeModuleSettings {
         return BarcodeModuleSettings(
             presenceMandatory = map["presenceMandatory"] as? Boolean ?: false,
             barcodeImageReturnEnabled = map["barcodeImageReturnEnabled"] as? Boolean ?: false,
@@ -140,15 +173,13 @@ object BlinkIdDeserializationUtils {
         )
     }
 
-    private fun deserializeMrzModuleSettings(map: Map<String, Any>?): MrzModuleSettings {
-        if (map == null) return MrzModuleSettings()
+    private fun deserializeMrzModuleSettings(map: Map<String, Any>): MrzModuleSettings {
         return MrzModuleSettings(
             presenceMandatory = map["presenceMandatory"] as? Boolean ?: false,
         )
     }
 
-    private fun deserializeVizModuleSettings(map: Map<String, Any>?): VizModuleSettings {
-        if (map == null) return VizModuleSettings()
+    private fun deserializeVizModuleSettings(map: Map<String, Any>): VizModuleSettings {
         return VizModuleSettings(
             presenceMandatory = map["presenceMandatory"] as? Boolean ?: false,
             signatureImageExtractionEnabled = map["signatureImageExtractionEnabled"] as? Boolean ?: false,
@@ -308,6 +339,38 @@ object BlinkIdDeserializationUtils {
             BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
         } catch (e: IllegalArgumentException) {
             null
+        }
+    }
+
+    private fun logSessionSettings(
+        source: String,
+        sessionMap: Map<String, Any>,
+        scanningSettingsMap: Map<String, Any>?,
+        scanningSettings: ScanningSettings,
+    ) {
+        Log.i(TAG, "[$source] scanningMode=${sessionMap["scanningMode"]}")
+        Log.i(
+            TAG,
+            "[$source] raw modules: documentCapture=${scanningSettingsMap?.get("documentCaptureModule")}, " +
+                "barcode=${scanningSettingsMap?.get("barcodeModule")}, " +
+                "mrz=${scanningSettingsMap?.get("mrzModule")}, " +
+                "viz=${scanningSettingsMap?.get("vizModule")}",
+        )
+        Log.i(
+            TAG,
+            "[$source] deserialized modules: documentCapture=${scanningSettings.documentCaptureModule}, " +
+                "barcode=${scanningSettings.barcodeModule}, " +
+                "mrz=${scanningSettings.mrzModule}, " +
+                "viz=${scanningSettings.vizModule}",
+        )
+        scanningSettings.barcodeModule?.let {
+            Log.i(TAG, "[$source] barcode.presenceMandatory=${it.presenceMandatory}")
+        }
+        scanningSettings.mrzModule?.let {
+            Log.i(TAG, "[$source] mrz.presenceMandatory=${it.presenceMandatory}")
+        }
+        scanningSettings.vizModule?.let {
+            Log.i(TAG, "[$source] viz.presenceMandatory=${it.presenceMandatory}")
         }
     }
 }

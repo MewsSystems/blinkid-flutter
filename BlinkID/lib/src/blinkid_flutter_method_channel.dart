@@ -60,10 +60,14 @@ class MethodChannelBlinkIdFlutter extends BlinkIdFlutterPlatform {
     ClassFilter? classFilter,
     RedactionSettingsResolver? redactionSettingsResolver,
   }) async {
+    final sessionPayload = jsonDecode(jsonEncode(blinkIdSessionSettings));
+    debugPrint(
+      '[BlinkIdFlutter] performScan sessionSettings: ${jsonEncode(sessionPayload)}',
+    );
     final jsonBlinkIdResult = await methodChannel
         .invokeMethod(ARG_SCAN_METHOD, {
           ARG_BLINKID_SDK_SETTINGS: jsonDecode(jsonEncode(blinkIdSdkSettings)),
-          ARG_SESSION_SETTINGS: jsonDecode(jsonEncode(blinkIdSessionSettings)),
+          ARG_SESSION_SETTINGS: sessionPayload,
           ARG_UX_SETTINGS: jsonDecode(jsonEncode(blinkIdScanningUxSettings)),
           ARG_CLASS_FILTER: jsonDecode(jsonEncode(classFilter)),
           ARG_REDACTION_SETTINGS_RESOLVER: jsonDecode(
@@ -100,10 +104,14 @@ class MethodChannelBlinkIdFlutter extends BlinkIdFlutterPlatform {
     required String firstImage,
     String? secondImage,
   }) async {
+    final sessionPayload = jsonDecode(jsonEncode(blinkIdSessionSettings));
+    debugPrint(
+      '[BlinkIdFlutter] performDirectApiScan sessionSettings: ${jsonEncode(sessionPayload)}',
+    );
     final jsonBlinkIdDirectApiResult = await methodChannel
         .invokeMethod(ARG_SCAN_DIRECT_API_METHOD, {
           ARG_BLINKID_SDK_SETTINGS: jsonDecode(jsonEncode(blinkIdSdkSettings)),
-          ARG_SESSION_SETTINGS: jsonDecode(jsonEncode(blinkIdSessionSettings)),
+          ARG_SESSION_SETTINGS: sessionPayload,
           ARG_REDACTION_SETTINGS: jsonDecode(jsonEncode(redactionSettings)),
           ARG_FIRST_IMAGE: jsonDecode(jsonEncode(firstImage)),
           ARG_SECOND_IMAGE: jsonDecode(jsonEncode(secondImage)),
