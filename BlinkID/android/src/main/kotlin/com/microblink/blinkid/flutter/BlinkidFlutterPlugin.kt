@@ -7,11 +7,11 @@ import com.microblink.blinkid.core.BlinkIdSdk
 import com.microblink.blinkid.core.session.BlinkIdProcessResult
 import com.microblink.blinkid.ux.contract.BlinkIdScanActivitySettings
 import com.microblink.blinkid.ux.contract.MbBlinkIdScan
-import com.microblink.core.LicenseLockedException
-import com.microblink.core.image.InputImage
-import com.microblink.core.ping.PingManager
-import com.microblink.core.ping.pinglets.WrapperProductInfo
-import com.microblink.ux.contract.ScanActivityResultStatus
+import com.microblink.blinkid.core.LicenseLockedException
+import com.microblink.blinkid.core.image.InputImage
+import com.microblink.blinkid.core.ping.PingManager
+import com.microblink.blinkid.core.ping.pinglets.WrapperProductInfo
+import com.microblink.blinkid.ux.contract.ScanActivityResultStatus
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding

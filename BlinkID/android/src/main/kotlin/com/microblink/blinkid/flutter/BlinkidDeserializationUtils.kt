@@ -22,23 +22,23 @@ import com.microblink.blinkid.core.settings.scanning.MrzModuleSettings
 import com.microblink.blinkid.core.settings.scanning.VizModuleSettings
 import com.microblink.blinkid.ux.settings.BlinkIdUxSettings
 import com.microblink.blinkid.ux.settings.ClassFilter
-import com.microblink.core.network.RequestTimeout
-import com.microblink.core.session.InputImageSource
-import com.microblink.core.settings.RedactionMode
-import com.microblink.core.utils.defaultResourceDownloadUrl
-import com.microblink.core.utils.defaultResourcesLocalFolder
+import com.microblink.blinkid.core.network.RequestTimeout
+import com.microblink.blinkid.core.session.InputImageSource
+import com.microblink.blinkid.core.settings.RedactionMode
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.RawValue
 import android.graphics.Bitmap
 import android.util.Base64
 import android.util.Log
-import com.microblink.ux.camera.CameraLensFacing
-import com.microblink.ux.camera.CameraSettings
+import com.microblink.blinkid.ux.camera.CameraLensFacing
+import com.microblink.blinkid.ux.camera.CameraSettings
 
 object BlinkIdDeserializationUtils {
 
     private const val TAG = "BlinkIdFlutter"
+    private const val DEFAULT_RESOURCE_DOWNLOAD_URL = "https://models.cdn.microblink.com/resources"
+    private const val DEFAULT_RESOURCES_LOCAL_FOLDER = "MLModels"
 
     fun deserializeBlinkIdSdkSettings(blinkIdSdkSettingsMap: Map<String, Any>?): BlinkIdSdkSettings? {
         val licenseKey = blinkIdSdkSettingsMap?.get("licenseKey") as? String ?: return null
@@ -48,9 +48,9 @@ object BlinkIdDeserializationUtils {
             licensee = blinkIdSdkSettingsMap["licensee"] as? String,
             downloadResources = blinkIdSdkSettingsMap["downloadResources"] as? Boolean ?: true,
             resourceDownloadUrl = blinkIdSdkSettingsMap["resourceDownloadUrl"] as? String
-                ?: defaultResourceDownloadUrl,
+                ?: DEFAULT_RESOURCE_DOWNLOAD_URL,
             resourceLocalFolder = blinkIdSdkSettingsMap["resourceLocalFolder"] as? String
-                ?: defaultResourcesLocalFolder,
+                ?: DEFAULT_RESOURCES_LOCAL_FOLDER,
             resourceRequestTimeout = deserializeResourceRequestTimeout(blinkIdSdkSettingsMap["resourceRequestTimeout"] as? Map<String, Any>),
             microblinkProxyUrl = blinkIdSdkSettingsMap["microblinkProxyURL"] as? String,
             )
@@ -280,7 +280,7 @@ object BlinkIdDeserializationUtils {
             ?: 10000
         return BlinkIdUxSettings(
             stepTimeoutDuration = stepTimeoutMs.milliseconds,
-            stateBasedTimeoutDuration = inactivityTimeoutMs.milliseconds,
+            inactivityTimeoutDuration = inactivityTimeoutMs.milliseconds,
             allowHapticFeedback = (uxMap["allowHapticFeedback"] as? Boolean) ?: true,
             classFilter = CustomClassFilter(classFilterMap),
             redactionSettingsResolver = deserializeRedactionSettingsResolver(redactionSettingsResolverMap),

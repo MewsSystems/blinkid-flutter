@@ -24,10 +24,10 @@ import java.io.ByteArrayOutputStream
 import android.util.Base64
 import com.microblink.blinkid.core.result.ParentInfo
 import com.microblink.blinkid.core.result.barcode.BarcodeElement
-import com.microblink.core.result.DateResult
-import com.microblink.core.result.DetailedCroppedImageResult
-import com.microblink.core.result.Rectangle
-import com.microblink.core.result.ScanningSide
+import com.microblink.blinkid.core.result.DateResult
+import com.microblink.blinkid.core.result.DetailedCroppedImageResult
+import com.microblink.blinkid.core.result.Rectangle
+import com.microblink.blinkid.core.result.ScanningSide
 import kotlin.collections.set
 
 object BlinkIdSerializationUtils {
