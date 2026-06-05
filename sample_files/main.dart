@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:blinkid_flutter/blinkid_flutter.dart';
 import 'blinkid_result_builder.dart';
 import 'module_settings_panel.dart';
+import 'optional_scan_settings_panel.dart';
 import 'scanning_modules_config.dart';
 
 void main() {
@@ -106,34 +107,9 @@ class _MyAppState extends State<MyApp> {
       final sessionSettings = _buildSessionSettings();
 
       final uiSettings = _modulesConfig.toUxSettings();
-
-      /// Place the optional ClassFilter class
-      /// The filter is currently modified to only accept Canada documents, and USA California documents
-      final classFilter = ClassFilter.withIncludedDocumentClasses([
-        DocumentFilter(country: Country.canada),
-        DocumentFilter(country: Country.usa, region: Region.california),
-      ]);
-
-      /// Place the optional Redaction settings resolver class
-      /// The filter is currently modified to only accept Canada documents, and USA California documents
-      RedactionSettingsResolver redactionSettingsResolver =
-          RedactionSettingsResolver([
-            RedactionSettings(
-              mode: RedactionMode.fullResult,
-              documentNumberRedactionSettings: DocumentNumberRedactionSettings(
-                prefixDigitsVisible: 0,
-                suffixDigitsVisible: 1,
-              ),
-              fields: [FieldType.firstName, FieldType.lastName],
-              documentFilter: [
-                DocumentFilter(
-                  country: Country.usa,
-                  region: Region.california,
-                  documentType: DocumentType.id,
-                ),
-              ],
-            ),
-          ]);
+      final classFilter = _modulesConfig.toClassFilter();
+      final redactionSettingsResolver =
+          _modulesConfig.toRedactionSettingsResolver();
 
       /// Call the 'performScan' method and handle the results
       /// Check how the results are handled in the blinkid_result_builder.dart file
@@ -142,9 +118,9 @@ class _MyAppState extends State<MyApp> {
             blinkIdSdkSettings: sdkSettings,
             blinkIdSessionSettings: sessionSettings,
             blinkidScanningUxSettings: uiSettings,
+            classFilter: classFilter,
+            redactionSettingsResolver: redactionSettingsResolver,
           )
-          //classFilter: classFilter,
-          //redactionSettingsResolver: redactionSettingsResolver)
           .then((result) {
             resetImages();
             setState(() {
@@ -455,6 +431,11 @@ class _MyAppState extends State<MyApp> {
                     config: _modulesConfig,
                     onChanged: () => setState(() {}),
                   ),
+                  OptionalScanSettingsPanel(
+                    config: _modulesConfig,
+                    onChanged: () => setState(() {}),
+                  ),
+                  const SizedBox(height: 8),
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16.0),
                     child: ElevatedButton(

@@ -88,6 +88,10 @@ cp ../sample_files/main.dart lib/
 cp ../sample_files/blinkid_result_builder.dart lib/
 cp ../sample_files/scanning_modules_config.dart lib/
 cp ../sample_files/module_settings_panel.dart lib/
+cp ../sample_files/sample_filter_options.dart lib/
+cp ../sample_files/optional_scan_settings_panel.dart lib/
+
+popd
 
 echo ""
 echo "Go to Flutter project folder: cd $appName"

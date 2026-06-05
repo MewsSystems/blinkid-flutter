@@ -87,14 +87,14 @@ class ModuleSettingsPanel extends StatelessWidget {
   }
 }
 
-class _ModuleCard extends StatelessWidget {
+class SampleModuleCard extends StatelessWidget {
   final String title;
   final String? subtitle;
   final bool enabled;
   final ValueChanged<bool> onEnabledChanged;
   final List<Widget> children;
 
-  const _ModuleCard({
+  const SampleModuleCard({
     required this.title,
     this.subtitle,
     required this.enabled,
@@ -176,7 +176,7 @@ class _BarcodeModuleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final b = config.barcode;
-    return _ModuleCard(
+    return SampleModuleCard(
       title: 'Barcode',
       subtitle: config.barcodeEnabled ? 'Enabled' : 'Disabled (null)',
       enabled: config.barcodeEnabled,
@@ -185,32 +185,32 @@ class _BarcodeModuleCard extends StatelessWidget {
         onChanged();
       },
       children: [
-        _SectionLabel('Presence & image'),
-        _BoolSettingTile(
+        SampleSectionLabel('Presence & image'),
+        SampleBoolSettingTile(
           title: 'Presence mandatory',
           subtitle: 'Barcode must be present on scanned side(s)',
           value: b.presenceMandatory,
           onChanged: (v) => _updateBarcode((s) => s.presenceMandatory = v),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'Barcode image return',
           value: b.barcodeImageReturnEnabled,
           onChanged: (v) =>
               _updateBarcode((s) => s.barcodeImageReturnEnabled = v),
         ),
-        _SectionLabel('Document barcodes'),
-        _BoolSettingTile(
+        SampleSectionLabel('Document barcodes'),
+        SampleBoolSettingTile(
           title: 'PDF417 scanning',
           value: b.pdf417ScanningEnabled,
           onChanged: (v) =>
               _updateBarcode((s) => s.pdf417ScanningEnabled = v),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'QR scanning',
           value: b.qrScanningEnabled,
           onChanged: (v) => _updateBarcode((s) => s.qrScanningEnabled = v),
         ),
-        _SectionLabel('Retail formats'),
+        SampleSectionLabel('Retail formats'),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: Text(
@@ -220,43 +220,43 @@ class _BarcodeModuleCard extends StatelessWidget {
             ),
           ),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'UPC-E',
           value: b.upceScanningEnabled,
           onChanged: (v) => _updateBarcode((s) => s.upceScanningEnabled = v),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'UPC-A',
           value: b.upcaScanningEnabled,
           onChanged: (v) => _updateBarcode((s) => s.upcaScanningEnabled = v),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'Code 128',
           value: b.code128ScanningEnabled,
           onChanged: (v) =>
               _updateBarcode((s) => s.code128ScanningEnabled = v),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'Code 39',
           value: b.code39ScanningEnabled,
           onChanged: (v) => _updateBarcode((s) => s.code39ScanningEnabled = v),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'EAN-8',
           value: b.ean8ScanningEnabled,
           onChanged: (v) => _updateBarcode((s) => s.ean8ScanningEnabled = v),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'EAN-13',
           value: b.ean13ScanningEnabled,
           onChanged: (v) => _updateBarcode((s) => s.ean13ScanningEnabled = v),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'ITF',
           value: b.itfScanningEnabled,
           onChanged: (v) => _updateBarcode((s) => s.itfScanningEnabled = v),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'DataMatrix',
           value: b.dataMatrixScanningEnabled,
           onChanged: (v) =>
@@ -284,7 +284,7 @@ class _DocumentCaptureModuleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final d = config.documentCapture;
-    return _ModuleCard(
+    return SampleModuleCard(
       title: 'Document capture',
       subtitle: config.documentCaptureEnabled ? 'Enabled' : 'Disabled (null)',
       enabled: config.documentCaptureEnabled,
@@ -293,56 +293,56 @@ class _DocumentCaptureModuleCard extends StatelessWidget {
         onChanged();
       },
       children: [
-        _SectionLabel('Images & return'),
-        _BoolSettingTile(
+        SampleSectionLabel('Images & return'),
+        SampleBoolSettingTile(
           title: 'Document image return',
           value: d.documentImageReturnEnabled,
           onChanged: (v) =>
               _update((s) => s.documentImageReturnEnabled = v),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'Input image return',
           subtitle: 'Increases memory usage',
           value: d.inputImageReturnEnabled,
           onChanged: (v) => _update((s) => s.inputImageReturnEnabled = v),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'Unsupported documents allowed',
           value: d.unsupportedDocumentsAllowed,
           onChanged: (v) =>
               _update((s) => s.unsupportedDocumentsAllowed = v),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'Skip second side with no extractable data',
           value: d.secondSideWithNoExtractableDataSkipped,
           onChanged: (v) =>
               _update((s) => s.secondSideWithNoExtractableDataSkipped = v),
         ),
-        _SectionLabel('Face & passport'),
-        _BoolSettingTile(
+        SampleSectionLabel('Face & passport'),
+        SampleBoolSettingTile(
           title: 'Face image extraction',
           value: d.faceImageExtractionEnabled,
           onChanged: (v) =>
               _update((s) => s.faceImageExtractionEnabled = v),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'Face image presence mandatory',
           value: d.faceImagePresenceMandatory,
           onChanged: (v) =>
               _update((s) => s.faceImagePresenceMandatory = v),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'Passport data page scan only',
           value: d.passportDataPageScanOnly,
           onChanged: (v) => _update((s) => s.passportDataPageScanOnly = v),
         ),
-        _SectionLabel('Image quality'),
+        SampleSectionLabel('Image quality'),
         _SensitivityDropdown(
           label: 'Blur sensitivity',
           value: d.blurSensitivityLevel,
           onChanged: (v) => _update((s) => s.blurSensitivityLevel = v),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'Reject image with blur',
           value: d.imageWithBlurRejected,
           onChanged: (v) => _update((s) => s.imageWithBlurRejected = v),
@@ -352,7 +352,7 @@ class _DocumentCaptureModuleCard extends StatelessWidget {
           value: d.glareSensitivityLevel,
           onChanged: (v) => _update((s) => s.glareSensitivityLevel = v),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'Reject image with glare',
           value: d.imageWithGlareRejected,
           onChanged: (v) => _update((s) => s.imageWithGlareRejected = v),
@@ -362,19 +362,19 @@ class _DocumentCaptureModuleCard extends StatelessWidget {
           value: d.tiltSensitivityLevel,
           onChanged: (v) => _update((s) => s.tiltSensitivityLevel = v),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'Reject poor lighting',
           value: d.imageWithPoorLightingRejected,
           onChanged: (v) =>
               _update((s) => s.imageWithPoorLightingRejected = v),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'Reject hand occlusion',
           value: d.imageWithHandOcclusionRejected,
           onChanged: (v) =>
               _update((s) => s.imageWithHandOcclusionRejected = v),
         ),
-        _IntSettingField(
+        SampleIntSettingField(
           label: 'Dots per inch',
           value: d.dotsPerInch,
           min: 100,
@@ -388,8 +388,8 @@ class _DocumentCaptureModuleCard extends StatelessWidget {
           max: 1,
           onChanged: (v) => _update((s) => s.extensionFactor = v),
         ),
-        _SectionLabel('Direct API'),
-        _BoolSettingTile(
+        SampleSectionLabel('Direct API'),
+        SampleBoolSettingTile(
           title: 'Input image cropped',
           subtitle: 'For pre-cropped Direct API images only',
           value: d.inputImageCropped,
@@ -415,7 +415,7 @@ class _MrzModuleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _ModuleCard(
+    return SampleModuleCard(
       title: 'MRZ',
       subtitle: config.mrzEnabled ? 'Enabled' : 'Disabled (null)',
       enabled: config.mrzEnabled,
@@ -424,7 +424,7 @@ class _MrzModuleCard extends StatelessWidget {
         onChanged();
       },
       children: [
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'Presence mandatory',
           subtitle: 'MRZ must be present on scanned side(s)',
           value: config.mrz.presenceMandatory,
@@ -452,7 +452,7 @@ class _VizModuleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final v = config.viz;
-    return _ModuleCard(
+    return SampleModuleCard(
       title: 'VIZ',
       subtitle: config.vizEnabled ? 'Enabled' : 'Disabled (null)',
       enabled: config.vizEnabled,
@@ -461,24 +461,24 @@ class _VizModuleCard extends StatelessWidget {
         onChanged();
       },
       children: [
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'Presence mandatory',
           value: v.presenceMandatory,
           onChanged: (val) => _update((s) => s.presenceMandatory = val),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'Signature image extraction',
           value: v.signatureImageExtractionEnabled,
           onChanged: (val) =>
               _update((s) => s.signatureImageExtractionEnabled = val),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'Character validation',
           value: v.characterValidationEnabled,
           onChanged: (val) =>
               _update((s) => s.characterValidationEnabled = val),
         ),
-        _BoolSettingTile(
+        SampleBoolSettingTile(
           title: 'Result aggregation',
           subtitle: 'Aggregate data from multiple frames (video only)',
           value: v.resultAggregationEnabled,
@@ -519,7 +519,7 @@ class _SessionSettingsCard extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            _IntSettingField(
+            SampleIntSettingField(
               label: 'Step timeout duration',
               value: config.stepTimeoutDuration,
               min: 0,
@@ -529,7 +529,7 @@ class _SessionSettingsCard extends StatelessWidget {
                 onChanged();
               },
             ),
-            _IntSettingField(
+            SampleIntSettingField(
               label: 'Inactivity timeout duration',
               value: config.inactivityTimeoutDuration,
               min: 0,
@@ -578,7 +578,7 @@ class _UxSettingsCard extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            _BoolSettingTile(
+            SampleBoolSettingTile(
               title: 'Show onboarding dialog',
               subtitle: 'Introduction dialog at the start of scanning',
               value: config.showOnboardingDialog,
@@ -594,10 +594,10 @@ class _UxSettingsCard extends StatelessWidget {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
+class SampleSectionLabel extends StatelessWidget {
   final String text;
 
-  const _SectionLabel(this.text);
+  const SampleSectionLabel(this.text);
 
   @override
   Widget build(BuildContext context) {
@@ -614,13 +614,13 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _BoolSettingTile extends StatelessWidget {
+class SampleBoolSettingTile extends StatelessWidget {
   final String title;
   final String? subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
 
-  const _BoolSettingTile({
+  const SampleBoolSettingTile({
     required this.title,
     this.subtitle,
     required this.value,
@@ -679,14 +679,14 @@ class _SensitivityDropdown extends StatelessWidget {
   }
 }
 
-class _IntSettingField extends StatefulWidget {
+class SampleIntSettingField extends StatefulWidget {
   final String label;
   final int value;
   final int min;
   final int max;
   final ValueChanged<int> onChanged;
 
-  const _IntSettingField({
+  const SampleIntSettingField({
     required this.label,
     required this.value,
     required this.min,
@@ -695,10 +695,10 @@ class _IntSettingField extends StatefulWidget {
   });
 
   @override
-  State<_IntSettingField> createState() => _IntSettingFieldState();
+  State<SampleIntSettingField> createState() => _SampleIntSettingFieldState();
 }
 
-class _IntSettingFieldState extends State<_IntSettingField> {
+class _SampleIntSettingFieldState extends State<SampleIntSettingField> {
   late TextEditingController _controller;
 
   @override
@@ -708,7 +708,7 @@ class _IntSettingFieldState extends State<_IntSettingField> {
   }
 
   @override
-  void didUpdateWidget(_IntSettingField oldWidget) {
+  void didUpdateWidget(SampleIntSettingField oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.value != widget.value &&
         _controller.text != '${widget.value}') {
@@ -832,6 +832,108 @@ class _DoubleSettingFieldState extends State<_DoubleSettingField> {
         onTapOutside: (_) => _commitAndDismiss(),
         onFieldSubmitted: (_) => _commitAndDismiss(),
         onEditingComplete: _commitAndDismiss,
+      ),
+    );
+  }
+}
+
+class SampleEnumDropdown<T> extends StatelessWidget {
+  final String label;
+  final T value;
+  final List<T> options;
+  final ValueChanged<T> onChanged;
+
+  const SampleEnumDropdown({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  String _labelFor(T option) {
+    if (option is Enum) {
+      return option.name;
+    }
+    return option.toString();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: DropdownButtonFormField<T>(
+        key: ValueKey('$label-$value'),
+        initialValue: value,
+        decoration: InputDecoration(
+          labelText: label,
+          isDense: true,
+          border: const OutlineInputBorder(),
+        ),
+        items: options
+            .map(
+              (option) => DropdownMenuItem(
+                value: option,
+                child: Text(_labelFor(option)),
+              ),
+            )
+            .toList(),
+        onChanged: (selected) {
+          if (selected != null) {
+            onChanged(selected);
+          }
+        },
+      ),
+    );
+  }
+}
+
+class SampleOptionalEnumDropdown<T> extends StatelessWidget {
+  final String label;
+  final T? value;
+  final List<T> options;
+  final ValueChanged<T?> onChanged;
+
+  const SampleOptionalEnumDropdown({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  String _labelFor(T option) {
+    if (option is Enum) {
+      return option.name;
+    }
+    return option.toString();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: DropdownButtonFormField<T?>(
+        key: ValueKey('$label-${value ?? 'none'}'),
+        initialValue: value,
+        decoration: InputDecoration(
+          labelText: label,
+          isDense: true,
+          border: const OutlineInputBorder(),
+        ),
+        items: [
+          DropdownMenuItem<T?>(
+            value: null,
+            child: Text('None'),
+          ),
+          ...options.map(
+            (option) => DropdownMenuItem<T?>(
+              value: option,
+              child: Text(_labelFor(option)),
+            ),
+          ),
+        ],
+        onChanged: onChanged,
       ),
     );
   }

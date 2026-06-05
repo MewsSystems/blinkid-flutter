@@ -1,4 +1,5 @@
 import 'package:blinkid_flutter/blinkid_flutter.dart';
+import 'sample_filter_options.dart';
 
 /// Holds UI-driven scanning configuration for the BlinkID sample app.
 class ScanningModulesConfig {
@@ -26,6 +27,15 @@ class ScanningModulesConfig {
   bool vizEnabled = true;
   VizModuleSettings viz = ScanningModulesConfig.defaultVizModule;
 
+  bool classFilterEnabled = false;
+  List<UiDocumentFilter> classFilterInclude = [];
+  List<UiDocumentFilter> classFilterExclude = [];
+
+  bool redactionResolverEnabled = false;
+  List<RedactionSettings> redactionResolverEntries = [
+    ScanningModulesConfig.defaultRedactionSettings(),
+  ];
+
   /// SDK defaults from [BarcodeModuleSettings] constructor in `types.dart`.
   static BarcodeModuleSettings get defaultBarcodeModule =>
       BarcodeModuleSettings();
@@ -39,6 +49,59 @@ class ScanningModulesConfig {
 
   /// SDK defaults from [VizModuleSettings] constructor in `types.dart`.
   static VizModuleSettings get defaultVizModule => VizModuleSettings();
+
+  static RedactionSettings defaultRedactionSettings() {
+    return RedactionSettings(
+      mode: RedactionMode.fullResult,
+      documentNumberRedactionSettings: DocumentNumberRedactionSettings(
+        prefixDigitsVisible: 0,
+        suffixDigitsVisible: 1,
+      ),
+      fields: [FieldType.firstName, FieldType.lastName],
+      documentFilter: [
+        DocumentFilter(
+          country: Country.usa,
+          region: Region.california,
+          documentType: DocumentType.id,
+        ),
+      ],
+    );
+  }
+
+  ClassFilter? toClassFilter() {
+    if (!classFilterEnabled) {
+      return null;
+    }
+
+    final includeDocuments = classFilterInclude
+        .where(hasDocumentFilterCriteria)
+        .map(uiToDocumentFilter)
+        .toList();
+    final excludeDocuments = classFilterExclude
+        .where(hasDocumentFilterCriteria)
+        .map(uiToDocumentFilter)
+        .toList();
+
+    if (includeDocuments.isEmpty && excludeDocuments.isEmpty) {
+      return null;
+    }
+
+    final filter = ClassFilter();
+    if (includeDocuments.isNotEmpty) {
+      filter.includeDocuments = includeDocuments;
+    }
+    if (excludeDocuments.isNotEmpty) {
+      filter.excludeDocuments = excludeDocuments;
+    }
+    return filter;
+  }
+
+  RedactionSettingsResolver? toRedactionSettingsResolver() {
+    if (!redactionResolverEnabled || redactionResolverEntries.isEmpty) {
+      return null;
+    }
+    return RedactionSettingsResolver(redactionResolverEntries);
+  }
 
   BlinkIdScanningSettings toScanningSettings() {
     return BlinkIdScanningSettings(
@@ -84,5 +147,11 @@ class ScanningModulesConfig {
 
     vizEnabled = true;
     viz = defaultVizModule;
+
+    classFilterEnabled = false;
+    classFilterInclude = [];
+    classFilterExclude = [];
+    redactionResolverEnabled = false;
+    redactionResolverEntries = [defaultRedactionSettings()];
   }
 }
