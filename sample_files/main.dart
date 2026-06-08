@@ -44,8 +44,14 @@ class _MyAppState extends State<MyApp> {
 
   final _modulesConfig = ScanningModulesConfig();
 
+  static const _microblinkProxyUrl =
+      'https://mb-ping-baltazar-proxy.devel.microblink.com';
+
   BlinkIdSdkSettings _buildSdkSettings() {
-    final sdkSettings = BlinkIdSdkSettings(licenseKey: sdkLicenseKey);
+    final sdkSettings = BlinkIdSdkSettings(
+      licenseKey: sdkLicenseKey,
+      microblinkProxyUrl: _microblinkProxyUrl,
+    );
     sdkSettings.downloadResources = true;
     return sdkSettings;
   }
