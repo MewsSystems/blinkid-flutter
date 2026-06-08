@@ -31,11 +31,12 @@ A valid license key is required to initialize the BlinkID plugin. A free trial l
 
 | Requirement        | Flutter                | iOS                    | Android                   |
 |:------------------:|:----------------------:|:----------------------:|:-------------------------:|
-| OS/API version     | Flutter 3.44 and newer | iOS 16.0 and newer      | API version 24 and newer   |
-| Compile SDK version| -                      | -                      | 36 and newer              |
-| Camera quality     | -                       | At least 1080p          | At least 1080p             |
+| OS/API version     | Flutter 3.44 and newer | iOS 16.0 and newer      | API level 24 and newer   |
+| Compile SDK version| —                      | —                      | 36 and newer              |
+| Kotlin version     | —                      | —                      | 2.1.20 and newer          |
+| Camera quality     | —                       | At least 1080p          | At least 1080p             |
 
-
+**Android-specific:** No Jetpack Compose setup is required in your app. The plugin launches BlinkID's prebuilt scanning UI via an Android Activity. Compose runtime libraries are resolved transitively through the plugin; if your app uses Compose for its own UI, you may use any version **at or above** the minimums declared in the plugin (see [Plugin integration](#plugin-integration)).
 - For additional help with the Flutter setup, view the official [documentation](https://flutter.dev/docs).
 - For more detailed information about the BlinkID Android and iOS requirements, view the native SDK documentation here ([Android](https://github.com/microblink/blinkid-android?tab=readme-ov-file#-device-requirements) & [iOS](https://github.com/microblink/blinkid-ios?tab=readme-ov-file#requirements)).
 
@@ -107,6 +108,44 @@ dependencies:
 4. Run the command to install the dependency:
 ```bash
 flutter pub get
+```
+
+### Android
+Set `minSdk` to **24** in `android/app/build.gradle.kts`:
+
+```kotlin
+android {
+    defaultConfig {
+        minSdk = 24
+    }
+}
+```
+
+Use Kotlin **2.1.20** or newer in `android/settings.gradle.kts`.
+
+No Jetpack Compose compiler plugin, `buildFeatures.compose`, Compose BOM, or explicit Compose dependencies are required. The plugin depends on `blinkid-ux`, which pulls Compose runtime libraries transitively for camera scanning (`performScan`).
+
+If your app already uses Compose, keep your own Compose configuration. The plugin only declares **minimum** runtime versions (lower bounds) so that BlinkID scanning works; newer Compose versions in your app are supported.
+
+Minimum Compose runtime versions for camera scanning (defined in `BlinkID/android/build.gradle`):
+
+| Artifact | Minimum version |
+|:---------|:----------------|
+| `androidx.compose.ui:ui` | 1.11.2 |
+| `androidx.compose.ui:ui-graphics` | 1.11.2 |
+| `androidx.compose.runtime:runtime` | 1.11.2 |
+| `androidx.compose.foundation:foundation` | 1.11.2 |
+| `androidx.compose.material3:material3` | 1.4.0 |
+| `androidx.activity:activity-compose` | 1.13.0 |
+| `androidx.lifecycle:lifecycle-viewmodel-compose` | 2.10.0 |
+
+DirectAPI scanning (`performDirectApiScan`) does not launch the Compose-based UX, but the plugin currently includes `blinkid-ux` for camera scanning support.
+
+### iOS
+Set the minimum iOS deployment target to **16.0** and add camera/photo usage descriptions to `ios/Runner/Info.plist`. After changing the deployment target, run:
+
+```bash
+flutter build ios --config-only
 ```
 
 ## <a name="plugin-usage"></a> Plugin usage

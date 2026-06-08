@@ -28,25 +28,11 @@ flutter pub get
 # go to the android project folder
 pushd android
 
-# Fix settings.gradle.kts to use Kotlin 2.1.20 and add Compose plugin
+# BlinkID SDK requires Kotlin 2.1.20+
 sed -i '' 's/id("org.jetbrains.kotlin.android") version "[0-9.]*"/id("org.jetbrains.kotlin.android") version "2.1.20"/' settings.gradle.kts
-sed -i '' '/id("org.jetbrains.kotlin.android")/a\
-\    id("org.jetbrains.kotlin.plugin.compose") version "2.1.20" apply false
-' settings.gradle.kts
 
-# The BlinkID SDK uses minSdk 24. Replace 'minSdk = flutter.minSdkVersion' with 'minSdk = 24' in app/build.gradle.kts
+# BlinkID SDK requires minSdk 24
 sed -i '' 's/minSdk = flutter\.minSdkVersion/minSdk = 24/' app/build.gradle.kts
-
-# Add Compose plugin to app/build.gradle.kts
-sed -i '' '/id("com.android.application")/a\
-\    id("org.jetbrains.kotlin.plugin.compose")
-' app/build.gradle.kts
-
-# Add buildFeatures and configurations to force Compose 1.11.2 (fixes $stable field crash)
-perl -i -pe 'BEGIN{$/=undef;} s/android \{/android {\n    buildFeatures {\n        compose = true\n    }\n    composeCompiler {\n        enableStrongSkippingMode = true\n    }\n/' app/build.gradle.kts
-
-# Append resolution strategy and dependencies before the flutter block
-perl -i -pe 'BEGIN{$/=undef;} s/flutter \{/configurations.all {\n    resolutionStrategy {\n        force("androidx.compose.ui:ui-graphics:1.11.2")\n        force("androidx.compose.ui:ui:1.11.2")\n        force("androidx.compose.runtime:runtime:1.11.2")\n        force("androidx.compose.foundation:foundation:1.11.2")\n        force("androidx.compose.material3:material3:1.4.0")\n    }\n}\n\ndependencies {\n    implementation(platform("androidx.compose:compose-bom:2026.05.01"))\n    implementation("androidx.compose.ui:ui")\n    implementation("androidx.compose.ui:ui-graphics")\n    implementation("androidx.compose.material3:material3")\n}\n\nflutter \{/' app/build.gradle.kts
 
 # go to flutter root project
 popd
