@@ -48,10 +48,12 @@ class _MyAppState extends State<MyApp> {
       'https://mb-ping-baltazar-proxy.devel.microblink.com';
 
   BlinkIdSdkSettings _buildSdkSettings() {
-    final sdkSettings = BlinkIdSdkSettings(
-      licenseKey: sdkLicenseKey,
-      microblinkProxyUrl: _microblinkProxyUrl,
-    );
+    // final sdkSettings = BlinkIdSdkSettings(
+    //   licenseKey: sdkLicenseKey,
+    //   microblinkProxyUrl: _microblinkProxyUrl,
+    // );
+    //TODO re-add this when license with proxy support is added
+    final sdkSettings = BlinkIdSdkSettings(licenseKey: sdkLicenseKey);
     sdkSettings.downloadResources = true;
     return sdkSettings;
   }

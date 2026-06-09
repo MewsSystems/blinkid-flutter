@@ -116,8 +116,11 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
             
             let uxSettings = BlinkIdDeserializationUtils.deserializeBlinkIdUxScanningSettings(cleanArguments["blinkIdScanningUxSettings"] as? [String: Any])
             
-            classInfoFilterDict = arguments["blinkIdClassFilter"] as? [String: Any]
-            redactionSettingsResolverDict = arguments["blinkIdRedactionSettingsResolver"] as? [String: Any]
+            classInfoFilterDict = cleanArguments["blinkIdClassFilter"] as? [String: Any]
+            redactionSettingsResolverDict = BlinkIdDeserializationUtils.toStringKeyedMap(
+                cleanArguments["blinkIdRedactionSettingsResolver"]
+            )
+            print("[BlinkIdFlutter] performScan received blinkIdRedactionSettingsResolver=\(String(describing: redactionSettingsResolverDict))")
             let analyzer = try await BlinkIDAnalyzer(
                 sdk: blinkIdSdk,
                 blinkIdSessionSettings: BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(sessionSettings),

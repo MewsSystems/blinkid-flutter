@@ -482,7 +482,7 @@ class RedactionSettings {
 /// is invoked by the SDK immediately before the scanning result is finalized.
 ///
 /// If not added, the SDK will use the default [RedactionSettings] for a given document class.
-@JsonSerializable()
+@JsonSerializable(explicitToJson: true)
 class RedactionSettingsResolver {
   /// A list of redaction configurations evaluated by the SDK.
   ///

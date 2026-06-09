@@ -131,6 +131,10 @@ class BlinkIdFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
             val blinkIdScanningUxSettings = call.argument<Map<String, Any>>("blinkIdScanningUxSettings")
             val classFilterMap = call.argument<Map<String, Any>>("blinkIdClassFilter")
             val redactionSettingsResolverMap = call.argument<Map<String, Any>>("blinkIdRedactionSettingsResolver")
+            android.util.Log.i(
+                "BlinkIdFlutter",
+                "performScan received blinkIdRedactionSettingsResolver=$redactionSettingsResolverMap",
+            )
             val sdkSettings = BlinkIdDeserializationUtils
                 .deserializeBlinkIdSdkSettings(blinkIdSdkSettings)
                 ?: return result.error(BLINKID_ERROR_RESULT_CODE, "Incorrect SDK Settings.", null)

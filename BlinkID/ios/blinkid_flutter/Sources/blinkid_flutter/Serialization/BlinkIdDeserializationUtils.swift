@@ -340,24 +340,29 @@ struct BlinkIdDeserializationUtils {
     }
     
     static func deserializeRedactionSettings(_ redactionDict: Dictionary<String, Any>) -> RedactionSettings? {
-        guard let fieldsRaw = redactionDict["fields"] as? [String] else {
+        guard let fieldsRaw = toStringList(redactionDict["fields"]), !fieldsRaw.isEmpty else {
+            print("[BlinkIdFlutter] deserializeRedactionSettings: no fields deserialized from \(String(describing: redactionDict["fields"]))")
             return nil
         }
         let fieldTypes: [FieldType] = fieldsRaw.compactMap { FieldType(rawValue: $0) }
+        if fieldTypes.isEmpty {
+            print("[BlinkIdFlutter] deserializeRedactionSettings: no valid FieldType values in \(fieldsRaw)")
+            return nil
+        }
 
         let mode: RedactionMode
         if let modeRaw = redactionDict["mode"] as? String,
            let parsedMode = RedactionMode(rawValue: modeRaw) {
             mode = parsedMode
         } else {
-            mode = .none
+            mode = .fullResult
         }
 
         let redactBarcode = redactionDict["redactBarcodeResult"] as? Bool ?? false
         let redactMrz = redactionDict["redactMrzResult"] as? Bool ?? false
 
         let documentNumberRedaction: DocumentNumberRedactionSettings?
-        if let documentNumberRedactionDict = redactionDict["documentNumberRedactionSettings"] as? Dictionary<String, Any> {
+        if let documentNumberRedactionDict = toStringKeyedMap(redactionDict["documentNumberRedactionSettings"]) {
             documentNumberRedaction = deserializeDocumentNumberRedactionSettings(documentNumberRedactionDict)
         } else {
             documentNumberRedaction = nil
@@ -375,11 +380,11 @@ struct BlinkIdDeserializationUtils {
     static func deserializeDocumentNumberRedactionSettings(_ documentNumberRedactionSettingsDict: Dictionary<String, Any>) -> DocumentNumberRedactionSettings {
         var documentNumberRedactionSettings = DocumentNumberRedactionSettings()
         
-        if let prefixDigitsVisible = documentNumberRedactionSettingsDict["prefixDigitsVisible"] as? Int {
+        if let prefixDigitsVisible = toInt(documentNumberRedactionSettingsDict["prefixDigitsVisible"]) {
             documentNumberRedactionSettings.prefixDigitsVisible = UInt8(prefixDigitsVisible)
         }
         
-        if let suffixDigitsVisible = documentNumberRedactionSettingsDict["suffixDigitsVisible"] as? Int {
+        if let suffixDigitsVisible = toInt(documentNumberRedactionSettingsDict["suffixDigitsVisible"]) {
             documentNumberRedactionSettings.suffixDigitsVisible = UInt8(suffixDigitsVisible)
         }
         
@@ -443,14 +448,22 @@ struct BlinkIdDeserializationUtils {
     ) -> RedactionSettings? {
 
         guard let redactionResolverDict,
-              let documentRedactionList = redactionResolverDict["documentRedactionList"] as? [[String: Any]] else { return nil }
+              let documentRedactionList = toStringKeyedMapList(redactionResolverDict["documentRedactionList"]),
+              !documentRedactionList.isEmpty else { return nil }
         
         for redactionDict in documentRedactionList {
             if shouldUseRedactionSettings(redactionDict, classInfo: classInfo) {
-                return deserializeRedactionSettings(redactionDict)
+                let settings = deserializeRedactionSettings(redactionDict)
+                print(
+                    "[BlinkIdFlutter] resolveRedactionSettings matched class=\(classInfo.country)/\(classInfo.region)/\(classInfo.documentType), mode=\(String(describing: settings?.mode)), fields=\(settings?.fields.count ?? 0)"
+                )
+                return settings
             }
         }
 
+        print(
+            "[BlinkIdFlutter] resolveRedactionSettings no matching entry for class=\(classInfo.country)/\(classInfo.region)/\(classInfo.documentType)"
+        )
         return nil
     }
     
@@ -458,7 +471,7 @@ struct BlinkIdDeserializationUtils {
         _ redactionDict: [String: Any],
         classInfo: BlinkID.BlinkIDSDK.DocumentClassInfo
     ) -> Bool {
-        guard let documentFilters = redactionDict["documentFilter"] as? [[String: Any]] else {
+        guard let documentFilters = toStringKeyedMapList(redactionDict["documentFilter"]) else {
             return true
         }
 
@@ -498,9 +511,45 @@ struct BlinkIdDeserializationUtils {
         let type = filteredClass["documentType"] as? String
         let region = filteredClass["region"] as? String
         
-        return (country == nil || classInfo.country == Country.init(rawValue: country!)) &&
-        (type == nil || classInfo.documentType == DocumentType.init(rawValue: type!) &&
-         (region == nil || classInfo.region == Region.init(rawValue: region!)))
+        let countryMatches = country == nil || classInfo.country == Country(rawValue: country!)
+        let typeMatches = type == nil || classInfo.documentType == DocumentType(rawValue: type!)
+        let regionMatches = region == nil || classInfo.region == Region(rawValue: region!)
+        
+        return countryMatches && typeMatches && regionMatches
+    }
+
+    static func toStringKeyedMap(_ value: Any?) -> [String: Any]? {
+        guard let dictionary = value as? [String: Any] else { return nil }
+        return sanitizeDictionary(dictionary)
+    }
+
+    private static func toStringList(_ value: Any?) -> [String]? {
+        guard let rawList = value as? [Any] else { return nil }
+        return rawList.compactMap { $0 as? String }
+    }
+
+    private static func toStringKeyedMapList(_ value: Any?) -> [[String: Any]]? {
+        guard let rawList = value as? [Any] else { return nil }
+        return rawList.compactMap { item in
+            guard let dictionary = item as? [String: Any] else { return nil }
+            return sanitizeDictionary(dictionary)
+        }
+    }
+
+    private static func toInt(_ value: Any?) -> Int? {
+        if let intValue = value as? Int {
+            return intValue
+        }
+        if let int32Value = value as? Int32 {
+            return Int(int32Value)
+        }
+        if let int64Value = value as? Int64 {
+            return Int(int64Value)
+        }
+        if let number = value as? NSNumber {
+            return number.intValue
+        }
+        return nil
     }
     
     static func sanitizeDictionary(_ dictionary: Dictionary<String, Any>?) -> Dictionary<String, Any>? {

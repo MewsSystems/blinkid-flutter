@@ -289,7 +289,11 @@ RedactionSettingsResolver _$RedactionSettingsResolverFromJson(
 
 Map<String, dynamic> _$RedactionSettingsResolverToJson(
   RedactionSettingsResolver instance,
-) => <String, dynamic>{'documentRedactionList': instance.documentRedactionList};
+) => <String, dynamic>{
+  'documentRedactionList': instance.documentRedactionList
+      .map((e) => e.toJson())
+      .toList(),
+};
 
 DetailedFieldType _$DetailedFieldTypeFromJson(Map<String, dynamic> json) =>
     DetailedFieldType(

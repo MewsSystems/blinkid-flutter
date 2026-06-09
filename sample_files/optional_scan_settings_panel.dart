@@ -406,18 +406,10 @@ class _RedactionSettingsEditor extends StatelessWidget {
     );
   }
 
-  void _updateDocumentFilter(UiDocumentFilter partial) {
-    final current = settings.documentFilter?.isNotEmpty == true
-        ? settings.documentFilter!.first
-        : null;
-    final next = UiDocumentFilter(
-      country: partial.country ?? current?.country,
-      region: partial.region ?? current?.region,
-      documentType: partial.documentType ?? current?.documentType,
-    );
+  void _updateDocumentFilter(UiDocumentFilter filter) {
     _updatePartial(
-      documentFilter: hasDocumentFilterCriteria(next)
-          ? [uiToDocumentFilter(next)]
+      documentFilter: hasDocumentFilterCriteria(filter)
+          ? [uiToDocumentFilter(filter)]
           : null,
     );
   }

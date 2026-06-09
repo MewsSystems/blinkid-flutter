@@ -51,7 +51,7 @@ const sampleRedactionFields = <FieldType>[
 DocumentFilter uiToDocumentFilter(UiDocumentFilter ui) {
   return DocumentFilter(
     country: ui.country,
-    region: ui.region,
+    region: ui.country == Country.usa ? ui.region : null,
     documentType: ui.documentType,
   );
 }

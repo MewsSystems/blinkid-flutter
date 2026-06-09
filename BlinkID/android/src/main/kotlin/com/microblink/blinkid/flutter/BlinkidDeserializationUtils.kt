@@ -36,7 +36,7 @@ import com.microblink.blinkid.ux.camera.CameraSettings
 
 object BlinkIdDeserializationUtils {
 
-    private const val TAG = "BlinkIdFlutter"
+    internal const val TAG = "BlinkIdFlutter"
     private const val DEFAULT_RESOURCE_DOWNLOAD_URL = "https://models.cdn.microblink.com/resources"
     private const val DEFAULT_RESOURCES_LOCAL_FOLDER = "MLModels"
 
@@ -229,11 +229,17 @@ object BlinkIdDeserializationUtils {
     fun deserializeRedactionSettings(redactionSettingsMap: Map<String, Any>?): RedactionSettings? {
         if (redactionSettingsMap == null) return null
         val mode = deserializeRedactionMode(redactionSettingsMap["mode"] as? String)
-        val fields = (redactionSettingsMap["fields"] as? List<String>)?.map {
+        val fields = toStringList(redactionSettingsMap["fields"])?.map {
             enumValueOf<FieldType>(it.replaceFirstChar { char -> char.uppercase() })
         } ?: emptyList()
+        if (fields.isEmpty()) {
+            Log.w(
+                TAG,
+                "deserializeRedactionSettings: no fields deserialized from ${redactionSettingsMap["fields"]}",
+            )
+        }
         val docNumSettings = deserializeDocumentNumberRedactionSettings(
-            redactionSettingsMap["documentNumberRedactionSettings"] as? Map<String, Any>
+            toStringKeyedMap(redactionSettingsMap["documentNumberRedactionSettings"])
         )
         val redactMrz = redactionSettingsMap["redactMrzResult"] as? Boolean ?: false
         val redactBarcode = redactionSettingsMap["redactBarcodeResult"] as? Boolean ?: false
@@ -246,11 +252,13 @@ object BlinkIdDeserializationUtils {
         )
     }
 
-    private fun deserializeDocumentNumberRedactionSettings(documentNumberRedactionSettingsMap: Map<String, Any>?): DocumentNumberRedactionSettings? {
+    private fun deserializeDocumentNumberRedactionSettings(
+        documentNumberRedactionSettingsMap: Map<String, Any>?,
+    ): DocumentNumberRedactionSettings? {
         if (documentNumberRedactionSettingsMap == null) return null
         return DocumentNumberRedactionSettings(
-            prefixDigitsVisible = (documentNumberRedactionSettingsMap["prefixDigitsVisible"] as? Int)?.toUByte() ?: 0u,
-            suffixDigitsVisible = (documentNumberRedactionSettingsMap["suffixDigitsVisible"] as? Int)?.toUByte() ?: 0u,
+            prefixDigitsVisible = toInt(documentNumberRedactionSettingsMap["prefixDigitsVisible"])?.toUByte() ?: 0u,
+            suffixDigitsVisible = toInt(documentNumberRedactionSettingsMap["suffixDigitsVisible"])?.toUByte() ?: 0u,
         )
     }
 
@@ -258,8 +266,70 @@ object BlinkIdDeserializationUtils {
         redactionSettingsResolverMap: Map<String, Any>?
     ): RedactionSettingsResolver? {
         if (redactionSettingsResolverMap == null) return null
-        val documentRedactionList = redactionSettingsResolverMap["documentRedactionList"] as? List<Map<String, Any>> ?: return null
-        return CustomRedactionSettingsResolver(documentRedactionList)
+        val documentRedactionList = toStringKeyedMapList(
+            redactionSettingsResolverMap["documentRedactionList"]
+        ) ?: return null
+        if (documentRedactionList.isEmpty()) return null
+
+        val entries = documentRedactionList.mapNotNull { redactionDict ->
+            val settings = deserializeRedactionSettings(redactionDict) ?: return@mapNotNull null
+            val documentFilters = toStringKeyedMapList(redactionDict["documentFilter"]).orEmpty()
+                .map(::deserializeSerializableDocumentFilter)
+            ParsedRedactionEntry(settings, documentFilters)
+        }
+        if (entries.isEmpty()) return null
+
+        Log.i(
+            TAG,
+            "deserializeRedactionSettingsResolver entries=${entries.size}, " +
+                "modes=${entries.map { it.settings.redactionMode }}, " +
+                "fieldCounts=${entries.map { it.settings.fields.size }}",
+        )
+        return CustomRedactionSettingsResolver(entries)
+    }
+
+    private fun toStringKeyedMap(value: Any?): Map<String, Any>? {
+        val map = value as? Map<*, *> ?: return null
+        return map.entries.mapNotNull { (key, mapValue) ->
+            (key as? String)?.let { stringKey ->
+                if (mapValue == null) return@mapNotNull null
+                stringKey to mapValue
+            }
+        }.toMap()
+    }
+
+    private fun toStringList(value: Any?): List<String>? {
+        val rawList = value as? List<*> ?: return null
+        return rawList.mapNotNull { it as? String }
+    }
+
+    private fun toInt(value: Any?): Int? = when (value) {
+        is Int -> value
+        is Long -> value.toInt()
+        is Number -> value.toInt()
+        else -> null
+    }
+
+    private fun toStringKeyedMapList(value: Any?): List<Map<String, Any>>? {
+        val rawList = value as? List<*> ?: return null
+        return rawList.mapNotNull { item -> toStringKeyedMap(item) }
+    }
+
+    internal fun matchesDocumentFilter(
+        documentFilter: DocumentFilter,
+        classInfo: DocumentClassInfo,
+    ): Boolean {
+        return matchesFilterField(documentFilter.country, Country.None, classInfo.country) &&
+            matchesFilterField(documentFilter.region, Region.None, classInfo.region) &&
+            matchesFilterField(documentFilter.type, Type.None, classInfo.type)
+    }
+
+    private fun <T> matchesFilterField(
+        filterValue: T?,
+        noneValue: T,
+        classInfoValue: T,
+    ): Boolean {
+        return filterValue == null || filterValue == noneValue || filterValue == classInfoValue
     }
 
     fun deserializeBlinkIdUxSettings(
@@ -328,7 +398,17 @@ object BlinkIdDeserializationUtils {
         return includeClass && excludeClass
     }
 
-    private fun matchClassFilter(
+    private fun deserializeSerializableDocumentFilter(
+        documentFilterMap: Map<String, Any>,
+    ): SerializableDocumentFilter {
+        return SerializableDocumentFilter(
+            country = documentFilterMap["country"] as? String,
+            region = documentFilterMap["region"] as? String,
+            documentType = documentFilterMap["documentType"] as? String,
+        )
+    }
+
+    internal fun matchClassFilter(
         filteredClass: Map<String, Any>,
         classInfo: DocumentClassInfo
     ): Boolean {
@@ -394,32 +474,61 @@ private class CustomClassFilter(
 }
 
 @Parcelize
+private data class SerializableDocumentFilter(
+    val country: String? = null,
+    val region: String? = null,
+    val documentType: String? = null,
+) : Parcelable {
+    fun toMatchMap(): Map<String, Any> = buildMap {
+        country?.let { put("country", it) }
+        region?.let { put("region", it) }
+        documentType?.let { put("documentType", it) }
+    }
+}
+
+@Parcelize
+private data class ParsedRedactionEntry(
+    val settings: RedactionSettings,
+    val documentFilters: List<SerializableDocumentFilter>,
+) : Parcelable
+
+@Parcelize
 private class CustomRedactionSettingsResolver(
-    private val documentRedactionList: @RawValue List<Map<String, Any>>
+    private val entries: List<ParsedRedactionEntry>,
 ) : RedactionSettingsResolver, Parcelable {
 
     override fun resolveRedactionSettings(classInfo: DocumentClassInfo): RedactionSettings? {
-        for (redactionDict in documentRedactionList) {
-            if (shouldUseRedactionSettings(redactionDict, classInfo)) {
-                return BlinkIdDeserializationUtils.deserializeRedactionSettings(redactionDict)
+        for (entry in entries) {
+            if (shouldUseRedactionSettings(entry.documentFilters, classInfo)) {
+                Log.i(
+                    BlinkIdDeserializationUtils.TAG,
+                    "resolveRedactionSettings matched class=${classInfo.country}/" +
+                        "${classInfo.region}/${classInfo.type}, mode=${entry.settings.redactionMode}, " +
+                        "fields=${entry.settings.fields.size}",
+                )
+                return entry.settings
             }
         }
+        Log.i(
+            BlinkIdDeserializationUtils.TAG,
+            "resolveRedactionSettings no matching entry for class=${classInfo.country}/" +
+                "${classInfo.region}/${classInfo.type}, " +
+                "filters=${entries.map { entry ->
+                    entry.documentFilters.map { filter ->
+                        "${filter.country}/${filter.region}/${filter.documentType}"
+                    }
+                }}",
+        )
         return null
     }
 
     private fun shouldUseRedactionSettings(
-        redactionDict: Map<String, Any>,
-        classInfo: DocumentClassInfo
+        documentFilters: List<SerializableDocumentFilter>,
+        classInfo: DocumentClassInfo,
     ): Boolean {
-        val documentFilters = redactionDict["documentFilter"] as? List<Map<String, Any>> ?: return true
         if (documentFilters.isEmpty()) return true
-        return documentFilters.any { filterDict ->
-            BlinkIdDeserializationUtils.deserializeClassFilter(
-                mapOf(
-                    "includeDocuments" to listOf(filterDict)
-                ),
-                classInfo
-            )
+        return documentFilters.any { filter ->
+            BlinkIdDeserializationUtils.matchClassFilter(filter.toMatchMap(), classInfo)
         }
     }
 }
