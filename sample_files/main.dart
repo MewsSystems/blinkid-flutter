@@ -12,6 +12,9 @@ import 'module_settings_panel.dart';
 import 'optional_scan_settings_panel.dart';
 import 'scanning_modules_config.dart';
 
+/// Set by initBlinkIdFlutterSample.sh via IS_PING_ENABLED.
+const isPingEnabled = true;
+
 void main() {
   runApp(MyApp());
 }
@@ -48,10 +51,14 @@ class _MyAppState extends State<MyApp> {
       'https://mb-ping-baltazar-proxy.devel.microblink.com';
 
   BlinkIdSdkSettings _buildSdkSettings() {
-    final sdkSettings = BlinkIdSdkSettings(
-      licenseKey: sdkLicenseKey,
-      microblinkProxyUrl: _microblinkProxyUrl,
-    );
+    final sdkSettings = isPingEnabled
+        ? BlinkIdSdkSettings(
+            licenseKey: sdkLicenseKey,
+            microblinkProxyUrl: _microblinkProxyUrl,
+          )
+        : BlinkIdSdkSettings(
+            licenseKey: sdkLicenseKey,
+          );
     sdkSettings.downloadResources = true;
     return sdkSettings;
   }
@@ -92,12 +99,20 @@ class _MyAppState extends State<MyApp> {
 
     /// Add a valid license key, based on the platform
     /// A valid license key can be obtained from the Microblink Developer Hub, here: https://developer.microblink.com
-    if (Platform.isAndroid) {
-      sdkLicenseKey =
-          "sRwCABVjb20ubWljcm9ibGluay5zYW1wbGUACm1pY3JvYmxpbmuR1jKtFvk9xE3vABHwur1/E0/yRpw+eYAD3hlbfZRvaopENT4LKsLqPRuBdGFVXvWK2Zqg4nl6cdguNGhS5tYjbTXHOZIMogpVl+DxCXCFhenDeFKil4MzqT/ndOSYhARb5Q==";
-    } else if (Platform.isIOS) {
-      sdkLicenseKey =
-          "sRwCABVjb20ubWljcm9ibGluay5zYW1wbGUBCm1pY3JvYmxpbmvKFE4PWyeoqP5EZMp/XTSFigyqyFuNq82r6VkIM4+wcvaGKXe2CWs3TfYuRn/zJU0M+jimRG8RNYPDKZFBBJRHA0P3nu+zmzMTO+BoipRTVWFmWEfD0oyeqSg51jC4/omn1g==";
+    if (isPingEnabled) {
+      if (Platform.isAndroid) {
+        sdkLicenseKey =
+            "sRwCABVjb20ubWljcm9ibGluay5zYW1wbGUACm1pY3JvYmxpbmuR1jKtFvk9xE3vABHwur1/E0/yRpw+eYAD3hlbfZRvaopENT4LKsLqPRuBdGFVXvWK2Zqg4nl6cdguNGhS5tYjbTXHOZIMogpVl+DxCXCFhenDeFKil4MzqT/ndOSYhARb5Q==";
+      } else if (Platform.isIOS) {
+        sdkLicenseKey =
+            "sRwCABVjb20ubWljcm9ibGluay5zYW1wbGUBCm1pY3JvYmxpbmvKFE4PWyeoqP5EZMp/XTSFigyqyFuNq82r6VkIM4+wcvaGKXe2CWs3TfYuRn/zJU0M+jimRG8RNYPDKZFBBJRHA0P3nu+zmzMTO+BoipRTVWFmWEfD0oyeqSg51jC4/omn1g==";
+      }
+    } else {
+      if (Platform.isAndroid) {
+        sdkLicenseKey = "sRwCABVjb20ubWljcm9ibGluay5zYW1wbGUAbGV5SkRjbVZoZEdWa1QyNGlPakUzTnpreE1ESXpOVGMxT1RBc0lrTnlaV0YwWldSR2IzSWlPaUprWkdRd05qWmxaaTAxT0RJekxUUXdNRGd0T1RRNE1DMDFORFU0WWpBeFlUVTJZamdpZlE9PRXlOs6VFBOfXCx1+6HuENpn05k2kl20pJr4kQ4S1sMxuSzZ+B8YhC9rYMsFXr3HSskFmMFwEe+44OQ1ZE2sm9iHUpxNBmVGpgBTKPOrc2vquGbpqmFwm1feyTL9Aw==";
+      } else if (Platform.isIOS) {
+        sdkLicenseKey = "sRwCABVjb20ubWljcm9ibGluay5zYW1wbGUBCm1pY3JvYmxpbmvKFE4PWyeoqP5EZMp/XTSFigyqyFuNq82r6VkIM4+wcvaGKXe2CWs3TfYuRn/zJU0M+jimRG8RNYPDKZFBBJRHA0P3nu+zmzMTO+BoipRTVWFmWEfD0oyeqSg51jC4/omn1g==";
+      }
     }
 
     // If neccessary, the SDK can be pre-loaded with the neccessary resources before the scanning session starts.
