@@ -139,8 +139,6 @@ class BlinkIdFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
                 .deserializeBlinkIdSdkSettings(blinkIdSdkSettings)
                 ?: return result.error(BLINKID_ERROR_RESULT_CODE, "Incorrect SDK Settings.", null)
 
-            blinkIdSdk = ensureLoadedSdk(call)
-
             flutterPluginActivity?.let {
                 val intent = MbBlinkIdScan().createIntent(
                     it,
