@@ -33,11 +33,21 @@ flutter pub get
 # go to the android project folder
 pushd android
 
-# BlinkID SDK requires Kotlin 2.1.20+
-sed -i '' 's/id("org.jetbrains.kotlin.android") version "[0-9.]*"/id("org.jetbrains.kotlin.android") version "2.1.20"/' settings.gradle.kts
+# --- BlinkID SDK ANDROID requirements for the generated sample app ----
 
-# BlinkID SDK requires minSdk 24
+# Kotlin requirements
+sed -i '' 's/id("org.jetbrains.kotlin.android") version "[0-9.]*"/id("org.jetbrains.kotlin.android") version "2.2.21"/' settings.gradle.kts
+
+# AGP
+sed -i '' 's/id("com.android.application") version "[0-9.]*"/id("com.android.application") version "9.1.0"/' settings.gradle.kts
+
+# Gradle wrapper
+sed -i '' 's|gradle-[0-9.]*-all.zip|gradle-9.3.1-all.zip|' gradle/wrapper/gradle-wrapper.properties
+
+# minSdk
 sed -i '' 's/minSdk = flutter\.minSdkVersion/minSdk = 24/' app/build.gradle.kts
+
+# -------
 
 # go to flutter root project
 popd
