@@ -27,7 +27,6 @@ abstract class BlinkIdFlutterPlatform extends PlatformInterface {
   }
 
   /// Returns the `performScan` method from the [MethodChannelBlinkIdFlutter].
-  /// It takes the following parameters: [BlinkIdSdkSettings], [BlinkIdSessionSettings] and the optional [BlinkIdUiSettings] and [ClassFilter] classes.
   /// See [MethodChannelBlinkIdFlutter] for more detailed information.
   Future<BlinkIdScanningResult?> performScan({
     required BlinkIdSdkSettings blinkIdSdkSettings,
@@ -46,8 +45,6 @@ abstract class BlinkIdFlutterPlatform extends PlatformInterface {
   }
 
   /// Returns the `performDirectApiScan` method from the [MethodChannelBlinkIdFlutter].
-  /// It takes the following parameters: [BlinkIdSdkSettings], [BlinkIdSessionSettings], `firstImage` [String] in the Base64 format
-  /// and the optional `secondImage` [String] in the Base64 format.
   /// See [MethodChannelBlinkIdFlutter] for more detailed information.
   Future<BlinkIdScanningResult?> performDirectApiScan({
     required BlinkIdSdkSettings blinkIdSdkSettings,

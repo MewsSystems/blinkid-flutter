@@ -22,10 +22,6 @@ struct BlinkIdDeserializationUtils {
             blinkidSdkSettings?.licensee = licensee
         }
         
-        if let helloLogEnabled = sdkSettingsDict?["helloLogEnabled"] as? Bool {
-            blinkidSdkSettings?.helloLogEnabled = helloLogEnabled
-        }
-        
         if let downloadResources = sdkSettingsDict?["downloadResources"] as? Bool {
             blinkidSdkSettings?.downloadResources = downloadResources
         }
