@@ -1,3 +1,90 @@
+## v8000
+
+### What's new
+- The list of all supported documents and result fields is now available [here](https://docs.microblink.com/blinkid/supported-documents).
+- SDK modularization & enhanced flexibility: We’ve transformed our core architecture. Features previously known as "fallback modes" are now independent SDK modules.
+    - Tailored implementation: Users can now toggle specific modules such as Capture, Barcode, MRZ, or VIZ scanners to build a workflow that fits their exact needs.
+    - Total control: This modular approach offers more flexibility, allowing you to use BlinkID as a comprehensive recognition tool or a specialized scanner, all while leveraging our latest feature updates.
+- Expanded barcode support: When operating in Barcode Mode, BlinkID is no longer limited to PDF417.
+    - Universal scanning: We've added support for QR codes, Code 128, Code 39, ITF, EAN, UPC, and DataMatrix.
+    - Versatility: This expansion allows the SDK to be used across a wider variety of document types beyond standard IDs.
+- Streamlined extraction & data redaction (anonymization): We are putting more power in the hands of our integrators by removing restrictive custom rules.
+    - Document rules: Custom document rules have been removed. Customers can now implement their own logic based on result completeness to determine how a document is processed.
+    - Data redaction (Anonymization): We’ve transitioned away from fixed data redaction (anonymization) rules. You can now programmatically decide which fields to mask and how to handle them based on the specific data returned.
+    - We are transitioning our terminology from 'anonymization' to 'data redaction' to more accurately reflect the nature of this feature.
+- Intelligent timeout mechanism: To balance performance with accuracy, we've introduced a new timeout feature
+    - Non-Blocking scans: Ensures a smooth user experience by preventing "stuck" scan states.
+    - Step-by-Step decisions: After each extraction step, you can decide whether the current data is sufficient or if the SDK should continue processing to gather more information.
+- Document-specific improvements
+    - EU residence permits: For documents with redundant fields on both the front and back, BlinkID now intelligently merges these into the top-level results for better data consistency.
+    - Egypt driver’s license: Enhanced data extraction to now include Date of Birth (DOB) as an additional field.
+    - Zimbabwe ID: Improved data extraction to support and return both alphabetic and numeric characters within the document number field.
+    - We have added extraction of date of birth from document numbers on Egypt DL.
+    - If a residence permit has a "remarks" field on both the front and back side, values of these fields will be combined in the top level result.
+
+### Bug fixes
+- Date conversion accuracy: Resolved an issue where Islamic-to-Gregorian date conversions could occasionally differ by +/- 1 day. These conversions are now precise and consistent.
+- We have fixed MRZ parsing rules for Zimbabwe ID and the new version of Brunei ID; these are now successfully extracted.
+
+### New documents support
+- Argentina - Polycarbonate Passport
+- Bhutan - Identity Card
+- Georgia - Polycarbonate Passport
+- Jamaica - Identity Card
+- Maldives - Driver's License
+- Mongolia - Identity Card
+- New Zealand - Proof Of Age Card
+- Pakistan - Origin Card
+- Saint Kitts And Nevis - Polycarbonate Passport
+- South Sudan - Identity Card
+- Virgin Islands Of The United States - Driver's License
+- Virgin Islands Of The United States - Identity Card
+
+#### New document versions for supported documents
+- Argentina - Alien ID
+- Argentina - Identity Card
+- Armenia - Identity Card
+- Australia, Australian Capital Territory - Driver's License
+- Australia, Australian Capital Territory - Identity Card
+- Brunei - Identity Card
+- Bulgaria - Residence Permit
+- Denmark - Driver's License
+- Georgia - Identity Card
+- Greece - Residence Permit
+- Guatemala - Alien ID
+- Guatemala - Identity Card
+- Guyana - Paper Passport
+- Kosovo - Driver's License
+- Kyrgyzstan - Polycarbonate Passport
+- Liechtenstein - Identity Card
+- Mauritius - Identity Card
+- Nigeria - Identity Card
+- Puerto Rico - Driver's License
+- Puerto Rico - Identity Card
+- Uganda - Identity Card
+- USA - Paper Passport
+- USA - Polycarbonate Passport
+- USA, Montana - Driver's License
+- USA, Montana - Identity Card
+- USA, New York City - Identity Card
+- Venezuela - Driver's License
+
+#### New segments supported on documents
+- Pakistan, proof of registration: renamed fathersName to additionalNameInformation
+- Mauritania, ID: renamed documentNumber to personalIdNumber
+
+### Minor API changes
+- Added new items to enums:
+    - new `FieldType` enum values: `CardAccessNumber`
+    - new `Type` enum values: `ORIGIN_CARD`
+    - new `Country` enum value: `VIRGIN_ISLANDS_OF_THE_UNITED_STATES`
+- Added member results to `ScanningResult` and `VizResult`:
+    -  'cardAccessNumber'
+- Removed items from enums:
+    -  removed `FieldType` enum values: Removed `ParentsLastName2`, `ParentsFirstName2`, `ChinPermanentExpiry`
+    -  removed `Country` enum value: `VIRGIN_ISLANDS_US`
+
+
 ## v7.7.0
 - Updated to [Android SDK v7.7.1](https://github.com/microblink/blinkid-android/releases/tag/v7.7.1) and [iOS SDK v7.7.0](https://github.com/microblink/blinkid-ios/releases/tag/v7.7.0)
 

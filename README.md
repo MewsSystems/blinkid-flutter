@@ -470,7 +470,7 @@ For **DirectAPI scanning**, pass a single `RedactionSettings` object directly to
 
 ## <a name="migrating-from-v7x"></a> Migrating from v7.x
 
-If you are upgrading from BlinkID Flutter **7.7.0** or earlier, the following changes apply:
+If you are upgrading from BlinkID Flutter **v7**, the following changes apply:
 
 | v7.x | v8 (8000.0.0) |
 |:-----|:--------------|
@@ -481,6 +481,8 @@ If you are upgrading from BlinkID Flutter **7.7.0** or earlier, the following ch
 | `ClassFilter.withIncludedDocumentClasses([...])` | `ClassFilter()..includeDocuments = [...]` |
 | Anonymization settings | `RedactionSettings` / `RedactionSettingsResolver` |
 | Android: no Compose requirement | Android: no Compose requirement in your app (BlinkID UX uses Compose internally) |
+
+Detailed migration guide done for native platforms can be found [here](https://docs.microblink.com/blinkid/migration-v8000).
 
 **Settings migration examples:**
 
