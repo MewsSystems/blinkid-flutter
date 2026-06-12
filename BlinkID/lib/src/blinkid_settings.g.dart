@@ -41,7 +41,7 @@ BlinkIdSessionSettings _$BlinkIdSessionSettingsFromJson(
       : BlinkIdScanningSettings.fromJson(
           json['scanningSettings'] as Map<String, dynamic>,
         ),
-  stepTimeoutDuration: (json['stepTimeoutDuration'] as num?)?.toInt() ?? 15000,
+  stepTimeoutDuration: (json['stepTimeoutDuration'] as num?)?.toInt() ?? 60000,
   inactivityTimeoutDuration:
       (json['inactivityTimeoutDuration'] as num?)?.toInt() ?? 10000,
 );

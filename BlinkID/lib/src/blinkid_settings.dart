@@ -199,7 +199,7 @@ class BlinkIdScanningUxSettings {
   ///
   /// The system determines the actual physical camera device.
   ///
-  /// Default: [PrefferedCamera.back]
+  /// Default: [PreferredCamera.back]
   PreferredCamera preferredCamera;
 
   BlinkIdScanningUxSettings({

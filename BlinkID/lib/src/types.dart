@@ -530,7 +530,7 @@ class DetailedFieldType {
 @JsonSerializable()
 class DocumentFilter {
   /// If set, only specified country will pass the filter criteria.
-  /// Otherwise, issuing country will not betaken into account.
+  /// Otherwise, issuing country will not be taken into account.
   Country? country;
 
   /// If set, only specified country will pass the filter criteria.

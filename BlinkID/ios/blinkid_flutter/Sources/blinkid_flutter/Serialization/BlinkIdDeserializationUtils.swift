@@ -44,7 +44,7 @@ struct BlinkIdDeserializationUtils {
         }
 
         if let resourceRequestTimeout = sdkSettingsDict?["resourceRequestTimeout"] as? Int {
-            blinkidSdkSettings?.resourceRequestTimeout = BlinkID.RequestTimeout.default
+            blinkidSdkSettings?.resourceRequestTimeout = BlinkID.RequestTimeout(seconds: TimeInterval(resourceRequestTimeout) / 1000.0)
         }
         
         if let microblinkProxyUrl = sdkSettingsDict?["microblinkProxyUrl"] as? String {
@@ -68,7 +68,7 @@ struct BlinkIdDeserializationUtils {
         }
         
         if let scanningMode = sessionSettingsDict?["scanningMode"] as? String {
-            blinkidSessionSettings.scanningMode = deseralizeScanningMode(scanningMode)
+            blinkidSessionSettings.scanningMode = deserializeScanningMode(scanningMode)
         }
         
         if let stepTimeoutDuration = sessionSettingsDict?["stepTimeoutDuration"] as? Int {
@@ -401,13 +401,13 @@ struct BlinkIdDeserializationUtils {
             return ScanningUXSettings(
                 showIntroductionAlert: showIntroductionAlert,
                 showHelpButton: showHelpButton,
-                preferredCameraPosition: deserializePrefferedCameraPosition(preferredCameraPosition),
+                preferredCameraPosition: deserializePreferredCameraPosition(preferredCameraPosition),
                 allowHapticFeedback: allowHapticFeedback)
         }
         return ScanningUXSettings()
     }
     
-    static func deserializePrefferedCameraPosition(_ value: String) -> Camera.CameraPosition {
+    static func deserializePreferredCameraPosition(_ value: String) -> Camera.CameraPosition {
         switch value {
         case "front":
             return Camera.CameraPosition.front
@@ -418,7 +418,7 @@ struct BlinkIdDeserializationUtils {
         }
     }
     
-    static func deseralizeScanningMode(_ value: String) -> ScanningMode {
+    static func deserializeScanningMode(_ value: String) -> ScanningMode {
         switch value {
         case "single":
             return ScanningMode.single

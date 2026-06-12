@@ -56,15 +56,13 @@ abstract class BlinkIdFlutterPlatform extends PlatformInterface {
     required String firstImage,
     String? secondImage,
   }) async {
-    {
-      return MethodChannelBlinkIdFlutter().performDirectApiScan(
-        blinkIdSdkSettings: blinkIdSdkSettings,
-        blinkIdSessionSettings: blinkIdSessionSettings,
-        redactionSettings: redactionSettings,
-        firstImage: firstImage,
-        secondImage: secondImage,
-      );
-    }
+    return MethodChannelBlinkIdFlutter().performDirectApiScan(
+      blinkIdSdkSettings: blinkIdSdkSettings,
+      blinkIdSessionSettings: blinkIdSessionSettings,
+      redactionSettings: redactionSettings,
+      firstImage: firstImage,
+      secondImage: secondImage,
+    );
   }
 
   /// Returns the `loadBlinkIdSdk` method from the [MethodChannelBlinkIdFlutter].
