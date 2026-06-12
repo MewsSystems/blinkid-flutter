@@ -31,7 +31,7 @@ class BlinkIdSdkSettings {
   String? bundleIdentifier;
 
   /// Timeout settings for resource downloads.
-  int? resourceRequestTimeout;
+  int? resourceRequestTimeout;  // TODO bug, should be set to RequestTimeout not int
 
   /// Set a custom HTTPS URL to be used as a proxy for Ping and license checks.
   /// The proxy URL will be applied only if the license has the appropriate rights.
