@@ -28,7 +28,7 @@ class BlinkIdResultBuilder {
         buildDateResult(result.dateOfBirth, "Date of birth") +
         buildDateResult(result.dateOfIssue, "Date of issue") +
         buildDateResult(result.dateOfExpiry, "Date of expiry") +
-        buildResult(result.maritalStatus, "Martial status") +
+        buildResult(result.maritalStatus, "Marital status") +
         buildResult(result.personalIdNumber, "Personal Id Number") +
         buildResult(result.profession, "Profession") +
         buildResult(result.race, "Race") +
@@ -38,7 +38,7 @@ class BlinkIdResultBuilder {
         buildResult(result.certificateNumber, "Certificate number") +
         buildResult(
           result.nationalInsuranceNumber,
-          "National insurace number",
+          "National insurance number",
         ) +
         buildDriverLicenceResult(result.driverLicenseDetailedInfo) +
         buildDataMatchResult(result.dataMatchResult) +
@@ -126,7 +126,6 @@ class BlinkIdResultBuilder {
         buildStringResult(result.issuingAuthority, "Issuing authority") +
         buildStringResult(result.maritalStatus, "Marital status") +
         buildStringResult(result.nationality, "Nationality") +
-        buildStringResult(result.personalIdNumber, "Personal ID number") +
         buildDateResult(result.dateOfBirth, "Date of birth") +
         buildDateResult(result.dateOfExpiry, "Date of expiry") +
         buildDateResult(result.dateOfIssue, "Date of issue") +
@@ -157,7 +156,6 @@ class BlinkIdResultBuilder {
         buildResult(result.placeOfBirth, "Place of birth") +
         buildResult(result.nationality, "Nationality") +
         buildResult(result.maritalStatus, "Marital status") +
-        buildResult(result.residentialStatus, "Residential status") +
         buildResult(result.employer, "Employer") +
         buildResult(result.sponsor, "Sponsor") +
         buildResult(result.bloodType, "Blood type") +
@@ -184,7 +182,6 @@ class BlinkIdResultBuilder {
           "Document optional additional number",
         ) +
         buildResult(result.eligibilityCategory, "Eligibility category") +
-        buildResult(result.fathersName, "Father's name") +
         buildResult(result.localizedName, "Localized name") +
         buildResult(result.manufacturingYear, "Manufacturing year") +
         buildResult(result.mothersName, "Mother's name") +
@@ -201,7 +198,6 @@ class BlinkIdResultBuilder {
           result.specificDocumentValidity,
           "Specific document validity",
         ) +
-        buildResult(result.sponsor, "Sponsor") +
         buildResult(result.vehicleOwner, "Vehicle owner") +
         buildResult(result.vehicleType, "Vehicle type") +
         buildResult(result.visaType, "Visa type") +

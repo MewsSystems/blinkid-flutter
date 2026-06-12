@@ -44,7 +44,7 @@ class _MyAppState extends State<MyApp> {
 
   final _modulesConfig = ScanningModulesConfig();
 
- static const String? _microblinkProxyUrl = null;
+  static const String? _microblinkProxyUrl = null;
 
   BlinkIdSdkSettings _buildSdkSettings() {
     final sdkSettings = BlinkIdSdkSettings(
@@ -100,7 +100,9 @@ class _MyAppState extends State<MyApp> {
     // If necessary, the SDK can be pre-loaded with the necessary resources before the scanning session starts.
     // This will decreasing the SDK loading time when starting a scanning session (since the resources will be downloaded and the license verified).
 
-    // blinkIdPlugin.loadBlinkIdSdk(BlinkIdSdkSettings(sdkLicenseKey));
+    // blinkIdPlugin.loadBlinkIdSdk(
+    //   blinkidSdkSettings: BlinkIdSdkSettings(licenseKey: sdkLicenseKey),
+    // );
   }
 
   Future<void> performScan() async {
@@ -289,6 +291,7 @@ class _MyAppState extends State<MyApp> {
     secondInputImageBase64 = "";
     faceImageBase64 = "";
     signatureImageBase64 = "";
+    barcodeInputImageBase64 = "";
   }
 
   @override

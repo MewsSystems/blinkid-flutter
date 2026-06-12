@@ -188,7 +188,7 @@ final sdkSettings = BlinkIdSdkSettings(
   downloadResources: true
 );
 
-// Scanning modules — enable only what your use case needs
+// Scanning modules — enable only what your use case needs, for example
 final scanningSettings = BlinkIdScanningSettings(
   documentCaptureModule: DocumentCaptureModuleSettings(
     documentImageReturnEnabled: true,
@@ -240,6 +240,7 @@ try {
     blinkIdSessionSettings: sessionSettings,
     blinkidScanningUxSettings: uxSettings,
     classFilter: classFilter,
+    redactionSettingsResolver: redactionSettingsResolver
   );
 
   if (result != null) {
