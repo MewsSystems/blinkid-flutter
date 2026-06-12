@@ -268,7 +268,7 @@ final result = await blinkIdPlugin.performDirectApiScan(
 
 ## <a name="scanning-modules"></a> Scanning modules
 
-In v8, scanning behavior is controlled through four independent modules configured on `BlinkIdScanningSettings`:
+In v8000, scanning behavior is controlled through four independent modules configured on `BlinkIdScanningSettings`:
 
 | Module | Class | Purpose |
 |:-------|:------|:--------|
