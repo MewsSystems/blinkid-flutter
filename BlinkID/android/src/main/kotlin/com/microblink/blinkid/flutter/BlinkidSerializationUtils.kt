@@ -4,7 +4,9 @@ import android.graphics.Bitmap
 import com.microblink.blinkid.core.result.AddressDetailedInfo
 import com.microblink.blinkid.core.result.AlphabetType
 import com.microblink.blinkid.core.result.DataMatchFieldState
+import com.microblink.blinkid.core.result.DataMatchFieldType
 import com.microblink.blinkid.core.result.DataMatchResult
+import com.microblink.blinkid.core.result.DataMatchState
 import com.microblink.blinkid.core.result.DependentInfo
 import com.microblink.blinkid.core.result.DriverLicenseDetailedInfo
 import com.microblink.blinkid.core.result.SingleSideScanningResult
@@ -12,6 +14,7 @@ import com.microblink.blinkid.core.result.StringResult
 import com.microblink.blinkid.core.result.VehicleClassInfo
 import com.microblink.blinkid.core.result.barcode.BarcodeData
 import com.microblink.blinkid.core.result.barcode.BarcodeResult
+import com.microblink.blinkid.core.result.barcode.BarcodeType
 import com.microblink.blinkid.core.result.classinfo.DocumentClassInfo
 import com.microblink.blinkid.core.result.mrz.MrzResult
 import com.microblink.blinkid.core.result.viz.VizResult
@@ -21,19 +24,16 @@ import java.io.ByteArrayOutputStream
 import android.util.Base64
 import com.microblink.blinkid.core.result.ParentInfo
 import com.microblink.blinkid.core.result.barcode.BarcodeElement
-import com.microblink.core.result.DateResult
-import com.microblink.core.result.DetailedCroppedImageResult
-import com.microblink.core.result.Rectangle
-import com.microblink.core.result.ScanningSide
+import com.microblink.blinkid.core.result.DateResult
+import com.microblink.blinkid.core.result.DetailedCroppedImageResult
+import com.microblink.blinkid.core.result.Rectangle
+import com.microblink.blinkid.core.result.ScanningSide
 import kotlin.collections.set
 
 object BlinkIdSerializationUtils {
     fun serializeBlinkIdScanningResult(scanningResult: BlinkIdScanningResult?): String? {
         val scanningResultDict: MutableMap<String, Any?> = mutableMapOf()
 
-        scanningResult?.mode.let {
-            scanningResultDict["recognitionMode"] = it?.ordinal
-        }
         scanningResult?.documentClassInfo?.let {
             scanningResultDict["documentClassInfo"] = serializeDocumentClassInfo(it)
         }
@@ -106,6 +106,9 @@ object BlinkIdSerializationUtils {
         scanningResult?.documentNumber?.let {
             scanningResultDict["documentNumber"] = serializeStringResult(it)
         }
+        scanningResult?.cardAccessNumber?.let {
+            scanningResultDict["cardAccessNumber"] = serializeStringResult(it)
+        }
         scanningResult?.personalIdNumber?.let {
             scanningResultDict["personalIdNumber"] = serializeStringResult(it)
         }
@@ -136,9 +139,6 @@ object BlinkIdSerializationUtils {
         scanningResult?.vehicleType?.let {
             scanningResultDict["vehicleType"] = serializeStringResult(it)
         }
-        scanningResult?.vehicleOwner?.let {
-            scanningResultDict["vehicleOwner"] = serializeStringResult(it)
-        }
         scanningResult?.eligibilityCategory?.let {
             scanningResultDict["eligibilityCategory"] = serializeStringResult(it)
         }
@@ -148,26 +148,17 @@ object BlinkIdSerializationUtils {
         scanningResult?.visaType?.let {
             scanningResultDict["visaType"] = serializeStringResult(it)
         }
-        scanningResult?.countryCode?.let {
-            scanningResultDict["countryCode"] = serializeStringResult(it)
+        scanningResult?.vehicleOwner?.let {
+            scanningResultDict["vehicleOwner"] = serializeStringResult(it)
         }
         scanningResult?.certificateNumber?.let {
             scanningResultDict["certificateNumber"] = serializeStringResult(it)
         }
+        scanningResult?.countryCode?.let {
+            scanningResultDict["countryCode"] = serializeStringResult(it)
+        }
         scanningResult?.nationalInsuranceNumber?.let {
             scanningResultDict["nationalInsuranceNumber"] = serializeStringResult(it)
-        }
-        scanningResult?.dateOfBirth?.let {
-            scanningResultDict["dateOfBirth"] = serializeDateResult(it)
-        }
-        scanningResult?.dateOfIssue?.let {
-            scanningResultDict["dateOfIssue"] = serializeDateResult(it)
-        }
-        scanningResult?.dateOfExpiry?.let {
-            scanningResultDict["dateOfExpiry"] = serializeDateResult(it)
-        }
-        scanningResult?.dateOfEntry?.let {
-            scanningResultDict["dateOfEntry"] = serializeDateResult(it)
         }
         scanningResult?.localityCode?.let {
             scanningResultDict["localityCode"] = serializeStringResult(it)
@@ -196,6 +187,21 @@ object BlinkIdSerializationUtils {
         scanningResult?.stateName?.let {
             scanningResultDict["stateName"] = serializeStringResult(it)
         }
+        scanningResult?.dateOfBirth?.let {
+            scanningResultDict["dateOfBirth"] = serializeDateResult(it)
+        }
+        scanningResult?.dateOfIssue?.let {
+            scanningResultDict["dateOfIssue"] = serializeDateResult(it)
+        }
+        scanningResult?.dateOfExpiry?.let {
+            scanningResultDict["dateOfExpiry"] = serializeDateResult(it)
+        }
+        scanningResult?.dateOfEntry?.let {
+            scanningResultDict["dateOfEntry"] = serializeDateResult(it)
+        }
+        scanningResult?.effectiveDate?.let {
+            scanningResultDict["effectiveDate"] = serializeDateResult(it)
+        }
         scanningResult?.dateOfExpiryPermanent?.let {
             scanningResultDict["dateOfExpiryPermanent"] = it
         }
@@ -211,9 +217,6 @@ object BlinkIdSerializationUtils {
         }
         scanningResult?.parentsInfo?.let {
             scanningResultDict["parentsInfo"] = it.map { parentInfo -> serializeParentInfo(parentInfo)}
-        }
-        scanningResult?.effectiveDate?.let {
-            scanningResultDict["effectiveDate"] = serializeDateResult(it)
         }
         scanningResult?.husbandName?.let {
             scanningResultDict["husbandName"] = serializeStringResult(it)
@@ -233,8 +236,8 @@ object BlinkIdSerializationUtils {
         scanningResult?.inputImage(ScanningSide.Second)?.let {
             scanningResultDict["secondInputImage"] = encodeBase64Image(it.bitmap)
         }
-        scanningResult?.barcodeInputImage()?.let {
-            scanningResultDict["barcodeInputImage"] = encodeBase64Image(it.bitmap)
+        scanningResult?.barcodeImage()?.let {
+            scanningResultDict["barcodeImage"] = encodeBase64Image(it.bitmap)
         }
         scanningResult?.documentImage(ScanningSide.First)?.let {
             scanningResultDict["firstDocumentImage"] = encodeBase64Image(it.bitmap)
@@ -275,8 +278,8 @@ object BlinkIdSerializationUtils {
         return simpleDateResultDict;
     }
 
-    private fun serializeDocumentClassInfo(documentClassInfo: DocumentClassInfo): Map<String, Any> {
-        val documentClassInfoDict: MutableMap<String, Any> = mutableMapOf()
+    private fun serializeDocumentClassInfo(documentClassInfo: DocumentClassInfo): Map<String, Any?> {
+        val documentClassInfoDict: MutableMap<String, Any?> = mutableMapOf()
         documentClassInfo.country?.name?.let {
             documentClassInfoDict["country"] = it.replaceFirstChar { char -> char.lowercase() }
         }
@@ -298,22 +301,41 @@ object BlinkIdSerializationUtils {
         return documentClassInfoDict
     }
 
-    private fun serializeDataMatchResult(dataMatchResult: DataMatchResult): Map<String, Any> {
+    private fun serializeDataMatchResult(dataMatchResult: DataMatchResult): Map<String, Any?> {
         return mapOf(
-            "states" to dataMatchResult.statePerField.map { serializeDataMatchFiled(it) },
-            "overallState" to dataMatchResult.overallState.ordinal
+            "states" to dataMatchResult.statePerField.map { serializeDataMatchField(it) },
+            "overallState" to serializeDataMatchState(dataMatchResult.overallState)
         )
     }
 
-    private fun serializeDataMatchFiled(dataMatchField: DataMatchFieldState): Map<String, Any> {
+    private fun serializeDataMatchField(dataMatchField: DataMatchFieldState): Map<String, Any> {
         return mapOf(
-            "field" to dataMatchField.fieldType.ordinal,
-            "state" to dataMatchField.state.ordinal
+            "field" to serializeDataMatchFieldType(dataMatchField.fieldType),
+            "state" to serializeDataMatchState(dataMatchField.state)
         )
     }
 
-    private fun serializeStringResult(stringResult: StringResult): Map<String, Any> {
-        val stringResultDict: MutableMap<String, Any> = mutableMapOf()
+    private fun serializeDataMatchFieldType(fieldType: DataMatchFieldType): String {
+        return when (fieldType) {
+            DataMatchFieldType.DateOfBirth -> "dateOfBirth"
+            DataMatchFieldType.DateOfExpiry -> "dateOfExpiry"
+            DataMatchFieldType.DocumentNumber -> "documentNumber"
+            DataMatchFieldType.DocumentAdditionalNumber -> "documentAdditionalNumber"
+            DataMatchFieldType.DocumentOptionalAdditionalNumber -> "documentOptionalAdditionalNumber"
+            DataMatchFieldType.PersonalIdNumber -> "personalIdNumber"
+        }
+    }
+
+    private fun serializeDataMatchState(state: DataMatchState): String {
+        return when (state) {
+            DataMatchState.NotPerformed -> "notPerformed"
+            DataMatchState.Failed -> "failed"
+            DataMatchState.Success -> "success"
+        }
+    }
+
+    private fun serializeStringResult(stringResult: StringResult): Map<String, Any?> {
+        val stringResultDict: MutableMap<String, Any?> = mutableMapOf()
 
         stringResultDict["value"] = stringResult.value(AlphabetType.Latin)
         stringResultDict["latin"] = stringResult.value(AlphabetType.Latin)
@@ -405,46 +427,46 @@ object BlinkIdSerializationUtils {
 
     private fun serializeSubResult(subResult: SingleSideScanningResult): Map<String, Any?> {
         return mapOf(
+            "viz" to serializeVizResult(subResult.viz),
+            "mrz" to serializeMrzResult(subResult.mrz),
             "barcode" to serializeBarcodeResult(subResult.barcode),
-            "barcodeInputImage" to encodeBase64Image(subResult.barcodeInputImage?.bitmap),
+            "inputImage" to encodeBase64Image(subResult.inputImage?.bitmap),
+            "barcodeImage" to encodeBase64Image(subResult.barcodeImage?.bitmap),
             "documentImage" to encodeBase64Image(subResult.documentImage?.bitmap),
             "faceImage" to serializeDetailedCroppedImageResult(subResult.faceImage),
-            "inputImage" to encodeBase64Image(subResult.inputImage?.bitmap),
-            "mrz" to serializeMrzResult(subResult.mrz),
             "signatureImage" to serializeDetailedCroppedImageResult(subResult.signatureImage),
-            "viz" to serializeVizResult(subResult.viz)
         )
     }
 
     private fun serializeBarcodeResult(barcodeResult: BarcodeResult?): Map<String, Any?> {
         return mapOf(
+            "barcodeData" to serializeBarcodeData(barcodeResult?.barcodeData),
+            "parsed" to barcodeResult?.parsed,
+            "firstName" to barcodeResult?.firstName,
+            "middleName" to barcodeResult?.middleName,
+            "lastName" to barcodeResult?.lastName,
+            "fullName" to barcodeResult?.fullName,
             "additionalNameInformation" to barcodeResult?.additionalNameInformation,
             "address" to barcodeResult?.address,
-            "addressDetailedInfo" to serializeAddressDetailedInfo(barcodeResult?.addressDetailedInfo),
-            "barcodeData" to serializeBarcodeData(barcodeResult?.barcodeData),
-            "dateOfBirth" to serializeDateResult(barcodeResult?.dateOfBirth),
-            "dateOfExpiry" to serializeDateResult(barcodeResult?.dateOfExpiry),
-            "dateOfIssue" to serializeDateResult(barcodeResult?.dateOfIssue),
-            "documentAdditionalNumber" to barcodeResult?.documentAdditionalNumber,
-            "documentNumber" to barcodeResult?.documentNumber,
-            "driverLicenseDetailedInfo" to serializeDriverLicenseDetailedInfo(barcodeResult?.driverLicenseDetailedInfo),
-            "employer" to barcodeResult?.employer,
-            "extendedElements" to serializeBarcodeExtendedElements(barcodeResult?.extendedElements?.barcodeElements),
-            "firstName" to barcodeResult?.firstName,
-            "fullName" to barcodeResult?.fullName,
-            "issuingAuthority" to barcodeResult?.issuingAuthority,
-            "lastName" to barcodeResult?.lastName,
-            "maritalStatus" to barcodeResult?.maritalStatus,
-            "middleName" to barcodeResult?.middleName,
             "nationality" to barcodeResult?.nationality,
-            "personalIdNumber" to barcodeResult?.personalIdNumber,
             "placeOfBirth" to barcodeResult?.placeOfBirth,
-            "profession" to barcodeResult?.profession,
             "race" to barcodeResult?.race,
             "religion" to barcodeResult?.religion,
+            "profession" to barcodeResult?.profession,
+            "maritalStatus" to barcodeResult?.maritalStatus,
             "residentialStatus" to barcodeResult?.residentialStatus,
+            "employer" to barcodeResult?.employer,
             "sex" to barcodeResult?.sex,
-            "parsed" to barcodeResult?.parsed
+            "dateOfBirth" to serializeDateResult(barcodeResult?.dateOfBirth),
+            "dateOfIssue" to serializeDateResult(barcodeResult?.dateOfIssue),
+            "dateOfExpiry" to serializeDateResult(barcodeResult?.dateOfExpiry),
+            "documentNumber" to barcodeResult?.documentNumber,
+            "personalIdNumber" to barcodeResult?.personalIdNumber,
+            "documentAdditionalNumber" to barcodeResult?.documentAdditionalNumber,
+            "issuingAuthority" to barcodeResult?.issuingAuthority,
+            "addressDetailedInfo" to serializeAddressDetailedInfo(barcodeResult?.addressDetailedInfo),
+            "driverLicenseDetailedInfo" to serializeDriverLicenseDetailedInfo(barcodeResult?.driverLicenseDetailedInfo),
+            "extendedElements" to serializeBarcodeExtendedElements(barcodeResult?.extendedElements?.barcodeElements),
         )
     }
 
@@ -459,57 +481,120 @@ object BlinkIdSerializationUtils {
 
     private fun serializeBarcodeData(barcodeData: BarcodeData?): Map<String, Any?> {
         return mapOf(
-            "barcodeType" to barcodeData?.barcodeType?.ordinal,
+            "barcodeType" to serializeBarcodeType(barcodeData?.barcodeType),
             "rawData" to barcodeData?.rawData.toString(),
             "stringData" to barcodeData?.stringData,
             "uncertain" to barcodeData?.uncertain
         )
     }
 
+    private fun serializeBarcodeType(barcodeType: BarcodeType?): String {
+        return when (barcodeType) {
+            BarcodeType.None -> "none"
+            BarcodeType.QRCode -> "qrCode"
+            BarcodeType.DataMatrix -> "dataMatrix"
+            BarcodeType.UPCE -> "upce"
+            BarcodeType.UPCA -> "upca"
+            BarcodeType.EAN8 -> "ean8"
+            BarcodeType.EAN13 -> "ean13"
+            BarcodeType.Code128 -> "code128"
+            BarcodeType.Code39 -> "code39"
+            BarcodeType.ITF -> "itf"
+            BarcodeType.Aztec -> "aztec"
+            BarcodeType.PDF417 -> "pdf417"
+            null -> "none"
+        }
+    }
+
     private fun serializeMrzResult(mrzResult: MrzResult?): Map<String, Any?> {
         return mapOf(
-            "dateOfBirth" to serializeDateResult(mrzResult?.dateOfBirth),
-            "dateOfExpiry" to serializeDateResult(mrzResult?.dateOfExpiry),
+            "rawMRZString" to mrzResult?.rawMRZString,
             "documentCode" to mrzResult?.documentCode,
-            "documentNumber" to mrzResult?.documentNumber,
-            "documentType" to mrzResult?.documentType?.ordinal,
-            "gender" to mrzResult?.gender,
             "issuer" to mrzResult?.issuer,
-            "issuerName" to mrzResult?.issuerName,
-            "nationality" to mrzResult?.nationality,
-            "nationalityName" to mrzResult?.nationalityName,
+            "documentNumber" to mrzResult?.documentNumber,
             "opt1" to mrzResult?.opt1,
             "opt2" to mrzResult?.opt2,
+            "gender" to mrzResult?.gender,
+            "nationality" to mrzResult?.nationality,
             "primaryID" to mrzResult?.primaryID,
-            "rawMRZString" to mrzResult?.rawMRZString,
-            "sanitizedDocumentCode" to mrzResult?.sanitizedDocumentCode,
-            "sanitizedDocumentNumber" to mrzResult?.sanitizedDocumentNumber,
-            "sanitizedIssuer" to mrzResult?.sanitizedIssuer,
-            "sanitizedNationality" to mrzResult?.sanitizedNationality,
+            "secondaryID" to mrzResult?.secondaryID,
+            "issuerName" to mrzResult?.issuerName,
+            "nationalityName" to mrzResult?.nationalityName,
+            "verified" to mrzResult?.verified,
+            "dateOfBirth" to serializeDateResult(mrzResult?.dateOfBirth),
+            "dateOfExpiry" to serializeDateResult(mrzResult?.dateOfExpiry),
+            "documentType" to mrzResult?.documentType?.ordinal,
             "sanitizedOpt1" to mrzResult?.sanitizedOpt1,
             "sanitizedOpt2" to mrzResult?.sanitizedOpt2,
-            "secondaryID" to mrzResult?.secondaryID,
-            "verified" to mrzResult?.verified
+            "sanitizedNationality" to mrzResult?.sanitizedNationality,
+            "sanitizedIssuer" to mrzResult?.sanitizedIssuer,
+            "sanitizedDocumentCode" to mrzResult?.sanitizedDocumentCode,
+            "sanitizedDocumentNumber" to mrzResult?.sanitizedDocumentNumber,
         )
     }
 
     private fun serializeVizResult(vizResult: VizResult?): Map<String, Any?> {
         val vizResultDict: MutableMap<String, Any> = mutableMapOf()
 
-        vizResult?.additionalAddressInformation?.let {
-            vizResultDict["additionalAddressInformation"] = serializeStringResult(it)
+        vizResult?.firstName?.let {
+            vizResultDict["firstName"] = serializeStringResult(it)
+        }
+        vizResult?.lastName?.let {
+            vizResultDict["lastName"] = serializeStringResult(it)
+        }
+        vizResult?.fullName?.let {
+            vizResultDict["fullName"] = serializeStringResult(it)
         }
         vizResult?.additionalNameInformation?.let {
             vizResultDict["additionalNameInformation"] = serializeStringResult(it)
         }
-        vizResult?.additionalOptionalAddressInformation?.let {
-            vizResultDict["additionalOptionalAddressInformation"] = serializeStringResult(it)
+        vizResult?.localizedName?.let {
+            vizResultDict["localizedName"] = serializeStringResult(it)
         }
-        vizResult?.additionalPersonalIdNumber?.let {
-            vizResultDict["additionalPersonalIdNumber"] = serializeStringResult(it)
+        vizResult?.fathersName?.let {
+            vizResultDict["fathersName"] = serializeStringResult(it)
+        }
+        vizResult?.mothersName?.let {
+            vizResultDict["mothersName"] = serializeStringResult(it)
         }
         vizResult?.address?.let {
             vizResultDict["address"] = serializeStringResult(it)
+        }
+        vizResult?.additionalAddressInformation?.let {
+            vizResultDict["additionalAddressInformation"] = serializeStringResult(it)
+        }
+        vizResult?.additionalOptionalAddressInformation?.let {
+            vizResultDict["additionalOptionalAddressInformation"] = serializeStringResult(it)
+        }
+        vizResult?.placeOfBirth?.let {
+            vizResultDict["placeOfBirth"] = serializeStringResult(it)
+        }
+        vizResult?.nationality?.let {
+            vizResultDict["nationality"] = serializeStringResult(it)
+        }
+        vizResult?.race?.let {
+            vizResultDict["race"] = serializeStringResult(it)
+        }
+        vizResult?.religion?.let {
+            vizResultDict["religion"] = serializeStringResult(it)
+        }
+        vizResult?.profession?.let {
+            vizResultDict["profession"] = serializeStringResult(it)
+        }
+        vizResult?.maritalStatus?.let {
+            vizResultDict["maritalStatus"] = serializeStringResult(it)
+        }
+        vizResult?.residentialStatus?.let {
+            vizResultDict["residentialStatus"] = serializeStringResult(it)
+        }
+        vizResult?.sex?.let {
+            vizResultDict["sex"] = serializeStringResult(it)
+        }
+        vizResult?.employer?.let {
+            vizResultDict["employer"] = serializeStringResult(it)
+        }
+        vizResult?.sponsor?.let {
+            vizResultDict["sponsor"] = serializeStringResult(it)
         }
         vizResult?.bloodType?.let {
             vizResultDict["bloodType"] = serializeStringResult(it)
@@ -517,14 +602,87 @@ object BlinkIdSerializationUtils {
         vizResult?.dateOfBirth?.let {
             vizResultDict["dateOfBirth"] = serializeDateResult(it)
         }
-        vizResult?.dateOfExpiry?.let {
-            vizResultDict["dateOfExpiry"] = serializeDateResult(it)
-        }
         vizResult?.dateOfIssue?.let {
             vizResultDict["dateOfIssue"] = serializeDateResult(it)
         }
+        vizResult?.dateOfExpiry?.let {
+            vizResultDict["dateOfExpiry"] = serializeDateResult(it)
+        }
         vizResult?.dateOfEntry?.let {
             vizResultDict["dateOfEntry"] = serializeDateResult(it)
+        }
+        vizResult?.dateOfExpiryPermanent?.let {
+            vizResultDict["dateOfExpiryPermanent"] = it
+        }
+        vizResult?.effectiveDate?.let {
+            vizResultDict["effectiveDate"] = serializeDateResult(it)
+        }
+        vizResult?.documentNumber?.let {
+            vizResultDict["documentNumber"] = serializeStringResult(it)
+        }
+        vizResult?.cardAccessNumber?.let {
+            vizResultDict["cardAccessNumber"] = serializeStringResult(it)
+        }
+        vizResult?.personalIdNumber?.let {
+            vizResultDict["personalIdNumber"] = serializeStringResult(it)
+        }
+        vizResult?.documentAdditionalNumber?.let {
+            vizResultDict["documentAdditionalNumber"] = serializeStringResult(it)
+        }
+        vizResult?.documentOptionalAdditionalNumber?.let {
+            vizResultDict["documentOptionalAdditionalNumber"] = serializeStringResult(it)
+        }
+        vizResult?.additionalPersonalIdNumber?.let {
+            vizResultDict["additionalPersonalIdNumber"] = serializeStringResult(it)
+        }
+        vizResult?.issuingAuthority?.let {
+            vizResultDict["issuingAuthority"] = serializeStringResult(it)
+        }
+        vizResult?.visaType?.let {
+            vizResultDict["visaType"] = serializeStringResult(it)
+        }
+        vizResult?.certificateNumber?.let {
+            vizResultDict["certificateNumber"] = serializeStringResult(it)
+        }
+        vizResult?.countryCode?.let {
+            vizResultDict["countryCode"] = serializeStringResult(it)
+        }
+        vizResult?.driverLicenseDetailedInfo?.let {
+            vizResultDict["driverLicenseDetailedInfo"] = serializeDriverLicenseDetailedInfo(it)
+        }
+        vizResult?.documentSubtype?.let {
+            vizResultDict["documentSubtype"] = serializeStringResult(it)
+        }
+        vizResult?.remarks?.let {
+            vizResultDict["remarks"] = serializeStringResult(it)
+        }
+        vizResult?.residencePermitType?.let {
+            vizResultDict["residencePermitType"] = serializeStringResult(it)
+        }
+        vizResult?.manufacturingYear?.let {
+            vizResultDict["manufacturingYear"] = serializeStringResult(it)
+        }
+        vizResult?.nationalInsuranceNumber?.let {
+            vizResultDict["nationalInsuranceNumber"] = serializeStringResult(it)
+        }
+        vizResult?.vehicleType?.let {
+            vizResultDict["vehicleType"] = serializeStringResult(it)
+        }
+        vizResult?.eligibilityCategory?.let {
+            vizResultDict["eligibilityCategory"] = serializeStringResult(it)
+        }
+        vizResult?.specificDocumentValidity?.let {
+            vizResultDict["specificDocumentValidity"] = serializeStringResult(it)
+        }
+        vizResult?.dependentsInfo?.let {
+            vizResultDict["dependentsInfo"] =
+                it.map { dependentInfo -> serializeDependentInfo(dependentInfo) }
+        }
+        vizResult?.vehicleOwner?.let {
+            vizResultDict["vehicleOwner"] = serializeStringResult(it)
+        }
+        vizResult?.parentsInfo?.let {
+            vizResultDict["parentsInfo"] = it.map { parentInfo -> serializeParentInfo(parentInfo) }
         }
         vizResult?.localityCode?.let {
             vizResultDict["localityCode"] = serializeStringResult(it)
@@ -553,126 +711,6 @@ object BlinkIdSerializationUtils {
         vizResult?.stateName?.let {
             vizResultDict["stateName"] = serializeStringResult(it)
         }
-        vizResult?.dateOfExpiryPermanent?.let {
-            vizResultDict["dateOfExpiryPermanent"] = it
-        }
-        vizResult?.dateOfExpiryPermanent?.let {
-            vizResultDict["dateOfExpiryPermanent"] = it
-        }
-        vizResult?.documentAdditionalNumber?.let {
-            vizResultDict["documentAdditionalNumber"] = serializeStringResult(it)
-        }
-        vizResult?.dependentsInfo.let {
-            it?.let {
-                vizResultDict["dependentsInfo"] =
-                    it.map { dependentInfo -> serializeDependentInfo(dependentInfo) }
-            }
-        }
-        vizResult?.documentNumber?.let {
-            vizResultDict["documentNumber"] = serializeStringResult(it)
-        }
-        vizResult?.documentOptionalAdditionalNumber?.let {
-            vizResultDict["documentOptionalAdditionalNumber"] = serializeStringResult(it)
-        }
-        vizResult?.documentSubtype?.let {
-            vizResultDict["documentSubtype"] = serializeStringResult(it)
-        }
-        vizResult?.driverLicenseDetailedInfo?.let {
-            vizResultDict["driverLicenseDetailedInfo"] = serializeDriverLicenseDetailedInfo(it)
-        }
-        vizResult?.eligibilityCategory?.let {
-            vizResultDict["eligibilityCategory"] = serializeStringResult(it)
-        }
-        vizResult?.employer?.let {
-            vizResultDict["employer"] = serializeStringResult(it)
-        }
-        vizResult?.fathersName?.let {
-            vizResultDict["fathersName"] = serializeStringResult(it)
-        }
-        vizResult?.firstName?.let {
-            vizResultDict["firstName"] = serializeStringResult(it)
-        }
-        vizResult?.fullName?.let {
-            vizResultDict["fullName"] = serializeStringResult(it)
-        }
-        vizResult?.issuingAuthority?.let {
-            vizResultDict["issuingAuthority"] = serializeStringResult(it)
-        }
-        vizResult?.lastName?.let {
-            vizResultDict["lastName"] = serializeStringResult(it)
-        }
-        vizResult?.localizedName?.let {
-            vizResultDict["localizedName"] = serializeStringResult(it)
-        }
-        vizResult?.profession?.let {
-            vizResultDict["profession"] = serializeStringResult(it)
-        }
-        vizResult?.placeOfBirth?.let {
-            vizResultDict["placeOfBirth"] = serializeStringResult(it)
-        }
-        vizResult?.personalIdNumber?.let {
-            vizResultDict["personalIdNumber"] = serializeStringResult(it)
-        }
-        vizResult?.nationality?.let {
-            vizResultDict["nationality"] = serializeStringResult(it)
-        }
-        vizResult?.mothersName?.let {
-            vizResultDict["mothersName"] = serializeStringResult(it)
-        }
-        vizResult?.maritalStatus?.let {
-            vizResultDict["maritalStatus"] = serializeStringResult(it)
-        }
-        vizResult?.manufacturingYear?.let {
-            vizResultDict["manufacturingYear"] = serializeStringResult(it)
-        }
-        vizResult?.race?.let {
-            vizResultDict["race"] = serializeStringResult(it)
-        }
-        vizResult?.religion?.let {
-            vizResultDict["religion"] = serializeStringResult(it)
-        }
-        vizResult?.remarks?.let {
-            vizResultDict["remarks"] = serializeStringResult(it)
-        }
-        vizResult?.residencePermitType?.let {
-            vizResultDict["residencePermitType"] = serializeStringResult(it)
-        }
-        vizResult?.residentialStatus?.let {
-            vizResultDict["residentialStatus"] = serializeStringResult(it)
-        }
-        vizResult?.sex?.let {
-            vizResultDict["sex"] = serializeStringResult(it)
-        }
-        vizResult?.specificDocumentValidity?.let {
-            vizResultDict["specificDocumentValidity"] = serializeStringResult(it)
-        }
-        vizResult?.sponsor?.let {
-            vizResultDict["sponsor"] = serializeStringResult(it)
-        }
-        vizResult?.vehicleOwner?.let {
-            vizResultDict["vehicleOwner"] = serializeStringResult(it)
-        }
-        vizResult?.vehicleType?.let {
-            vizResultDict["vehicleType"] = serializeStringResult(it)
-        }
-        vizResult?.visaType?.let {
-            vizResultDict["visaType"] = serializeStringResult(it)
-        }
-        vizResult?.countryCode?.let {
-            vizResultDict["countryCode"] = serializeStringResult(it)
-        }
-        vizResult?.certificateNumber?.let {
-            vizResultDict["certificateNumber"] = serializeStringResult(it)
-        }
-        vizResult?.nationalInsuranceNumber?.let {
-            vizResultDict["nationalInsuranceNumber"] = serializeStringResult(it)
-        }
-        vizResult?.parentsInfo?.let {
-            vizResultDict["parentsInfo"] = it.map { parentInfo -> serializeParentInfo(parentInfo)}
-        }
-        vizResult?.effectiveDate?.let {
-            vizResultDict["effectiveDate"] = serializeDateResult(it)
-        }
         vizResult?.husbandName?.let {
             vizResultDict["husbandName"] = serializeStringResult(it)
         }
@@ -688,8 +726,8 @@ object BlinkIdSerializationUtils {
         return vizResultDict
     }
 
-    private fun serializeDetailedCroppedImageResult(detailedCroppedImageResult: DetailedCroppedImageResult?): Map<String, Any> {
-        val detailedCroppedImageResultDict: MutableMap<String, Any> = mutableMapOf()
+    private fun serializeDetailedCroppedImageResult(detailedCroppedImageResult: DetailedCroppedImageResult?): Map<String, Any?> {
+        val detailedCroppedImageResultDict: MutableMap<String, Any?> = mutableMapOf()
         detailedCroppedImageResult?.bitmap?.let {
             encodeBase64Image(it)?.let { image ->
                 detailedCroppedImageResultDict["image"] = image
@@ -747,3 +785,4 @@ object BlinkIdSerializationUtils {
         }
     }
 }
+

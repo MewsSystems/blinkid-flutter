@@ -1,7 +1,6 @@
 // swift-tools-version: 5.9
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 import PackageDescription
-
 let package = Package(
     name: "blinkid_flutter",
     platforms: [
@@ -11,7 +10,7 @@ let package = Package(
         .library(name: "blinkid-flutter", targets: ["blinkid_flutter"])
     ],
     dependencies: [
-        .package(url: "https://github.com/BlinkID/blinkid-ios.git", exact: .init(7,7,0)),
+        .package(url: "https://github.com/microblink/blinkid-ios.git", exact: .init(8000,0,0)),
     ],
     targets: [
         .target(

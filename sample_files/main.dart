@@ -8,6 +8,9 @@ import 'package:image_picker/image_picker.dart';
 /// import the blinkid_flutter package
 import 'package:blinkid_flutter/blinkid_flutter.dart';
 import 'blinkid_result_builder.dart';
+import 'module_settings_panel.dart';
+import 'optional_scan_settings_panel.dart';
+import 'scanning_modules_config.dart';
 
 void main() {
   runApp(MyApp());
@@ -37,7 +40,50 @@ class _MyAppState extends State<MyApp> {
   ///
   /// It will be used both for the default UX scan (performScan method),
   /// and the DirectAPI scan (directApiMultiSideScan and directApiSingleSideScan methods).
-  final blinkIdPlugin = BlinkidFlutter();
+  final blinkIdPlugin = BlinkIdFlutter();
+
+  final _modulesConfig = ScanningModulesConfig();
+
+  static const String? _microblinkProxyUrl = null;
+
+  BlinkIdSdkSettings _buildSdkSettings() {
+    final sdkSettings = BlinkIdSdkSettings(
+            licenseKey: sdkLicenseKey,
+            microblinkProxyUrl: _microblinkProxyUrl,
+            downloadResources: true
+          );
+    return sdkSettings;
+  }
+
+  BlinkIdSessionSettings _buildSessionSettings() =>
+      _modulesConfig.toSessionSettings();
+
+  void _logScanConfiguration(String action) {
+    final sessionSettings = _buildSessionSettings();
+    final scanningSettings = sessionSettings.scanningSettings;
+    debugPrint('[BlinkIdSample] $action');
+    debugPrint('[BlinkIdSample] scanningMode: ${sessionSettings.scanningMode}');
+    debugPrint(
+      '[BlinkIdSample] stepTimeoutDuration: ${sessionSettings.stepTimeoutDuration}, '
+      'inactivityTimeoutDuration: ${sessionSettings.inactivityTimeoutDuration}',
+    );
+    debugPrint(
+      '[BlinkIdSample] showOnboardingDialog: ${_modulesConfig.showOnboardingDialog}',
+    );
+    debugPrint(
+      '[BlinkIdSample] modules enabled: '
+      'documentCapture=${_modulesConfig.documentCaptureEnabled}, '
+      'barcode=${_modulesConfig.barcodeEnabled}, '
+      'mrz=${_modulesConfig.mrzEnabled}, '
+      'viz=${_modulesConfig.vizEnabled}',
+    );
+    debugPrint(
+      '[BlinkIdSample] scanningSettings JSON: ${jsonEncode(scanningSettings.toJson())}',
+    );
+    debugPrint(
+      '[BlinkIdSample] full sessionSettings JSON: ${jsonEncode(sessionSettings.toJson())}',
+    );
+  }
 
   @override
   void initState() {
@@ -53,63 +99,35 @@ class _MyAppState extends State<MyApp> {
           "sRwCABVjb20ubWljcm9ibGluay5zYW1wbGUBbGV5SkRjbVZoZEdWa1QyNGlPakUzTnpreE56VTBNekE0T1Rrc0lrTnlaV0YwWldSR2IzSWlPaUprWkdRd05qWmxaaTAxT0RJekxUUXdNRGd0T1RRNE1DMDFORFU0WWpBeFlUVTJZamdpZlE9PaObKYfb4FlwqmqVoofXLicsmElmnSm1gmoXWaFx8MgdmmJRSLpdAfP6uV5xAr3K4rColEBYQ38GNh+FT081yjXPFB16LwdVhDiJcEK07cTBG5hQPXRy8+hoJJ1U7w==";
     }
 
-    // If neccessary, the SDK can be pre-loaded with the neccessary resources before the scanning session starts.
+    // If necessary, the SDK can be pre-loaded with the necessary resources before the scanning session starts.
     // This will decreasing the SDK loading time when starting a scanning session (since the resources will be downloaded and the license verified).
 
-    // blinkIdPlugin.loadBlinkIdSdk(BlinkIdSdkSettings(sdkLicenseKey));
+    // blinkIdPlugin.loadBlinkIdSdk(
+    //   blinkidSdkSettings: BlinkIdSdkSettings(licenseKey: sdkLicenseKey),
+    // );
   }
 
   Future<void> performScan() async {
     try {
-      /// Set the BlinkID SDK settings
-      final sdkSettings = BlinkIdSdkSettings(sdkLicenseKey);
-      sdkSettings.downloadResources = true;
+      _logScanConfiguration('Scan with camera');
+      final sdkSettings = _buildSdkSettings();
+      final sessionSettings = _buildSessionSettings();
 
-      /// Create and modify the Session Settings
-      final sessionSettings = BlinkIdSessionSettings();
-      sessionSettings.scanningMode = ScanningMode.automatic;
-
-      /// Create and modify the scanning settings
-      final scanningSettings = BlinkIdScanningSettings();
-      scanningSettings.anonymizationMode = AnonymizationMode.fullResult;
-      scanningSettings.glareDetectionLevel = DetectionLevel.mid;
-      scanningSettings.blurDetectionLevel = DetectionLevel.mid;
-
-      /// Create and modify the Image settings
-      final imageSettings = CroppedImageSettings();
-      imageSettings.returnDocumentImage = true;
-      imageSettings.returnSignatureImage = true;
-      imageSettings.returnFaceImage = true;
-
-      /// Place the image settings in the scanning settings
-      scanningSettings.croppedImageSettings = imageSettings;
-
-      /// Place the Scanning settings in the Session settings
-      sessionSettings.scanningSettings = scanningSettings;
-
-      /// Create and modify the UX settings
-      /// This paramater is optional
-      final uiSettings = BlinkIdScanningUxSettings();
-      uiSettings.showHelpButton = true;
-      uiSettings.showOnboardingDialog = false;
-      uiSettings.allowHapticFeedback = true;
-      uiSettings.preferredCamera = PreferredCamera.back;
-
-      /// Place the optional ClassFilter class
-      /// The filter is currently modified to only accept Canada documents, and USA California documents
-      final classFilter = ClassFilter.withIncludedDocumentClasses([
-        DocumentFilter(Country.canada),
-        DocumentFilter(Country.usa, Region.california),
-      ]);
+      final uiSettings = _modulesConfig.toUxSettings();
+      final classFilter = _modulesConfig.toClassFilter();
+      final redactionSettingsResolver =
+          _modulesConfig.toRedactionSettingsResolver();
 
       /// Call the 'performScan' method and handle the results
       /// Check how the results are handled in the blinkid_result_builder.dart file
       await blinkIdPlugin
           .performScan(
-            sdkSettings,
-            sessionSettings,
-            uiSettings,
-          ) //, classFilter)
+            blinkIdSdkSettings: sdkSettings,
+            blinkIdSessionSettings: sessionSettings,
+            blinkidScanningUxSettings: uiSettings,
+            classFilter: classFilter,
+            redactionSettingsResolver: redactionSettingsResolver,
+          )
           .then((result) {
             resetImages();
             setState(() {
@@ -141,6 +159,7 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> directApiMultiSideScan() async {
     try {
+      _logScanConfiguration('DirectAPI MultiSide');
       /// Get the front and the back side of the document with the pickMultiImage method
       /// First select the front and the then back side of the image
       final images = await ImagePicker().pickMultiImage();
@@ -152,44 +171,17 @@ class _MyAppState extends State<MyApp> {
       /// Convert the picked image to the Base64 format
       String backImageBase64 = base64Encode(await images[1].readAsBytes());
 
-      /// Set the BlinkID SDK settings
-      final sdkSettings = BlinkIdSdkSettings(sdkLicenseKey);
-      sdkSettings.downloadResources = true;
-
-      /// Create and modify the Session Settings
-      final sessionSettings = BlinkIdSessionSettings();
-      sessionSettings.scanningMode = ScanningMode.automatic;
-
-      /// Create and modify the scanning settings
-      final scanningSettings = BlinkIdScanningSettings();
-      scanningSettings.anonymizationMode = AnonymizationMode.fullResult;
-      scanningSettings.glareDetectionLevel = DetectionLevel.mid;
-
-      /// Uncomment the following line if you are passing input images
-      /// that consist solely of the cropped document image.
-      ///
-      /// scanningSettings.scanCroppedDocumentImage = true;
-
-      /// Create and modify the Image settings
-      final imageSettings = CroppedImageSettings();
-      imageSettings.returnDocumentImage = true;
-      imageSettings.returnSignatureImage = true;
-      imageSettings.returnFaceImage = true;
-
-      /// Place the image settings in the scanning settings
-      scanningSettings.croppedImageSettings = imageSettings;
-
-      /// Place the Scanning settings in the Session settings
-      sessionSettings.scanningSettings = scanningSettings;
+      final sdkSettings = _buildSdkSettings();
+      final sessionSettings = _buildSessionSettings();
 
       /// Call the 'performDirectApiScan' method and handle the results
       /// Check how the results are handled in the blinkid_result_builder.dart file
       await blinkIdPlugin
           .performDirectApiScan(
-            sdkSettings,
-            sessionSettings,
-            frontImageBase64,
-            backImageBase64,
+            blinkIdSdkSettings: sdkSettings,
+            blinkIdSessionSettings: sessionSettings,
+            firstImage: frontImageBase64,
+            secondImage: backImageBase64,
           )
           .then((result) {
             setState(() {
@@ -222,6 +214,7 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> directApiSingleSideScan() async {
     try {
+      _logScanConfiguration('DirectAPI SingleSide');
       /// Get either the front or the back side of the document with the pickImage method
       final image = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (image == null) return;
@@ -229,40 +222,17 @@ class _MyAppState extends State<MyApp> {
       /// Convert the picked image to the Base64 format
       String imageBase64 = base64Encode(await image.readAsBytes());
 
-      /// Set the BlinkID SDK settings
-      final sdkSettings = BlinkIdSdkSettings(sdkLicenseKey);
-      sdkSettings.downloadResources = true;
-
-      /// Create and modify the Session Settings
-      final sessionSettings = BlinkIdSessionSettings();
-      sessionSettings.scanningMode = ScanningMode.single;
-
-      /// Create and modify the scanning settings
-      final scanningSettings = BlinkIdScanningSettings();
-      scanningSettings.anonymizationMode = AnonymizationMode.fullResult;
-      scanningSettings.glareDetectionLevel = DetectionLevel.mid;
-
-      /// Uncomment the following line if you are passing input images
-      /// that consist solely of the cropped document image.
-      ///
-      /// scanningSettings.scanCroppedDocumentImage = true;
-
-      /// Create and modify the Image settings
-      final imageSettings = CroppedImageSettings();
-      imageSettings.returnDocumentImage = true;
-      imageSettings.returnSignatureImage = true;
-      imageSettings.returnFaceImage = true;
-
-      /// Place the image settings in the scanning settings
-      scanningSettings.croppedImageSettings = imageSettings;
-
-      /// Place the Scanning settings in the Session settings
-      sessionSettings.scanningSettings = scanningSettings;
+      final sdkSettings = _buildSdkSettings();
+      final sessionSettings = _buildSessionSettings();
 
       /// Call the 'performDirectApiScan' method and handle the results
       /// Check how the results are handled in the blinkid_result_builder.dart file
       await blinkIdPlugin
-          .performDirectApiScan(sdkSettings, sessionSettings, imageBase64)
+          .performDirectApiScan(
+            blinkIdSdkSettings: sdkSettings,
+            blinkIdSessionSettings: sessionSettings,
+            firstImage: imageBase64,
+          )
           .then((result) {
             setState(() {
               resetImages();
@@ -323,6 +293,7 @@ class _MyAppState extends State<MyApp> {
     secondInputImageBase64 = "";
     faceImageBase64 = "";
     signatureImageBase64 = "";
+    barcodeInputImageBase64 = "";
   }
 
   @override
@@ -447,16 +418,34 @@ class _MyAppState extends State<MyApp> {
     }
 
     return MaterialApp(
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1565C0)),
+        useMaterial3: true,
+      ),
       home: Scaffold(
         appBar: AppBar(title: const Text("BlinkID Sample")),
-        body: SingleChildScrollView(
-          padding: EdgeInsets.all(16.0),
-          child: Builder(
+        body: GestureDetector(
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          behavior: HitTestBehavior.translucent,
+          child: SingleChildScrollView(
+            keyboardDismissBehavior:
+                ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.all(16.0),
+            child: Builder(
             builder: (BuildContext context) {
               return Column(
                 children: <Widget>[
+                  ModuleSettingsPanel(
+                    config: _modulesConfig,
+                    onChanged: () => setState(() {}),
+                  ),
+                  OptionalScanSettingsPanel(
+                    config: _modulesConfig,
+                    onChanged: () => setState(() {}),
+                  ),
+                  const SizedBox(height: 8),
                   Padding(
-                    padding: EdgeInsets.only(bottom: 16.0),
+                    padding: const EdgeInsets.only(bottom: 16.0),
                     child: ElevatedButton(
                       onPressed: () => performScan(),
                       child: Text("Scan with camera"),
@@ -503,6 +492,7 @@ class _MyAppState extends State<MyApp> {
                 ],
               );
             },
+          ),
           ),
         ),
       ),

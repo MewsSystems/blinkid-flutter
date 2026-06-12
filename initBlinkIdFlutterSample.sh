@@ -11,14 +11,16 @@ flutter create --org com.microblink -a kotlin $appName
 # enter into demo project folder
 pushd $appName
 
+# Toggle whether to use the local BlinkID plugin from this repo (true) or pub.dev (false).
 IS_LOCAL_BUILD=false || exit 1
+
 if [ "$IS_LOCAL_BUILD" = true ]; then
   # add blinkid_flutter dependency with local path to pubspec.yaml
   perl -i~ -pe "BEGIN{$/ = undef;} s/dependencies:\n  flutter:\n    sdk: flutter/dependencies:\n  flutter:\n    sdk: flutter\n  blinkid_flutter:\n    path: ..\/BlinkID\n  image_picker: 1.1.2/" pubspec.yaml
   echo "Using blinkid_flutter from this repo instead from flutter pub"
 else
   # add blinkid_flutter dependency to pubspec.yaml
-  perl -i~ -pe "BEGIN{$/ = undef;} s/dependencies:\n  flutter:\n    sdk: flutter/dependencies:\n  flutter:\n    sdk: flutter\n  blinkid_flutter:\n  image_picker: 1.1.2/" pubspec.yaml
+  perl -i~ -pe "BEGIN{$/ = undef;} s/dependencies:\n  flutter:\n    sdk: flutter/dependencies:\n  flutter:\n    sdk: flutter\n  blinkid_flutter: ^8000.0.0 \n  image_picker: 1.1.2/" pubspec.yaml
   echo "Using blinkid_flutter from flutter pub"
 fi
 
@@ -28,11 +30,18 @@ flutter pub get
 # go to the android project folder
 pushd android
 
-# The BlinkID SDK uses minSdk 24. Replace 'minSdk = flutter.minSdkVersion' with 'minSdk = 24' in app/build.gradle.kts
+# --- BlinkID SDK ANDROID requirements for the generated sample app ----
+
+# Kotlin
+sed -i '' 's/id("org.jetbrains.kotlin.android") version "[0-9.]*"/id("org.jetbrains.kotlin.android") version "2.2.21"/' settings.gradle.kts
+# AGP
+sed -i '' 's/id("com.android.application") version "[0-9.]*"/id("com.android.application") version "9.1.0"/' settings.gradle.kts
+# Gradle wrapper
+sed -i '' 's|gradle-[0-9.]*-all.zip|gradle-9.3.1-all.zip|' gradle/wrapper/gradle-wrapper.properties
+# minSdk
 sed -i '' 's/minSdk = flutter\.minSdkVersion/minSdk = 24/' app/build.gradle.kts
 
-# The BlinkID SDK uses Kotlin 2.1.0. Replace Kotlin Android plugin version in settings.gradle.kts
-sed -i '' 's/id("org.jetbrains.kotlin.android") version "[^"]*" apply false/id("org.jetbrains.kotlin.android") version "2.1.0" apply false/' settings.gradle.kts
+# -------
 
 # go to flutter root project
 popd
@@ -72,6 +81,12 @@ popd
 # copy the BlinkID sample app implementation files
 cp ../sample_files/main.dart lib/
 cp ../sample_files/blinkid_result_builder.dart lib/
+cp ../sample_files/scanning_modules_config.dart lib/
+cp ../sample_files/module_settings_panel.dart lib/
+cp ../sample_files/sample_filter_options.dart lib/
+cp ../sample_files/optional_scan_settings_panel.dart lib/
+
+popd
 
 echo ""
 echo "Go to Flutter project folder: cd $appName"

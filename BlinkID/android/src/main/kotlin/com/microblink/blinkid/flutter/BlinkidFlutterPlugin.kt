@@ -7,11 +7,11 @@ import com.microblink.blinkid.core.BlinkIdSdk
 import com.microblink.blinkid.core.session.BlinkIdProcessResult
 import com.microblink.blinkid.ux.contract.BlinkIdScanActivitySettings
 import com.microblink.blinkid.ux.contract.MbBlinkIdScan
-import com.microblink.core.LicenseLockedException
-import com.microblink.core.image.InputImage
-import com.microblink.core.ping.PingManager
-import com.microblink.core.ping.pinglets.WrapperProductInfo
-import com.microblink.ux.contract.ScanActivityResultStatus
+import com.microblink.blinkid.core.LicenseLockedException
+import com.microblink.blinkid.core.image.InputImage
+import com.microblink.blinkid.core.ping.PingManager
+import com.microblink.blinkid.core.ping.pinglets.WrapperProductInfo
+import com.microblink.blinkid.ux.contract.ScanActivityResultStatus
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -24,7 +24,7 @@ import kotlinx.coroutines.*
 
 
 /** BlinkidFlutterPlugin */
-class BlinkidFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
+class BlinkIdFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
     ActivityResultListener {
     private val BLINKID_METHOD_PERFORM_SCAN = "performScan"
     private val BLINKID_METHOD_PERFORM_DIRECTAPI_SCAN = "performDirectApiScan"
@@ -97,7 +97,7 @@ class BlinkidFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
 
             blinkIdSdk?.let { return it }
 
-            val blinkIdSdkSettings = call.argument<Map<String, Any>>("blinkidSdkSettings")
+            val blinkIdSdkSettings = call.argument<Map<String, Any>>("blinkIdSdkSettings")
             val sdkSettings = BlinkIdDeserializationUtils
                 .deserializeBlinkIdSdkSettings(blinkIdSdkSettings)?: throw IllegalStateException("Incorrect SDK Settings.")
 
@@ -122,15 +122,22 @@ class BlinkidFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
 
     private suspend fun performScan(call: MethodCall, result: Result) {
         try {
-            val blinkIdSdkSettings = call.argument<Map<String, Any>>("blinkidSdkSettings")
-            val blinkidSessionSettings = call.argument<Map<String, Any>>("blinkidSessionSettings")
+            val blinkIdSdkSettings = call.argument<Map<String, Any>>("blinkIdSdkSettings")
+            val blinkIdSessionSettings = call.argument<Map<String, Any>>("blinkIdSessionSettings")
+            android.util.Log.i(
+                "BlinkIdFlutter",
+                "performScan received blinkIdSessionSettings=$blinkIdSessionSettings",
+            )
             val blinkIdScanningUxSettings = call.argument<Map<String, Any>>("blinkIdScanningUxSettings")
-            val classFilterMap = call.argument<Map<String, Any>>("blinkidClassFilter")
+            val classFilterMap = call.argument<Map<String, Any>>("blinkIdClassFilter")
+            val redactionSettingsResolverMap = call.argument<Map<String, Any>>("blinkIdRedactionSettingsResolver")
+            android.util.Log.i(
+                "BlinkIdFlutter",
+                "performScan received blinkIdRedactionSettingsResolver=$redactionSettingsResolverMap",
+            )
             val sdkSettings = BlinkIdDeserializationUtils
                 .deserializeBlinkIdSdkSettings(blinkIdSdkSettings)
                 ?: return result.error(BLINKID_ERROR_RESULT_CODE, "Incorrect SDK Settings.", null)
-
-            blinkIdSdk = ensureLoadedSdk(call)
 
             flutterPluginActivity?.let {
                 val intent = MbBlinkIdScan().createIntent(
@@ -139,12 +146,14 @@ class BlinkidFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
                         sdkSettings = sdkSettings,
                         cameraSettings = BlinkIdDeserializationUtils.deserializeCameraSettings(blinkIdScanningUxSettings),
                         scanningSessionSettings = BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
-                            blinkidSessionSettings,
+                            blinkIdSessionSettings,
                             false
                         ),
                         uxSettings = BlinkIdDeserializationUtils.deserializeBlinkIdUxSettings(
                             blinkidUxSettingsMap = blinkIdScanningUxSettings,
-                            classFilterMap
+                            classFilterMap = classFilterMap,
+                            redactionSettingsResolverMap = redactionSettingsResolverMap,
+                            sessionSettingsMap = blinkIdSessionSettings,
                         ),
                         showOnboardingDialog = (blinkIdScanningUxSettings?.getOrDefault("showOnboardingDialog", true) as? Boolean) ?: true,
                         showHelpButton = (blinkIdScanningUxSettings?.getOrDefault("showHelpButton", true) as? Boolean) ?: true,
@@ -169,7 +178,7 @@ class BlinkidFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
 
     private suspend fun performDirectApiScan(call: MethodCall, result: Result) {
         try {
-            val blinkidSessionSettings = call.argument<Map<String, Any>>("blinkidSessionSettings")
+            val blinkIdSessionSettings = call.argument<Map<String, Any>>("blinkIdSessionSettings")
             val firstImage = call.argument<String>("firstImage")
             val secondImage = call.argument<String>("secondImage")
             flutterResult = result
@@ -177,12 +186,17 @@ class BlinkidFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
             blinkIdSdk?.let {
                 addFlutterPinglet(context)
 
-                    val session = it.createScanningSession(
+                    val sessionResult = it.createScanningSession(
                         BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
-                            blinkidSessionSettings,
+                            blinkIdSessionSettings,
                             true
                         )
                     )
+                    if (sessionResult.isFailure) {
+                        flutterResult?.error(BLINKID_ERROR_RESULT_CODE, sessionResult.exceptionOrNull()?.message ?: "Could not create scanning session.", null)
+                        return@let
+                    }
+                    val session = sessionResult.getOrThrow()
                     var result: kotlin.Result<BlinkIdProcessResult>? = null
 
                     firstImage?.let { firstImageBase64 ->
@@ -200,12 +214,22 @@ class BlinkidFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
                     }
 
                     if (result?.isSuccess == true) {
-                        val scanningResult = session.getResult()
-                        flutterResult?.success(
-                            BlinkIdSerializationUtils.serializeBlinkIdScanningResult(
-                                scanningResult
+                        val redactionSettingsMap = call.argument<Map<String, Any>>("directApiRedactionSettings")
+                        val redactionSettings = BlinkIdDeserializationUtils.deserializeRedactionSettings(redactionSettingsMap)
+                        val scanningResultKotlinResult = session.getResult(redactionSettings)
+                        if (scanningResultKotlinResult.isSuccess) {
+                            flutterResult?.success(
+                                BlinkIdSerializationUtils.serializeBlinkIdScanningResult(
+                                    scanningResultKotlinResult.getOrNull()
+                                )
                             )
-                        )
+                        } else {
+                            flutterResult?.error(
+                                BLINKID_ERROR_RESULT_CODE,
+                                scanningResultKotlinResult.exceptionOrNull()?.message ?: "Could not get the results.",
+                                null
+                            )
+                        }
                     } else {
                         flutterResult?.error(
                             BLINKID_ERROR_RESULT_CODE,
