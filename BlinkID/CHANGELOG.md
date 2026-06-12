@@ -73,6 +73,26 @@
 - Pakistan, proof of registration: renamed fathersName to additionalNameInformation
 - Mauritania, ID: renamed documentNumber to personalIdNumber
 
+### Requirements
+- Flutter **3.44.1** or newer
+- Dart **3.12.1** or newer
+- iOS **16.0** or newer; Swift Package Manager must be enabled (`flutter config --enable-swift-package-manager`)
+- Android API level **24** or newer; **compileSdk 36**; **AGP 9.1.0**; **Kotlin 2.2.21**
+- Integrator apps do **not** need Jetpack Compose setup; Compose is used internally by BlinkID UX
+
+### Breaking changes
+- **Module-based scanning settings:** flat fields on `BlinkIdScanningSettings` (e.g. `glareDetectionLevel`, `CroppedImageSettings`) are replaced by optional module configs: `DocumentCaptureModuleSettings`, `MrzModuleSettings`, `BarcodeModuleSettings`, `VizModuleSettings`
+- **UX settings:** use `BlinkIdScanningUxSettings` (already renamed from `BlinkIdUiSettings` in v7.6; v8000 builds on the module model)
+- **Method signatures:** `performScan` and `performDirectApiScan` use **named parameters** instead of positional arguments
+- **SDK settings constructor:** `BlinkIdSdkSettings(licenseKey: ...)` — the v7 positional `sdkLicenseKey` parameter name is gone
+- **Class filter:** prefer `ClassFilter()..includeDocuments = [...]` / `..excludeDocuments = [...]` instead of `ClassFilter.withIncludedDocumentClasses(...)`
+- **Anonymization → redaction:** `AnonymizationSettings` / fixed rules removed; use `RedactionSettings` (DirectAPI) or `RedactionSettingsResolver` (camera scan)
+- **Custom document rules removed:** `customDocumentRules` on `BlinkIdScanningSettings` is no longer supported — implement completeness logic in your app
+- **Session timeouts:** `BlinkIdSessionSettings` adds `stepTimeoutDuration` and `inactivityTimeoutDuration` (milliseconds)
+- **Enum/result changes:** see Minor API changes below (`VIRGIN_ISLANDS_US` → `VIRGIN_ISLANDS_OF_THE_UNITED_STATES`, removed `FieldType` values, new `cardAccessNumber`, etc.)
+
+For step-by-step migration examples, see the [Migrating from v7.x](https://github.com/microblink/blinkid-flutter/tree/master?tab=readme-ov-file#migrating-from-v7x) section in the README and the [native v8000 migration guide](https://docs.microblink.com/blinkid/migration-v8000).
+
 ### Minor API changes
 - Added new items to enums:
     - new `FieldType` enum values: `CardAccessNumber`
