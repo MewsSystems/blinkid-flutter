@@ -12,7 +12,7 @@ flutter create --org com.microblink -a kotlin $appName
 pushd $appName
 
 # Toggle whether to use the local BlinkID plugin from this repo (true) or pub.dev (false).
-IS_LOCAL_BUILD=true
+IS_LOCAL_BUILD=false || exit 1
 
 if [ "$IS_LOCAL_BUILD" = true ]; then
   # add blinkid_flutter dependency with local path to pubspec.yaml
@@ -32,15 +32,12 @@ pushd android
 
 # --- BlinkID SDK ANDROID requirements for the generated sample app ----
 
-# Kotlin requirements
+# Kotlin
 sed -i '' 's/id("org.jetbrains.kotlin.android") version "[0-9.]*"/id("org.jetbrains.kotlin.android") version "2.2.21"/' settings.gradle.kts
-
 # AGP
 sed -i '' 's/id("com.android.application") version "[0-9.]*"/id("com.android.application") version "9.1.0"/' settings.gradle.kts
-
 # Gradle wrapper
 sed -i '' 's|gradle-[0-9.]*-all.zip|gradle-9.3.1-all.zip|' gradle/wrapper/gradle-wrapper.properties
-
 # minSdk
 sed -i '' 's/minSdk = flutter\.minSdkVersion/minSdk = 24/' app/build.gradle.kts
 

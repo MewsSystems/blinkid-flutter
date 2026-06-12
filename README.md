@@ -40,7 +40,7 @@ A valid license key is required to initialize the BlinkID plugin. A free trial l
 |     AGP version     |           —            |           —            |    9.1.0 and newer     |
 |   Camera quality    |—                       |At least 1080p          |     At least 1080p     | 
 
-**Android-specific:** Set `minSdk = 24` in your app module (see [Plugin integration](#plugin-integration)). No Jetpack Compose setup is required — the plugin launches BlinkID's prebuilt scanning UI via an Android Activity.
+See [Plugin integration](#plugin-integration) for more details.
 
 For additional help with the Flutter setup, view the official [documentation](https://flutter.dev/docs).
 
@@ -183,8 +183,10 @@ if (Platform.isAndroid) {
 }
 
 // SDK initialization settings
-final sdkSettings = BlinkIdSdkSettings(licenseKey: sdkLicenseKey);
-sdkSettings.downloadResources = true;
+final sdkSettings = BlinkIdSdkSettings(
+  licenseKey: sdkLicenseKey,
+  downloadResources: true
+);
 
 // Scanning modules — enable only what your use case needs
 final scanningSettings = BlinkIdScanningSettings(
