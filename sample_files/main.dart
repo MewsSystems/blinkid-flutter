@@ -92,9 +92,11 @@ class _MyAppState extends State<MyApp> {
     /// Add a valid license key, based on the platform
     /// A valid license key can be obtained from the Microblink Developer Hub, here: https://developer.microblink.com
     if (Platform.isAndroid) {
-      sdkLicenseKey = "sRwCABVjb20ubWljcm9ibGluay5zYW1wbGUAbGV5SkRjbVZoZEdWa1QyNGlPakUzTnpreE1ESXpOVGMxT1RBc0lrTnlaV0YwWldSR2IzSWlPaUprWkdRd05qWmxaaTAxT0RJekxUUXdNRGd0T1RRNE1DMDFORFU0WWpBeFlUVTJZamdpZlE9PRXlOs6VFBOfXCx1+6HuENpn05k2kl20pJr4kQ4S1sMxuSzZ+B8YhC9rYMsFXr3HSskFmMFwEe+44OQ1ZE2sm9iHUpxNBmVGpgBTKPOrc2vquGbpqmFwm1feyTL9Aw==";
+      sdkLicenseKey =
+          "sRwCABVjb20ubWljcm9ibGluay5zYW1wbGUAbGV5SkRjbVZoZEdWa1QyNGlPakUzTnpreE1ESXpOVGMxT1RBc0lrTnlaV0YwWldSR2IzSWlPaUprWkdRd05qWmxaaTAxT0RJekxUUXdNRGd0T1RRNE1DMDFORFU0WWpBeFlUVTJZamdpZlE9PRXlOs6VFBOfXCx1+6HuENpn05k2kl20pJr4kQ4S1sMxuSzZ+B8YhC9rYMsFXr3HSskFmMFwEe+44OQ1ZE2sm9iHUpxNBmVGpgBTKPOrc2vquGbpqmFwm1feyTL9Aw==";
     } else if (Platform.isIOS) {
-      sdkLicenseKey = "sRwCABVjb20ubWljcm9ibGluay5zYW1wbGUBCm1pY3JvYmxpbmvKFE4PWyeoqP5EZMp/XTSFigyqyFuNq82r6VkIM4+wcvaGKXe2CWs3TfYuRn/zJU0M+jimRG8RNYPDKZFBBJRHA0P3nu+zmzMTO+BoipRTVWFmWEfD0oyeqSg51jC4/omn1g==";
+      sdkLicenseKey =
+          "sRwCABVjb20ubWljcm9ibGluay5zYW1wbGUBbGV5SkRjbVZoZEdWa1QyNGlPakUzTnpreE56VTBNekE0T1Rrc0lrTnlaV0YwWldSR2IzSWlPaUprWkdRd05qWmxaaTAxT0RJekxUUXdNRGd0T1RRNE1DMDFORFU0WWpBeFlUVTJZamdpZlE9PaObKYfb4FlwqmqVoofXLicsmElmnSm1gmoXWaFx8MgdmmJRSLpdAfP6uV5xAr3K4rColEBYQ38GNh+FT081yjXPFB16LwdVhDiJcEK07cTBG5hQPXRy8+hoJJ1U7w==";
     }
 
     // If necessary, the SDK can be pre-loaded with the necessary resources before the scanning session starts.
