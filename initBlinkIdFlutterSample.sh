@@ -14,9 +14,6 @@ pushd $appName
 # Toggle whether to use the local BlinkID plugin from this repo (true) or pub.dev (false).
 IS_LOCAL_BUILD=true
 
-# Toggle whether the sample app uses production ping license keys (if true) or license keys without ping permission (if false)
-IS_PING_ENABLED=false
-
 if [ "$IS_LOCAL_BUILD" = true ]; then
   # add blinkid_flutter dependency with local path to pubspec.yaml
   perl -i~ -pe "BEGIN{$/ = undef;} s/dependencies:\n  flutter:\n    sdk: flutter/dependencies:\n  flutter:\n    sdk: flutter\n  blinkid_flutter:\n    path: ..\/BlinkID\n  image_picker: 1.1.2/" pubspec.yaml
@@ -86,13 +83,6 @@ popd
 
 # copy the BlinkID sample app implementation files
 cp ../sample_files/main.dart lib/
-if [ "$IS_PING_ENABLED" = true ]; then
-  perl -i~ -pe 's/const isPingEnabled = (true|false)/const isPingEnabled = true/' lib/main.dart
-  echo "Ping enabled: using production license keys"
-else
-  perl -i~ -pe 's/const isPingEnabled = (true|false)/const isPingEnabled = false/' lib/main.dart
-  echo "Ping disabled: using placeholder license keys"
-fi
 cp ../sample_files/blinkid_result_builder.dart lib/
 cp ../sample_files/scanning_modules_config.dart lib/
 cp ../sample_files/module_settings_panel.dart lib/

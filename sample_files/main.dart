@@ -12,9 +12,6 @@ import 'module_settings_panel.dart';
 import 'optional_scan_settings_panel.dart';
 import 'scanning_modules_config.dart';
 
-/// Set by initBlinkIdFlutterSample.sh via IS_PING_ENABLED.
-const isPingEnabled = true;
-
 void main() {
   runApp(MyApp());
 }
@@ -47,19 +44,14 @@ class _MyAppState extends State<MyApp> {
 
   final _modulesConfig = ScanningModulesConfig();
 
-  static const _microblinkProxyUrl =
-      'https://mb-ping-baltazar-proxy.devel.microblink.com';
+ static const String? _microblinkProxyUrl = null;
 
   BlinkIdSdkSettings _buildSdkSettings() {
-    final sdkSettings = isPingEnabled
-        ? BlinkIdSdkSettings(
+    final sdkSettings = BlinkIdSdkSettings(
             licenseKey: sdkLicenseKey,
             microblinkProxyUrl: _microblinkProxyUrl,
-          )
-        : BlinkIdSdkSettings(
-            licenseKey: sdkLicenseKey,
+            downloadResources: true
           );
-    sdkSettings.downloadResources = true;
     return sdkSettings;
   }
 
@@ -99,23 +91,13 @@ class _MyAppState extends State<MyApp> {
 
     /// Add a valid license key, based on the platform
     /// A valid license key can be obtained from the Microblink Developer Hub, here: https://developer.microblink.com
-    if (isPingEnabled) {
-      if (Platform.isAndroid) {
-        sdkLicenseKey =
-            "sRwCABVjb20ubWljcm9ibGluay5zYW1wbGUACm1pY3JvYmxpbmuR1jKtFvk9xE3vABHwur1/E0/yRpw+eYAD3hlbfZRvaopENT4LKsLqPRuBdGFVXvWK2Zqg4nl6cdguNGhS5tYjbTXHOZIMogpVl+DxCXCFhenDeFKil4MzqT/ndOSYhARb5Q==";
-      } else if (Platform.isIOS) {
-        sdkLicenseKey =
-            "sRwCABVjb20ubWljcm9ibGluay5zYW1wbGUBCm1pY3JvYmxpbmvKFE4PWyeoqP5EZMp/XTSFigyqyFuNq82r6VkIM4+wcvaGKXe2CWs3TfYuRn/zJU0M+jimRG8RNYPDKZFBBJRHA0P3nu+zmzMTO+BoipRTVWFmWEfD0oyeqSg51jC4/omn1g==";
-      }
-    } else {
-      if (Platform.isAndroid) {
-        sdkLicenseKey = "sRwCABVjb20ubWljcm9ibGluay5zYW1wbGUAbGV5SkRjbVZoZEdWa1QyNGlPakUzTnpreE1ESXpOVGMxT1RBc0lrTnlaV0YwWldSR2IzSWlPaUprWkdRd05qWmxaaTAxT0RJekxUUXdNRGd0T1RRNE1DMDFORFU0WWpBeFlUVTJZamdpZlE9PRXlOs6VFBOfXCx1+6HuENpn05k2kl20pJr4kQ4S1sMxuSzZ+B8YhC9rYMsFXr3HSskFmMFwEe+44OQ1ZE2sm9iHUpxNBmVGpgBTKPOrc2vquGbpqmFwm1feyTL9Aw==";
-      } else if (Platform.isIOS) {
-        sdkLicenseKey = "sRwCABVjb20ubWljcm9ibGluay5zYW1wbGUBCm1pY3JvYmxpbmvKFE4PWyeoqP5EZMp/XTSFigyqyFuNq82r6VkIM4+wcvaGKXe2CWs3TfYuRn/zJU0M+jimRG8RNYPDKZFBBJRHA0P3nu+zmzMTO+BoipRTVWFmWEfD0oyeqSg51jC4/omn1g==";
-      }
+    if (Platform.isAndroid) {
+      sdkLicenseKey = "sRwCABVjb20ubWljcm9ibGluay5zYW1wbGUAbGV5SkRjbVZoZEdWa1QyNGlPakUzTnpreE1ESXpOVGMxT1RBc0lrTnlaV0YwWldSR2IzSWlPaUprWkdRd05qWmxaaTAxT0RJekxUUXdNRGd0T1RRNE1DMDFORFU0WWpBeFlUVTJZamdpZlE9PRXlOs6VFBOfXCx1+6HuENpn05k2kl20pJr4kQ4S1sMxuSzZ+B8YhC9rYMsFXr3HSskFmMFwEe+44OQ1ZE2sm9iHUpxNBmVGpgBTKPOrc2vquGbpqmFwm1feyTL9Aw==";
+    } else if (Platform.isIOS) {
+      sdkLicenseKey = "sRwCABVjb20ubWljcm9ibGluay5zYW1wbGUBCm1pY3JvYmxpbmvKFE4PWyeoqP5EZMp/XTSFigyqyFuNq82r6VkIM4+wcvaGKXe2CWs3TfYuRn/zJU0M+jimRG8RNYPDKZFBBJRHA0P3nu+zmzMTO+BoipRTVWFmWEfD0oyeqSg51jC4/omn1g==";
     }
 
-    // If neccessary, the SDK can be pre-loaded with the neccessary resources before the scanning session starts.
+    // If necessary, the SDK can be pre-loaded with the necessary resources before the scanning session starts.
     // This will decreasing the SDK loading time when starting a scanning session (since the resources will be downloaded and the license verified).
 
     // blinkIdPlugin.loadBlinkIdSdk(BlinkIdSdkSettings(sdkLicenseKey));
