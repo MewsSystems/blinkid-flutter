@@ -1,4 +1,4 @@
-## v8000
+## v8000.0.0
 
 ### What's new
 - The list of all supported documents and result fields is now available [here](https://docs.microblink.com/blinkid/supported-documents).

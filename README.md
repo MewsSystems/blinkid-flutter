@@ -472,14 +472,14 @@ For **DirectAPI scanning**, pass a single `RedactionSettings` object directly to
 
 If you are upgrading from BlinkID Flutter **v7**, the following changes apply:
 
-| v7.x | v8 (8000.0.0) |
-|:-----|:--------------|
-| Flat scanning settings (`glareDetectionLevel`, `CroppedImageSettings`, etc.) | Module-based settings on `BlinkIdScanningSettings` |
-| `BlinkIdUiSettings` | `BlinkIdScanningUxSettings` |
-| Positional method arguments | Named parameters on `performScan` / `performDirectApiScan` |
-| `BlinkIdSdkSettings(sdkLicenseKey)` constructor | `BlinkIdSdkSettings(licenseKey: sdkLicenseKey)` |
-| `ClassFilter.withIncludedDocumentClasses([...])` | `ClassFilter()..includeDocuments = [...]` |
-| Anonymization settings | `RedactionSettings` / `RedactionSettingsResolver` |
+| v7.x | v8000.0.0                                                                        |
+|:-----|:---------------------------------------------------------------------------------|
+| Flat scanning settings (`glareDetectionLevel`, `CroppedImageSettings`, etc.) | Module-based settings on `BlinkIdScanningSettings`                               |
+| `BlinkIdUiSettings` | `BlinkIdScanningUxSettings`                                                      |
+| Positional method arguments | Named parameters on `performScan` / `performDirectApiScan`                       |
+| `BlinkIdSdkSettings(sdkLicenseKey)` constructor | `BlinkIdSdkSettings(licenseKey: sdkLicenseKey)`                                  |
+| `ClassFilter.withIncludedDocumentClasses([...])` | `ClassFilter()..includeDocuments = [...]`                                        |
+| Anonymization settings | `RedactionSettings` / `RedactionSettingsResolver`                                |
 | Android: no Compose requirement | Android: no Compose requirement in your app (BlinkID UX uses Compose internally) |
 
 Detailed migration guide done for native platforms can be found [here](https://docs.microblink.com/blinkid/migration-v8000).
@@ -493,7 +493,7 @@ scanningSettings.croppedImageSettings = CroppedImageSettings(
   returnFaceImage: true,
 );
 
-// v8 — image return via DocumentCaptureModuleSettings
+// v8000 — image return via DocumentCaptureModuleSettings
 scanningSettings.documentCaptureModule = DocumentCaptureModuleSettings(
   documentImageReturnEnabled: true,
   faceImageExtractionEnabled: true,
@@ -504,7 +504,7 @@ scanningSettings.documentCaptureModule = DocumentCaptureModuleSettings(
 // v7
 await blinkIdPlugin.performScan(sdkSettings, sessionSettings, uiSettings);
 
-// v8
+// v8000
 await blinkIdPlugin.performScan(
   blinkIdSdkSettings: sdkSettings,
   blinkIdSessionSettings: sessionSettings,
@@ -512,7 +512,7 @@ await blinkIdPlugin.performScan(
 );
 ```
 
-Review the [scanning modules](#scanning-modules) section and the sample app configuration files to map your v7 settings to the appropriate v8 modules.
+Review the [scanning modules](#scanning-modules) section and the sample app configuration files to map your v7 settings to the appropriate v8000 modules.
 
 ## <a name="additional-information"></a> Additional information
 For any additional questions and information, feel free to contact us [here](https://help.microblink.com), or directly to the Support team via mail support@microblink.com.
