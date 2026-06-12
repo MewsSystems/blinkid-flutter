@@ -44,6 +44,7 @@ struct BlinkIdDeserializationUtils {
         }
 
         if let resourceRequestTimeout = sdkSettingsDict?["resourceRequestTimeout"] as? Int {
+            // TODO Bug in iOS native SDK
             blinkidSdkSettings?.resourceRequestTimeout = BlinkID.RequestTimeout.default
         }
         
