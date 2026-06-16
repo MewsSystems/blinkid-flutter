@@ -396,8 +396,8 @@ This method is automatically called after each successful scan session.
 | [`BlinkIdScanningUxSettings`](BlinkID/lib/src/blinkid_settings.dart) | UX customization for camera scanning. |
 
 Each Dart file documents available properties in detail. Native equivalents:
-- [Android SDK documentation](https://blinkid.github.io/blinkid-android/blinkid-core/com.microblink.blinkid.core/index.html)
-- [iOS SDK documentation](https://blinkid.github.io/blinkid-swift-package/documentation/blinkid/)
+- [Android SDK documentation](https://microblink.github.io/blinkid-android/blinkid-core/com.microblink.blinkid.core/index.html)
+- [iOS SDK documentation](https://microblink.github.io/blinkid-swift-package/documentation/blinkid/)
 
 Native deserialization implementations:
 - [Android](BlinkID/android/src/main/kotlin/com/microblink/blinkid/flutter/BlinkidDeserializationUtils.kt)
@@ -425,8 +425,8 @@ Field values use `StringResult` (with `value`, `latin`, `arabic`, etc.) and `Dat
 See [`BlinkID/lib/src/blinkid_result.dart`](BlinkID/lib/src/blinkid_result.dart) for the full result model.
 
 Native result documentation:
-- [Android](https://blinkid.github.io/blinkid-android/blinkid-core/com.microblink.blinkid.core.session/-blink-id-scanning-result/index.html)
-- [iOS](https://blinkid.github.io/blinkid-swift-package/documentation/blinkid/blinkidscanningresult)
+- [Android](https://microblink.github.io/blinkid-android/blinkid-core/com.microblink.blinkid.core.session/-blink-id-scanning-result/index.html)
+- [iOS](https://microblink.github.io/blinkid-swift-package/documentation/blinkid/blinkidscanningresult)
 
 Native serialization implementations:
 - [Android](BlinkID/android/src/main/kotlin/com/microblink/blinkid/flutter/BlinkidSerializationUtils.kt)
