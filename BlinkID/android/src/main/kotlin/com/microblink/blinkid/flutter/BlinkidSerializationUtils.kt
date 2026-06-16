@@ -280,6 +280,9 @@ object BlinkIdSerializationUtils {
 
     private fun serializeDocumentClassInfo(documentClassInfo: DocumentClassInfo): Map<String, Any?> {
         val documentClassInfoDict: MutableMap<String, Any?> = mutableMapOf()
+        // TODO: Align country/region/documentType strings with iOS (rawValue). Android uses
+        // enum.name with only the first character lowercased; values usually match but are not
+        // guaranteed identical for every enum. Prefer shared explicit string mappers on both platforms.
         documentClassInfo.country?.name?.let {
             documentClassInfoDict["country"] = it.replaceFirstChar { char -> char.lowercase() }
         }
@@ -358,6 +361,8 @@ object BlinkIdSerializationUtils {
         }
 
         val sideDict: MutableMap<String, Any?> = mutableMapOf()
+        // TODO: Serialize ScanningSide as "first"/"second" strings (not ordinals).
+        // See blinkid-react-native BlinkIdSerializationUtilities.kt.
         stringResult.side(AlphabetType.Latin)?.let {
             sideDict["latin"] = it.ordinal
         }
@@ -482,6 +487,8 @@ object BlinkIdSerializationUtils {
     private fun serializeBarcodeData(barcodeData: BarcodeData?): Map<String, Any?> {
         return mapOf(
             "barcodeType" to serializeBarcodeType(barcodeData?.barcodeType),
+            // TODO: Encode rawData as Base64 (Base64.NO_WRAP), not byteArray.toString().
+            // iOS bridge uses base64EncodedString(); see blinkid-react-native encodeBase64Bytes().
             "rawData" to barcodeData?.rawData.toString(),
             "stringData" to barcodeData?.stringData,
             "uncertain" to barcodeData?.uncertain
@@ -523,6 +530,7 @@ object BlinkIdSerializationUtils {
             "verified" to mrzResult?.verified,
             "dateOfBirth" to serializeDateResult(mrzResult?.dateOfBirth),
             "dateOfExpiry" to serializeDateResult(mrzResult?.dateOfExpiry),
+            // TODO: Serialize as MRZ document type string (e.g. "passport"), not ordinal.
             "documentType" to mrzResult?.documentType?.ordinal,
             "sanitizedOpt1" to mrzResult?.sanitizedOpt1,
             "sanitizedOpt2" to mrzResult?.sanitizedOpt2,
@@ -737,6 +745,7 @@ object BlinkIdSerializationUtils {
             detailedCroppedImageResultDict["location"] = serializeLocation(it)
         }
         detailedCroppedImageResult?.side?.let {
+            // TODO: Serialize as "first"/"second" string, not ordinal.
             detailedCroppedImageResultDict["side"] = it.ordinal
         }
         return detailedCroppedImageResultDict
