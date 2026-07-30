@@ -20,6 +20,10 @@ class BlinkIdScannerController extends ChangeNotifier {
   BlinkIdScannerStatus _status = BlinkIdScannerStatus.uninitialized;
   BlinkIdScannerStatus get status => _status;
 
+  Object? _lastError;
+  /// Last error when status is [BlinkIdScannerStatus.error].
+  Object? get lastError => _lastError;
+
   final _guidanceController = StreamController<BlinkIdGuidance>.broadcast();
   Stream<BlinkIdGuidance> get guidanceStream => _guidanceController.stream;
 
@@ -118,10 +122,12 @@ class BlinkIdScannerController extends ChangeNotifier {
   }
 
   void _failScan(String message) {
+    final error = Exception(message);
+    _lastError = error;
     _setStatus(BlinkIdScannerStatus.error);
     final completer = _scanCompleter;
     _scanCompleter = null;
-    completer?.completeError(Exception(message));
+    completer?.completeError(error);
   }
 
   void _setStatus(BlinkIdScannerStatus s) {

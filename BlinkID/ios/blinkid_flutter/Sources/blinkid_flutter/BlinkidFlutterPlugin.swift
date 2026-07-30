@@ -12,12 +12,17 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
     private var classInfoFilterDict: Dictionary<String, Any>?
     private var redactionSettingsResolverDict: Dictionary<String, Any>?
     
-    private var blinkIdSdk: BlinkIDSdk?
+    var blinkIdSdk: BlinkIDSdk?
     
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "blinkid_flutter", binaryMessenger: registrar.messenger())
         let instance = BlinkIdFlutterPlugin()
         registrar.addMethodCallDelegate(instance, channel: channel)
+        let factory = BlinkIdScannerViewFactory(
+            messenger: registrar.messenger(),
+            sdkProvider: { instance.blinkIdSdk },
+        )
+        registrar.register(factory, withId: "com.microblink.blinkid/scanner_view")
     }
     
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

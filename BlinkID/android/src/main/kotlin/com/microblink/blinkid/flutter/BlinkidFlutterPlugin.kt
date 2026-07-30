@@ -45,6 +45,10 @@ class BlinkIdFlutterPlugin() : FlutterPlugin, MethodCallHandler, ActivityAware,
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "blinkid_flutter")
         channel.setMethodCallHandler(this)
         context = flutterPluginBinding.applicationContext
+        flutterPluginBinding.platformViewRegistry.registerViewFactory(
+            "com.microblink.blinkid/scanner_view",
+            BlinkIdScannerViewFactory(flutterPluginBinding.binaryMessenger) { blinkIdSdk },
+        )
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {

@@ -207,10 +207,15 @@ class BlinkIdScannerView(
 private fun Any.toGuidanceString(): String = when (toString()) {
     "TOO_FAR", "TooFar" -> "tooFar"
     "TOO_CLOSE", "TooClose" -> "tooClose"
-    "CAMERA_ANGLE_TOO_STEEP", "CameraAngleTooSteep", "Tilted" -> "tilted"
-    "DOCUMENT_TOO_CLOSE_TO_FRAME_EDGE" -> "tooClose"
-    "BARCODE_DETECTION_FAILED", "DETECTION_FAILED" -> "searching"
+    "DOCUMENT_TOO_CLOSE_TO_FRAME_EDGE" -> "tooCloseToEdge"
+    "CAMERA_ANGLE_TOO_STEEP", "CameraAngleTooSteep" -> "tilted"
     "HOLD_STILL", "HoldStill" -> "holdStill"
     "FLIP_DOCUMENT", "FlipDocument" -> "flipDocument"
+    "BLUR_DETECTED", "BlurDetected" -> "blur"
+    "GLARE_DETECTED", "GlareDetected" -> "glare"
+    "DOCUMENT_NOT_FULLY_VISIBLE", "DocumentNotFullyVisible" -> "notFullyVisible"
+    "FACE_PHOTO_NOT_FULLY_VISIBLE", "FacePhotoNotFullyVisible" -> "notFullyVisible"
+    "LOW_LIGHTING", "LowLighting", "INCREASE_LIGHTING_INTENSITY" -> "lowLight"
+    "TOO_MUCH_LIGHTING", "TooMuchLighting", "DECREASE_LIGHTING_INTENSITY" -> "tooMuchLight"
     else -> "searching"
 }

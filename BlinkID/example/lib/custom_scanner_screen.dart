@@ -52,7 +52,25 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
     body: Stack(
       fit: StackFit.expand,
       children: [
-        BlinkIdScannerView(controller: _controller),
+        BlinkIdScannerView(
+              controller: _controller,
+              placeholderBuilder: (_) => const ColoredBox(
+                color: Color(0xFF000000),
+                child: Center(
+                  child: CircularProgressIndicator(color: Color(0xFFFFFFFF)),
+                ),
+              ),
+              errorBuilder: (_, error) => ColoredBox(
+                color: const Color(0xFF000000),
+                child: Center(
+                  child: Text(
+                    'Camera error:\n$error',
+                    style: const TextStyle(color: Color(0xFFFFFFFF)),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
         _GuidanceOverlay(controller: _controller),
         Positioned(
           top: MediaQuery.of(context).padding.top + 8,
@@ -111,8 +129,14 @@ class _GuidanceOverlay extends StatelessWidget {
     null || BlinkIdGuidanceSearching() => 'Point camera at your ID',
     BlinkIdGuidanceTooFar() => 'Move closer',
     BlinkIdGuidanceTooClose() => 'Move further away',
-    BlinkIdGuidanceTilted() => 'Hold the document straight',
-    BlinkIdGuidanceHoldStill() => 'Hold still...',
-    BlinkIdGuidanceFlipDocument() => 'Flip your document',
+    BlinkIdGuidanceTooCloseToEdge() => 'Move the document from the edge',
+    BlinkIdGuidanceTilted() => 'Keep document parallel to phone',
+    BlinkIdGuidanceHoldStill() => 'Hold still…',
+    BlinkIdGuidanceFlipDocument() => 'Flip to the back side',
+    BlinkIdGuidanceBlur() => 'Keep document and phone still',
+    BlinkIdGuidanceGlare() => 'Tilt or move document to remove reflection',
+    BlinkIdGuidanceNotFullyVisible() => 'Keep the document fully visible',
+    BlinkIdGuidanceLowLight() => 'Move to a brighter spot',
+    BlinkIdGuidanceTooMuchLight() => 'Move to a spot with less lighting',
   };
 }

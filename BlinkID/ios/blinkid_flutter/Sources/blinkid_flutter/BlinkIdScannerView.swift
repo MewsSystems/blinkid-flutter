@@ -201,9 +201,15 @@ private extension BlinkIDDetectionStatus {
         switch self {
         case .tooFar: return "tooFar"
         case .tooClose: return "tooClose"
+        case .documentTooCloseToFrameEdge: return "tooCloseToEdge"
         case .cameraTiltedTooMuch: return "tilted"
         case .holdStill: return "holdStill"
         case .flipDocument: return "flipDocument"
+        case .blurDetected: return "blur"
+        case .glareDetected: return "glare"
+        case .documentNotFullyVisible, .facePhotoNotFullyVisible: return "notFullyVisible"
+        case .increaseLightingIntensity: return "lowLight"
+        case .decreaseLightingIntensity: return "tooMuchLight"
         default: return "searching"
         }
     }
