@@ -3,12 +3,16 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../blinkid_flutter_platform_interface.dart';
 import '../blinkid_result.dart';
 import '../blinkid_settings.dart';
 import 'blinkid_guidance.dart';
 
 enum BlinkIdScannerStatus {
   uninitialized,
+  /// SDK resources are downloading / license is being verified.
+  loadingSdk,
+  /// SDK loaded; platform view not yet attached.
   initializing,
   ready,
   scanning,
@@ -50,11 +54,21 @@ class BlinkIdScannerController extends ChangeNotifier {
   Map<String, dynamic> _creationParams = {};
   Map<String, dynamic> get creationParams => _creationParams;
 
+  /// Loads the BlinkID SDK (model download + license check) then prepares
+  /// the controller for view attachment. Shows [loadingSdk] status during
+  /// the SDK init so callers can render a loading spinner.
   Future<void> initialize(
     BlinkIdSdkSettings sdkSettings,
     BlinkIdSessionSettings sessionSettings,
   ) async {
     if (_status != BlinkIdScannerStatus.uninitialized) return;
+    _setStatus(BlinkIdScannerStatus.loadingSdk);
+    try {
+      await BlinkIdFlutterPlatform.instance.loadBlinkIdSdk(sdkSettings);
+    } on PlatformException catch (e) {
+      _failScan(e.message ?? 'SDK load failed');
+      rethrow;
+    }
     _setStatus(BlinkIdScannerStatus.initializing);
     _creationParams = {
       'sdkSettings': sdkSettings.toJson(),

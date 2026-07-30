@@ -40,6 +40,7 @@ class BlinkIdScannerView extends StatelessWidget {
               const ColoredBox(color: Color(0xFF000000));
         }
         if (controller.status == BlinkIdScannerStatus.uninitialized ||
+            controller.status == BlinkIdScannerStatus.loadingSdk ||
             controller.status == BlinkIdScannerStatus.initializing) {
           return placeholderBuilder?.call(context) ??
               const ColoredBox(color: Color(0xFF000000));
