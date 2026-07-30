@@ -1,45 +1,136 @@
-group 'com.microblink.blinkid.flutter'
-version '1.0'
+group = "com.microblink.blinkid_flutter"
+version = "1.0"
 
 buildscript {
     repositories {
         google()
-        jcenter()
+        mavenCentral()
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.5.0'
+        classpath("com.android.tools.build:gradle:9.1.0")
     }
 }
-
-rootProject.allprojects {
+allprojects {
     repositories {
         google()
-        jcenter()
-        maven { url 'https://maven.microblink.com' }
+        mavenCentral()
     }
 }
 
-apply plugin: 'com.android.library'
+apply plugin: "com.android.library"
+apply plugin: 'kotlin-parcelize'
+
+// Minimum Compose runtime versions required by blinkid-ux for camera scanning (performScan).
+// These are enforced as lower bounds only — client apps may use newer Compose versions.
+ext {
+    blinkidUxVersion = "8000.0.0"
+    blinkidUxMinComposeUi = "1.11.2"
+    blinkidUxMinMaterial3 = "1.4.0"
+    blinkidUxMinActivityCompose = "1.13.0"
+    blinkidUxMinLifecycleViewmodelCompose = "2.10.0"
+}
 
 android {
-    
-    if (project.android.hasProperty("namespace")) {
-        namespace 'com.microblink.blinkid.flutter'
+    namespace = "com.microblink.blinkid.flutter"
+
+    compileSdk = 36
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
-    compileSdkVersion 34
+
+    sourceSets {
+        main.java.srcDirs += "src/main/kotlin"
+        test.java.srcDirs += "src/test/kotlin"
+    }
 
     defaultConfig {
-        minSdkVersion 21
+        minSdk = 24
+        targetSdk = 36
     }
-    lintOptions {
-        disable 'InvalidPackage'
+
+    testOptions {
+        unitTests.all {
+            useJUnitPlatform()
+
+            testLogging {
+               events "passed", "skipped", "failed", "standardOut", "standardError"
+               outputs.upToDateWhen {false}
+               showStandardStreams = true
+            }
+        }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
 dependencies {
-    implementation('com.microblink:blinkid:6.12.0@aar') {
-        transitive = true
-    }
-}
+    testImplementation("org.jetbrains.kotlin:kotlin-test")
+    testImplementation("org.mockito:mockito-core:5.1.1")
 
+    // blinkid-ux ships Compose-based scanning UI as a precompiled AAR. Client apps do not need
+    // the Compose compiler, buildFeatures.compose, or a Compose BOM. Compose runtime libraries
+    // are pulled transitively; constraints below declare minimum versions for performScan.
+    constraints {
+        def constraintReason =
+            "Minimum Compose runtime for blinkid-ux:${blinkidUxVersion} camera scanning; newer versions are allowed"
+
+        implementation("androidx.compose.ui:ui") {
+            version { require(blinkidUxMinComposeUi) }
+            because(constraintReason)
+        }
+        implementation("androidx.compose.ui:ui-graphics") {
+            version { require(blinkidUxMinComposeUi) }
+            because(constraintReason)
+        }
+        implementation("androidx.compose.runtime:runtime") {
+            version { require(blinkidUxMinComposeUi) }
+            because(constraintReason)
+        }
+        implementation("androidx.compose.foundation:foundation") {
+            version { require(blinkidUxMinComposeUi) }
+            because(constraintReason)
+        }
+        implementation("androidx.compose.material3:material3") {
+            version { require(blinkidUxMinMaterial3) }
+            because(constraintReason)
+        }
+        implementation("androidx.activity:activity-compose") {
+            version { require(blinkidUxMinActivityCompose) }
+            because(constraintReason)
+        }
+        implementation("androidx.lifecycle:lifecycle-viewmodel-compose") {
+            version { require(blinkidUxMinLifecycleViewmodelCompose) }
+            because(constraintReason)
+        }
+
+        // Security: force patched versions of vulnerable transitive deps
+        implementation("org.bouncycastle:bcprov-jdk18on") {
+            version { require("1.80.2") }
+            because("CVE-2025-14813 (critical) fixed in 1.80.2")
+        }
+        implementation("org.bitbucket.b_c:jose4j") {
+            version { require("0.9.6") }
+            because("CVE-2024-29371 (high) fixed in 0.9.6")
+        }
+        implementation("org.jdom:jdom2") {
+            version { require("2.0.6.1") }
+            because("CVE-2021-33813 (high) fixed in 2.0.6.1")
+        }
+    }
+
+    implementation("com.microblink:blinkid-ux:${blinkidUxVersion}")
+
+    // CameraX for BlinkIdScannerView custom camera surface
+    def cameraXVersion = "1.4.1"
+    implementation("androidx.camera:camera-core:${cameraXVersion}")
+    implementation("androidx.camera:camera-camera2:${cameraXVersion}")
+    implementation("androidx.camera:camera-lifecycle:${cameraXVersion}")
+    implementation("androidx.camera:camera-view:${cameraXVersion}")
+}
