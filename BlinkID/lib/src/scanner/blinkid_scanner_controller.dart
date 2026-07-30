@@ -41,7 +41,7 @@ class BlinkIdScannerController extends ChangeNotifier {
       'sdkSettings': sdkSettings.toJson(),
       'sessionSettings': sessionSettings.toJson(),
     };
-    // Channel IDs are assigned after platform view creation via _onPlatformViewCreated.
+    // Channels assigned after platform view creation via onPlatformViewCreated.
   }
 
   void onPlatformViewCreated(int id) {
@@ -60,7 +60,10 @@ class BlinkIdScannerController extends ChangeNotifier {
           _guidanceController.add(BlinkIdGuidance.fromString(event));
         }
       },
-      onError: (e) => _guidanceController.addError(e),
+      onError: (Object e) {
+        _guidanceController.addError(e);
+        _failScan('Camera stream error: $e');
+      },
     );
 
     _setStatus(BlinkIdScannerStatus.ready);
@@ -70,14 +73,31 @@ class BlinkIdScannerController extends ChangeNotifier {
     if (_status != BlinkIdScannerStatus.ready) {
       throw StateError('Controller not ready (status: $_status)');
     }
+    final channel = _methodChannel;
+    if (channel == null) {
+      throw StateError('Platform view not yet created');
+    }
+
     _setStatus(BlinkIdScannerStatus.scanning);
     _scanCompleter = Completer<BlinkIdScanningResult>();
-    await _methodChannel?.invokeMethod('startScan');
+
+    try {
+      await channel.invokeMethod<void>('startScan');
+    } on PlatformException catch (e) {
+      _failScan(e.message ?? 'startScan failed');
+      rethrow;
+    }
+
     return _scanCompleter!.future;
   }
 
   void cancel() {
-    _methodChannel?.invokeMethod('cancelScan');
+    _methodChannel?.invokeMethod<void>('cancelScan');
+    if (_status == BlinkIdScannerStatus.scanning) {
+      _setStatus(BlinkIdScannerStatus.ready);
+      _scanCompleter?.completeError(const _CancelException());
+      _scanCompleter = null;
+    }
   }
 
   Future<dynamic> _handleMethodCall(MethodCall call) async {
@@ -87,14 +107,21 @@ class BlinkIdScannerController extends ChangeNotifier {
         final result = BlinkIdScanningResult(json);
         _setStatus(BlinkIdScannerStatus.done);
         _scanCompleter?.complete(result);
+        _scanCompleter = null;
       case 'onScanError':
-        final msg = call.arguments as String? ?? 'Scan error';
-        _setStatus(BlinkIdScannerStatus.error);
-        _scanCompleter?.completeError(Exception(msg));
+        _failScan(call.arguments as String? ?? 'Scan error');
       case 'onScanCanceled':
         _setStatus(BlinkIdScannerStatus.ready);
         _scanCompleter?.completeError(const _CancelException());
+        _scanCompleter = null;
     }
+  }
+
+  void _failScan(String message) {
+    _setStatus(BlinkIdScannerStatus.error);
+    final completer = _scanCompleter;
+    _scanCompleter = null;
+    completer?.completeError(Exception(message));
   }
 
   void _setStatus(BlinkIdScannerStatus s) {
@@ -106,7 +133,10 @@ class BlinkIdScannerController extends ChangeNotifier {
   void dispose() {
     _guidanceSub?.cancel();
     _guidanceController.close();
-    _methodChannel?.invokeMethod('dispose');
+    // Best-effort cleanup; ignore errors during dispose.
+    _methodChannel?.invokeMethod<void>('dispose').ignore();
+    // Fail any pending scan so callers don't leak.
+    _failScan('Controller disposed');
     super.dispose();
   }
 }

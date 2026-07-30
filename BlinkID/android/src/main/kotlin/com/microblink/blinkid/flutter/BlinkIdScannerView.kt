@@ -120,7 +120,14 @@ class BlinkIdScannerView(
     private fun setupCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         cameraProviderFuture.addListener({
-            val cameraProvider = cameraProviderFuture.get()
+            val cameraProvider = try {
+                cameraProviderFuture.get()
+            } catch (e: Exception) {
+                scope.launch {
+                    methodChannel.invokeMethod("onScanError", "Camera unavailable: ${e.message}")
+                }
+                return@addListener
+            }
 
             val preview = Preview.Builder().build().also {
                 it.setSurfaceProvider(previewView.surfaceProvider)
@@ -146,7 +153,7 @@ class BlinkIdScannerView(
                     when (frameResult) {
                         is BlinkIdProcessResult.Detection -> {
                             val guidance = frameResult.detectionStatus?.toGuidanceString() ?: "searching"
-                            CoroutineScope(Dispatchers.Main).launch {
+                            scope.launch {
                                 guidanceEventSink?.success(guidance)
                             }
                         }

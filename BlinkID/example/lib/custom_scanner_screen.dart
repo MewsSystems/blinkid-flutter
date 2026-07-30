@@ -28,8 +28,16 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
         .then((result) {
           if (mounted) Navigator.pop(context, result);
         })
-        .catchError((e) {
-          if (mounted) Navigator.pop(context, null);
+        .catchError((Object e) {
+          if (!mounted) return;
+          if (e is! Exception || e.toString() == 'Scan canceled') {
+            Navigator.pop(context, null);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Scan error: $e')),
+            );
+            Navigator.pop(context, null);
+          }
         });
   }
 
