@@ -91,13 +91,24 @@ object BlinkIdDeserializationUtils {
 
     private fun deserializeScanningSettings(scanningSettingsMap: Map<String, Any>?): ScanningSettings {
         if (scanningSettingsMap == null) return ScanningSettings()
+        val documentCaptureModule = optionalDocumentCaptureModuleSettings(
+            scanningSettingsMap["documentCaptureModule"],
+        )
+        val barcodeModule = optionalBarcodeModuleSettings(scanningSettingsMap["barcodeModule"])
+        val mrzModule = optionalMrzModuleSettings(scanningSettingsMap["mrzModule"])
+        val vizModule = optionalVizModuleSettings(scanningSettingsMap["vizModule"])
+        // All modules null means "use SDK defaults" — ScanningSettings() enables modules by default.
+        if (documentCaptureModule == null && barcodeModule == null && mrzModule == null && vizModule == null) {
+            return ScanningSettings(
+                maxAllowedMismatchesPerField = (scanningSettingsMap["maxAllowedMismatchesPerField"] as? Int)?.toUInt()
+                    ?: 0u,
+            )
+        }
         return ScanningSettings(
-            documentCaptureModule = optionalDocumentCaptureModuleSettings(
-                scanningSettingsMap["documentCaptureModule"],
-            ),
-            barcodeModule = optionalBarcodeModuleSettings(scanningSettingsMap["barcodeModule"]),
-            mrzModule = optionalMrzModuleSettings(scanningSettingsMap["mrzModule"]),
-            vizModule = optionalVizModuleSettings(scanningSettingsMap["vizModule"]),
+            documentCaptureModule = documentCaptureModule,
+            barcodeModule = barcodeModule,
+            mrzModule = mrzModule,
+            vizModule = vizModule,
             maxAllowedMismatchesPerField = (scanningSettingsMap["maxAllowedMismatchesPerField"] as? Int)?.toUInt()
                 ?: 0u,
         )

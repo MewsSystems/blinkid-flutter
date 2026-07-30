@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'custom_scanner_screen.dart';
 
 // TODO: Replace with a valid BlinkID license key from https://developer.microblink.com
-const _licenseKeyAndroid = 'YOUR_ANDROID_LICENSE_KEY';
-const _licenseKeyIos = 'YOUR_IOS_LICENSE_KEY';
+const _licenseKeyAndroid =
+    '***REMOVED***';
+const _licenseKeyIos =
+    '***REMOVED***';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -37,7 +39,8 @@ class _HomeScreenState extends State<HomeScreen> {
         blinkIdSessionSettings: _sessionSettings,
       );
       setState(() { _result = _formatResult(result); });
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('BlinkID scan error: $e\n$st');
       setState(() { _result = 'Error: $e'; });
     } finally {
       setState(() { _scanning = false; });

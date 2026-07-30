@@ -1,29 +1,50 @@
+// Guidance states emitted by [BlinkIdScannerController.guidanceStream].
+//
+// Android-verified DetectionStatus mapping (from compiled SDK):
+//   CameraTooFar              → tooFar
+//   CameraTooClose            → tooClose
+//   DocumentTooCloseToCameraEdge → tooCloseToEdge
+//   CameraAngleTooSteep       → tilted
+//   DocumentPartiallyVisible  → notFullyVisible
+//   Success / Failed          → searching
+//
+// flipDocument is NOT a DetectionStatus — it is emitted by the controller
+// when ScanningStatus.SideScanned fires (front side complete). The guidance
+// stream goes silent during the flip phase; use BlinkIdScanPhase instead.
+//
+// blur / glare / holdStill / lowLight / tooMuchLight are reserved for iOS;
+// Android's DetectionStatus does not include these cases.
 sealed class BlinkIdGuidance {
   const BlinkIdGuidance._();
 
+  // --- Android + iOS ---
   const factory BlinkIdGuidance.searching() = BlinkIdGuidanceSearching;
   const factory BlinkIdGuidance.tooFar() = BlinkIdGuidanceTooFar;
   const factory BlinkIdGuidance.tooClose() = BlinkIdGuidanceTooClose;
+  const factory BlinkIdGuidance.tooCloseToEdge() = BlinkIdGuidanceTooCloseToEdge;
   const factory BlinkIdGuidance.tilted() = BlinkIdGuidanceTilted;
-  const factory BlinkIdGuidance.holdStill() = BlinkIdGuidanceHoldStill;
+  const factory BlinkIdGuidance.notFullyVisible() = BlinkIdGuidanceNotFullyVisible;
+
+  // --- Phase-driven (not emitted via stream; use BlinkIdScanPhase.flip) ---
   const factory BlinkIdGuidance.flipDocument() = BlinkIdGuidanceFlipDocument;
+
+  // --- iOS only (unconfirmed; pending iOS SDK verification) ---
+  const factory BlinkIdGuidance.holdStill() = BlinkIdGuidanceHoldStill;
   const factory BlinkIdGuidance.blur() = BlinkIdGuidanceBlur;
   const factory BlinkIdGuidance.glare() = BlinkIdGuidanceGlare;
-  const factory BlinkIdGuidance.notFullyVisible() = BlinkIdGuidanceNotFullyVisible;
-  const factory BlinkIdGuidance.tooCloseToEdge() = BlinkIdGuidanceTooCloseToEdge;
   const factory BlinkIdGuidance.lowLight() = BlinkIdGuidanceLowLight;
   const factory BlinkIdGuidance.tooMuchLight() = BlinkIdGuidanceTooMuchLight;
 
   static BlinkIdGuidance fromString(String value) => switch (value) {
     'tooFar' => const BlinkIdGuidance.tooFar(),
     'tooClose' => const BlinkIdGuidance.tooClose(),
+    'tooCloseToEdge' => const BlinkIdGuidance.tooCloseToEdge(),
     'tilted' => const BlinkIdGuidance.tilted(),
-    'holdStill' => const BlinkIdGuidance.holdStill(),
+    'notFullyVisible' => const BlinkIdGuidance.notFullyVisible(),
     'flipDocument' => const BlinkIdGuidance.flipDocument(),
+    'holdStill' => const BlinkIdGuidance.holdStill(),
     'blur' => const BlinkIdGuidance.blur(),
     'glare' => const BlinkIdGuidance.glare(),
-    'notFullyVisible' => const BlinkIdGuidance.notFullyVisible(),
-    'tooCloseToEdge' => const BlinkIdGuidance.tooCloseToEdge(),
     'lowLight' => const BlinkIdGuidance.lowLight(),
     'tooMuchLight' => const BlinkIdGuidance.tooMuchLight(),
     _ => const BlinkIdGuidance.searching(),
@@ -42,16 +63,24 @@ final class BlinkIdGuidanceTooClose extends BlinkIdGuidance {
   const BlinkIdGuidanceTooClose() : super._();
 }
 
+final class BlinkIdGuidanceTooCloseToEdge extends BlinkIdGuidance {
+  const BlinkIdGuidanceTooCloseToEdge() : super._();
+}
+
 final class BlinkIdGuidanceTilted extends BlinkIdGuidance {
   const BlinkIdGuidanceTilted() : super._();
 }
 
-final class BlinkIdGuidanceHoldStill extends BlinkIdGuidance {
-  const BlinkIdGuidanceHoldStill() : super._();
+final class BlinkIdGuidanceNotFullyVisible extends BlinkIdGuidance {
+  const BlinkIdGuidanceNotFullyVisible() : super._();
 }
 
 final class BlinkIdGuidanceFlipDocument extends BlinkIdGuidance {
   const BlinkIdGuidanceFlipDocument() : super._();
+}
+
+final class BlinkIdGuidanceHoldStill extends BlinkIdGuidance {
+  const BlinkIdGuidanceHoldStill() : super._();
 }
 
 final class BlinkIdGuidanceBlur extends BlinkIdGuidance {
@@ -60,14 +89,6 @@ final class BlinkIdGuidanceBlur extends BlinkIdGuidance {
 
 final class BlinkIdGuidanceGlare extends BlinkIdGuidance {
   const BlinkIdGuidanceGlare() : super._();
-}
-
-final class BlinkIdGuidanceNotFullyVisible extends BlinkIdGuidance {
-  const BlinkIdGuidanceNotFullyVisible() : super._();
-}
-
-final class BlinkIdGuidanceTooCloseToEdge extends BlinkIdGuidance {
-  const BlinkIdGuidanceTooCloseToEdge() : super._();
 }
 
 final class BlinkIdGuidanceLowLight extends BlinkIdGuidance {

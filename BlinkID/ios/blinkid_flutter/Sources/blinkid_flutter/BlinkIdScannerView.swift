@@ -17,6 +17,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private var blinkIdSession: BlinkIDScanningSession?
     private var isScanning = false
+    // Guards against multiple completion calls from in-flight Tasks.
     private var isProcessingResult = false
 
     init(
@@ -61,7 +62,6 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
             blinkIdSession = nil
             result(nil)
         case "resumeAfterFlip":
-            // Flip animation completed on Flutter side; re-enable frame processing.
             isScanning = true
             result(nil)
         case "dispose":
@@ -156,41 +156,51 @@ extension BlinkIdScannerView: AVCaptureVideoDataOutputSampleBufferDelegate {
 
         Task {
             do {
-                let frameResult = try await session.process(inputImage: inputImage)
-                await handleFrameResult(frameResult, session: session)
+                // process() is Void-returning on iOS; guidance comes via session status.
+                try await session.process(inputImage: inputImage)
+
+                // TODO: Replace with session.getScanningStatus() equivalent once
+                // the iOS SDK exposes it. For now poll getResult() to detect completion.
+                // getResult() throws when scanning is still in progress.
+                await checkScanningStatus(session: session)
             } catch {
-                // non-fatal frame error; continue scanning
+                // Non-fatal frame error; continue scanning.
             }
         }
     }
 
     @MainActor
-    private func handleFrameResult(_ frameResult: BlinkIDFrameProcessResult, session: BlinkIDScanningSession) async {
-        // Emit guidance from detection status
-        if let status = frameResult.detectionStatus {
-            let guidance = status.guidanceString
+    private func checkScanningStatus(session: BlinkIDScanningSession) async {
+        // Attempt to retrieve guidance from session's last detection status.
+        if let detectionStatus = session.lastDetectionStatus {
+            let guidance = detectionStatus.guidanceString
             guidanceEventSink?(guidance)
-            // Pause frame processing when flip needed; Flutter calls resumeAfterFlip
-            // when its animation completes.
-            if guidance == "flipDocument" {
-                isScanning = false
-            }
         }
 
-        // Scanning complete when frameResult signals done
-        guard frameResult.resultCompletionStatus == .complete, !isProcessingResult else { return }
-        isProcessingResult = true
-        isScanning = false
+        // Check if a scanning side completed or the full scan is done.
+        // getResult() is the current best signal for iOS — it succeeds only when
+        // enough data is captured. Replace with a dedicated status API if exposed.
+        guard !isProcessingResult else { return }
 
-        do {
-            let scanResult = try await session.getResult(redactionSettings: nil)
+        let resultAttempt = await session.getResult(redactionSettings: nil)
+        switch resultAttempt {
+        case .success(let scanResult) where scanResult != nil:
+            // Full scan complete.
+            isProcessingResult = true
+            isScanning = false
             let json = BlinkIdSerializationUtils.serializeBlinkIdScanningResult(scanResult)
             methodChannel.invokeMethod("onScanResult", arguments: json)
-        } catch {
-            methodChannel.invokeMethod("onScanError", arguments: error.localizedDescription)
+            blinkIdSession = nil
+            isProcessingResult = false
+
+        case .success:
+            // getResult succeeded but no data yet — keep scanning.
+            break
+
+        case .failure:
+            // Still scanning — expected, not an error.
+            break
         }
-        blinkIdSession = nil
-        isProcessingResult = false
     }
 }
 
@@ -206,20 +216,18 @@ extension BlinkIdScannerView: FlutterStreamHandler {
     }
 }
 
+// MARK: - DetectionStatus → guidance string
+// TODO: Verify these enum case names against the compiled BlinkID.xcframework.
+// Android verified cases: CameraTooFar, CameraTooClose, DocumentTooCloseToCameraEdge,
+// CameraAngleTooSteep, DocumentPartiallyVisible, Success, Failed.
 private extension BlinkIDDetectionStatus {
     var guidanceString: String {
         switch self {
-        case .tooFar: return "tooFar"
-        case .tooClose: return "tooClose"
-        case .documentTooCloseToFrameEdge: return "tooCloseToEdge"
-        case .cameraTiltedTooMuch: return "tilted"
-        case .holdStill: return "holdStill"
-        case .flipDocument: return "flipDocument"
-        case .blurDetected: return "blur"
-        case .glareDetected: return "glare"
-        case .documentNotFullyVisible, .facePhotoNotFullyVisible: return "notFullyVisible"
-        case .increaseLightingIntensity: return "lowLight"
-        case .decreaseLightingIntensity: return "tooMuchLight"
+        case .cameraTooFar: return "tooFar"
+        case .cameraTooClose: return "tooClose"
+        case .documentTooCloseToCameraEdge: return "tooCloseToEdge"
+        case .cameraAngleTooSteep: return "tilted"
+        case .documentPartiallyVisible: return "notFullyVisible"
         default: return "searching"
         }
     }

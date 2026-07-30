@@ -1,11 +1,10 @@
 plugins {
     id "com.android.application"
-    id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
 }
 
 android {
-    namespace "com.microblink.blinkid.flutter.example"
+    namespace "com.flutter.scanner.example"
     compileSdk flutter.compileSdkVersion
     ndkVersion flutter.ndkVersion
 
@@ -19,7 +18,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.microblink.blinkid.flutter.example"
+        applicationId "com.flutter.scanner.example"
         minSdk flutter.minSdkVersion
         targetSdk flutter.targetSdkVersion
         versionCode flutter.versionCode

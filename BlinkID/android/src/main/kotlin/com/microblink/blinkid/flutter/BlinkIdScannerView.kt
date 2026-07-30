@@ -13,9 +13,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import com.microblink.blinkid.core.BlinkIdSdk
+import com.microblink.blinkid.core.image.ImageRotation
 import com.microblink.blinkid.core.image.InputImage
-import com.microblink.blinkid.core.session.BlinkIdProcessResult
+import com.microblink.blinkid.core.result.ScanningStatus
 import com.microblink.blinkid.core.session.BlinkIdScanningSession
+import com.microblink.blinkid.core.session.DetectionStatus
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
@@ -25,6 +27,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.util.concurrent.Executors
 
 @SuppressLint("ViewConstructor")
@@ -36,7 +39,11 @@ class BlinkIdScannerView(
     private val sdkProvider: () -> BlinkIdSdk?,
 ) : PlatformView, LifecycleOwner {
 
-    private val previewView = PreviewView(context)
+    private val previewView = PreviewView(context).apply {
+        // TextureView composites into the Flutter render tree (TLHC-compatible).
+        // Default SurfaceView creates a separate window surface that renders above all Flutter widgets.
+        implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+    }
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val scope = CoroutineScope(Dispatchers.Main)
 
@@ -107,7 +114,7 @@ class BlinkIdScannerView(
             val sessionSettingsMap = creationParams["sessionSettings"] as? Map<*, *>
             @Suppress("UNCHECKED_CAST")
             val sessionResult = sdk.createScanningSession(
-                BlinkidDeserializationUtils.deserializeBlinkIdSessionSettings(
+                BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
                     sessionSettingsMap as? Map<String, Any>,
                     false,
                 )
@@ -149,25 +156,24 @@ class BlinkIdScannerView(
                 }
                 val session = scanningSession ?: run { imageProxy.close(); return@setAnalyzer }
 
-                val rotation = imageProxy.imageInfo.rotationDegrees
-                val inputImage = InputImage.createFromCameraXImageProxy(imageProxy, rotation)
-                val processResult = session.process(inputImage)
+                val imageRotation = when (imageProxy.imageInfo.rotationDegrees) {
+                    90 -> ImageRotation.Rotation90
+                    180 -> ImageRotation.Rotation180
+                    270 -> ImageRotation.Rotation270
+                    else -> ImageRotation.Rotation0
+                }
+                val inputImage = InputImage.createFromCameraXImageProxy(imageProxy, imageRotation)
+                val processResult = runBlocking { session.process(inputImage) }
 
-                if (processResult.isSuccess) {
-                    val frameResult = processResult.getOrNull()
-                    when (frameResult) {
-                        is BlinkIdProcessResult.Detection -> {
-                            val guidance = frameResult.detectionStatus?.toGuidanceString() ?: "searching"
-                            scope.launch {
-                                guidanceEventSink?.success(guidance)
-                                // Pause frame processing when flip is needed; Flutter side
-                                // calls resumeAfterFlip when its animation completes.
-                                if (guidance == "flipDocument") {
-                                    isScanning = false
-                                }
-                            }
-                        }
-                        is BlinkIdProcessResult.Complete -> {
+                if (processResult.isFailure) {
+                    android.util.Log.e("BlinkIdScannerView", "process() failed: ${processResult.exceptionOrNull()}")
+                } else if (processResult.isSuccess) {
+                    val frameResult = processResult.getOrNull()!!
+                    val detectionStatus = frameResult.inputImageAnalysisResult.documentDetectionStatus
+                    val scanningStatus = runBlocking { session.getScanningStatus() }
+
+                    when (scanningStatus) {
+                        ScanningStatus.DocumentScanned -> {
                             isScanning = false
                             scope.launch {
                                 val scanResult = session.getResult(null)
@@ -185,7 +191,15 @@ class BlinkIdScannerView(
                                 scanningSession = null
                             }
                         }
-                        else -> {}
+                        ScanningStatus.SideScanned -> {
+                            // First side done; pause until Flutter calls resumeAfterFlip.
+                            isScanning = false
+                            scope.launch { guidanceEventSink?.success("flipDocument") }
+                        }
+                        else -> {
+                            val guidance = detectionStatus.toGuidanceString()
+                            scope.launch { guidanceEventSink?.success(guidance) }
+                        }
                     }
                 }
                 imageProxy.close()
@@ -214,18 +228,11 @@ class BlinkIdScannerView(
     }
 }
 
-private fun Any.toGuidanceString(): String = when (toString()) {
-    "TOO_FAR", "TooFar" -> "tooFar"
-    "TOO_CLOSE", "TooClose" -> "tooClose"
-    "DOCUMENT_TOO_CLOSE_TO_FRAME_EDGE" -> "tooCloseToEdge"
-    "CAMERA_ANGLE_TOO_STEEP", "CameraAngleTooSteep" -> "tilted"
-    "HOLD_STILL", "HoldStill" -> "holdStill"
-    "FLIP_DOCUMENT", "FlipDocument" -> "flipDocument"
-    "BLUR_DETECTED", "BlurDetected" -> "blur"
-    "GLARE_DETECTED", "GlareDetected" -> "glare"
-    "DOCUMENT_NOT_FULLY_VISIBLE", "DocumentNotFullyVisible" -> "notFullyVisible"
-    "FACE_PHOTO_NOT_FULLY_VISIBLE", "FacePhotoNotFullyVisible" -> "notFullyVisible"
-    "LOW_LIGHTING", "LowLighting", "INCREASE_LIGHTING_INTENSITY" -> "lowLight"
-    "TOO_MUCH_LIGHTING", "TooMuchLighting", "DECREASE_LIGHTING_INTENSITY" -> "tooMuchLight"
-    else -> "searching"
+private fun DetectionStatus.toGuidanceString(): String = when (this) {
+    DetectionStatus.CameraTooFar -> "tooFar"
+    DetectionStatus.CameraTooClose -> "tooClose"
+    DetectionStatus.DocumentTooCloseToCameraEdge -> "tooCloseToEdge"
+    DetectionStatus.CameraAngleTooSteep -> "tilted"
+    DetectionStatus.DocumentPartiallyVisible -> "notFullyVisible"
+    DetectionStatus.Success, DetectionStatus.Failed -> "searching"
 }

@@ -17,77 +17,110 @@ class CustomScannerScreen extends StatefulWidget {
 
 class _CustomScannerScreenState extends State<CustomScannerScreen> {
   late final BlinkIdScannerController _controller;
+  bool _scanStarted = false;
 
   @override
   void initState() {
     super.initState();
     _controller = BlinkIdScannerController();
-    _controller
-        .initialize(widget.sdkSettings, widget.sessionSettings)
-        .then((_) => _controller.scan())
-        .then((result) {
-          if (mounted) Navigator.pop(context, result);
-        })
-        .catchError((Object e) {
+    _controller.addListener(_onControllerChanged);
+    _controller.initialize(widget.sdkSettings, widget.sessionSettings)
+        .catchError((Object e, StackTrace st) {
+          debugPrint('BlinkID custom scanner error: $e\n$st');
           if (!mounted) return;
-          if (e.toString() != 'Scan canceled') {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Scan error: $e')),
-            );
-          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Scan error: $e')),
+          );
           Navigator.pop(context, null);
         });
   }
 
+  void _onControllerChanged() {
+    if (_scanStarted || _controller.status != BlinkIdScannerStatus.ready) return;
+    _scanStarted = true;
+    _controller.scan().then((result) {
+      if (mounted) Navigator.pop(context, result);
+    }).catchError((Object e, StackTrace st) {
+      debugPrint('BlinkID custom scanner error: $e\n$st');
+      if (!mounted) return;
+      final msg = e.toString();
+      if (msg != 'Scan canceled' && msg != 'Exception: Controller disposed') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Scan error: $e')),
+        );
+      }
+      Navigator.pop(context, null);
+    });
+  }
+
   @override
   void dispose() {
+    _controller.removeListener(_onControllerChanged);
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    body: Stack(
-      fit: StackFit.expand,
-      children: [
-        BlinkIdScannerView(
-          controller: _controller,
-          placeholderBuilder: (_) => const ColoredBox(
+    body: ListenableBuilder(
+      listenable: _controller,
+      builder: (context, _) {
+        final status = _controller.status;
+
+        // Show loading until SDK is ready to accept a PlatformView.
+        if (status == BlinkIdScannerStatus.uninitialized ||
+            status == BlinkIdScannerStatus.loadingSdk) {
+          return const ColoredBox(
             color: Color(0xFF000000),
-            child: Center(
-              child: CircularProgressIndicator(color: Color(0xFFFFFFFF)),
-            ),
-          ),
-          errorBuilder: (_, error) => ColoredBox(
+            child: Center(child: CircularProgressIndicator(color: Color(0xFFFFFFFF))),
+          );
+        }
+
+        // Show error state.
+        if (status == BlinkIdScannerStatus.error) {
+          final err = _controller.lastError;
+          debugPrint('BlinkID camera error: $err');
+          return ColoredBox(
             color: const Color(0xFF000000),
             child: Center(
               child: Text(
-                'Camera error:\n$error',
+                'Camera error:\n$err',
                 style: const TextStyle(color: Color(0xFFFFFFFF)),
                 textAlign: TextAlign.center,
               ),
             ),
-          ),
-        ),
-        ListenableBuilder(
-          listenable: _controller,
-          builder: (context, _) => switch (_controller.phase) {
-            BlinkIdScanPhase.flip => _FlipOverlay(controller: _controller),
-            _ => _GuidanceOverlay(controller: _controller),
-          },
-        ),
-        Positioned(
-          top: MediaQuery.of(context).padding.top + 8,
-          left: 8,
-          child: IconButton(
-            icon: const Icon(Icons.close, color: Colors.white),
-            onPressed: () {
-              _controller.cancel();
-              Navigator.pop(context, null);
-            },
-          ),
-        ),
-      ],
+          );
+        }
+
+        // From initializing onwards: mount PlatformView. Overlay spinner until ready.
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            BlinkIdScannerView(controller: _controller),
+            if (status == BlinkIdScannerStatus.initializing)
+              const ColoredBox(
+                color: Color(0xFF000000),
+                child: Center(child: CircularProgressIndicator(color: Color(0xFFFFFFFF))),
+              ),
+            if (status != BlinkIdScannerStatus.initializing)
+              switch (_controller.phase) {
+                BlinkIdScanPhase.flip => _FlipOverlay(controller: _controller),
+                _ => _GuidanceOverlay(controller: _controller),
+              },
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8,
+              left: 8,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () {
+                  _controller.cancel();
+                  Navigator.pop(context, null);
+                },
+              ),
+            ),
+          ],
+        );
+      },
     ),
   );
 }
@@ -155,9 +188,17 @@ class _FlipOverlayState extends State<_FlipOverlay>
 }
 
 // Shown during front/back scanning phases.
-class _GuidanceOverlay extends StatelessWidget {
+class _GuidanceOverlay extends StatefulWidget {
   const _GuidanceOverlay({required this.controller});
   final BlinkIdScannerController controller;
+
+  @override
+  State<_GuidanceOverlay> createState() => _GuidanceOverlayState();
+}
+
+class _GuidanceOverlayState extends State<_GuidanceOverlay> {
+  int _switcherKey = 0;
+  String _lastText = '';
 
   @override
   Widget build(BuildContext context) => Align(
@@ -167,15 +208,18 @@ class _GuidanceOverlay extends StatelessWidget {
         bottom: MediaQuery.of(context).padding.bottom + 48,
       ),
       child: StreamBuilder<BlinkIdGuidance>(
-        stream: controller.guidanceStream,
+        stream: widget.controller.guidanceStream,
         builder: (context, snapshot) {
-          final text = _guidanceText(snapshot.data, controller.phase);
+          final text = _guidanceText(snapshot.data, widget.controller.phase);
+          if (text != _lastText) {
+            _lastText = text;
+            _switcherKey++;
+          }
           return AnimatedSwitcher(
             duration: const Duration(milliseconds: 200),
             child: Container(
-              key: ValueKey(text),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              key: ValueKey(_switcherKey),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.black54,
                 borderRadius: BorderRadius.circular(12),
