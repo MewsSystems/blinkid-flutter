@@ -60,6 +60,10 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
             isScanning = false
             blinkIdSession = nil
             result(nil)
+        case "resumeAfterFlip":
+            // Flip animation completed on Flutter side; re-enable frame processing.
+            isScanning = true
+            result(nil)
         case "dispose":
             teardown()
             result(nil)
@@ -164,7 +168,13 @@ extension BlinkIdScannerView: AVCaptureVideoDataOutputSampleBufferDelegate {
     private func handleFrameResult(_ frameResult: BlinkIDFrameProcessResult, session: BlinkIDScanningSession) async {
         // Emit guidance from detection status
         if let status = frameResult.detectionStatus {
-            guidanceEventSink?(status.guidanceString)
+            let guidance = status.guidanceString
+            guidanceEventSink?(guidance)
+            // Pause frame processing when flip needed; Flutter calls resumeAfterFlip
+            // when its animation completes.
+            if guidance == "flipDocument" {
+                isScanning = false
+            }
         }
 
         // Scanning complete when frameResult signals done

@@ -16,12 +16,27 @@ enum BlinkIdScannerStatus {
   error,
 }
 
+enum BlinkIdScanPhase {
+  /// Scanning the front side.
+  front,
+
+  /// Front side complete. Caller should show flip animation and call
+  /// [BlinkIdScannerController.onFlipComplete] when animation finishes.
+  /// Guidance events are suppressed during this phase.
+  flip,
+
+  /// Flip animation done; scanning the back side.
+  back,
+}
+
 class BlinkIdScannerController extends ChangeNotifier {
   BlinkIdScannerStatus _status = BlinkIdScannerStatus.uninitialized;
   BlinkIdScannerStatus get status => _status;
 
+  BlinkIdScanPhase _phase = BlinkIdScanPhase.front;
+  BlinkIdScanPhase get phase => _phase;
+
   Object? _lastError;
-  /// Last error when status is [BlinkIdScannerStatus.error].
   Object? get lastError => _lastError;
 
   final _guidanceController = StreamController<BlinkIdGuidance>.broadcast();
@@ -45,7 +60,6 @@ class BlinkIdScannerController extends ChangeNotifier {
       'sdkSettings': sdkSettings.toJson(),
       'sessionSettings': sessionSettings.toJson(),
     };
-    // Channels assigned after platform view creation via onPlatformViewCreated.
   }
 
   void onPlatformViewCreated(int id) {
@@ -59,11 +73,7 @@ class BlinkIdScannerController extends ChangeNotifier {
     _methodChannel!.setMethodCallHandler(_handleMethodCall);
 
     _guidanceSub = _eventChannel!.receiveBroadcastStream().listen(
-      (event) {
-        if (event is String) {
-          _guidanceController.add(BlinkIdGuidance.fromString(event));
-        }
-      },
+      _onGuidanceEvent,
       onError: (Object e) {
         _guidanceController.addError(e);
         _failScan('Camera stream error: $e');
@@ -71,6 +81,36 @@ class BlinkIdScannerController extends ChangeNotifier {
     );
 
     _setStatus(BlinkIdScannerStatus.ready);
+  }
+
+  void _onGuidanceEvent(dynamic event) {
+    if (event is! String) return;
+    final guidance = BlinkIdGuidance.fromString(event);
+
+    if (guidance is BlinkIdGuidanceFlipDocument) {
+      if (_phase == BlinkIdScanPhase.front) {
+        // Latch into flip phase — suppress further guidance until onFlipComplete().
+        _phase = BlinkIdScanPhase.flip;
+        notifyListeners();
+      }
+      // Don't emit flipDocument to guidanceStream; caller uses phase instead.
+      return;
+    }
+
+    // Suppress all guidance during flip phase — analyzer should ideally be
+    // paused natively, but filter here as a safety net.
+    if (_phase == BlinkIdScanPhase.flip) return;
+
+    _guidanceController.add(guidance);
+  }
+
+  /// Call this after your flip animation completes to resume back-side scanning.
+  void onFlipComplete() {
+    if (_phase != BlinkIdScanPhase.flip) return;
+    _phase = BlinkIdScanPhase.back;
+    notifyListeners();
+    // Resume the native analyzer.
+    _methodChannel?.invokeMethod<void>('resumeAfterFlip').ignore();
   }
 
   Future<BlinkIdScanningResult> scan() async {
@@ -82,6 +122,7 @@ class BlinkIdScannerController extends ChangeNotifier {
       throw StateError('Platform view not yet created');
     }
 
+    _phase = BlinkIdScanPhase.front;
     _setStatus(BlinkIdScannerStatus.scanning);
     _scanCompleter = Completer<BlinkIdScanningResult>();
 
@@ -139,9 +180,7 @@ class BlinkIdScannerController extends ChangeNotifier {
   void dispose() {
     _guidanceSub?.cancel();
     _guidanceController.close();
-    // Best-effort cleanup; ignore errors during dispose.
     _methodChannel?.invokeMethod<void>('dispose').ignore();
-    // Fail any pending scan so callers don't leak.
     _failScan('Controller disposed');
     super.dispose();
   }

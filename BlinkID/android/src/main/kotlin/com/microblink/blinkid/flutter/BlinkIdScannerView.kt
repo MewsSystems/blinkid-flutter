@@ -83,6 +83,11 @@ class BlinkIdScannerView(
                 scanningSession = null
                 result.success(null)
             }
+            "resumeAfterFlip" -> {
+                // Flip animation completed on Flutter side; re-enable frame processing.
+                isScanning = true
+                result.success(null)
+            }
             "dispose" -> {
                 dispose()
                 result.success(null)
@@ -155,6 +160,11 @@ class BlinkIdScannerView(
                             val guidance = frameResult.detectionStatus?.toGuidanceString() ?: "searching"
                             scope.launch {
                                 guidanceEventSink?.success(guidance)
+                                // Pause frame processing when flip is needed; Flutter side
+                                // calls resumeAfterFlip when its animation completes.
+                                if (guidance == "flipDocument") {
+                                    isScanning = false
+                                }
                             }
                         }
                         is BlinkIdProcessResult.Complete -> {

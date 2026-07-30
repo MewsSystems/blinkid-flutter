@@ -30,14 +30,12 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
         })
         .catchError((Object e) {
           if (!mounted) return;
-          if (e is! Exception || e.toString() == 'Scan canceled') {
-            Navigator.pop(context, null);
-          } else {
+          if (e.toString() != 'Scan canceled') {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Scan error: $e')),
             );
-            Navigator.pop(context, null);
           }
+          Navigator.pop(context, null);
         });
   }
 
@@ -53,25 +51,31 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
       fit: StackFit.expand,
       children: [
         BlinkIdScannerView(
-              controller: _controller,
-              placeholderBuilder: (_) => const ColoredBox(
-                color: Color(0xFF000000),
-                child: Center(
-                  child: CircularProgressIndicator(color: Color(0xFFFFFFFF)),
-                ),
-              ),
-              errorBuilder: (_, error) => ColoredBox(
-                color: const Color(0xFF000000),
-                child: Center(
-                  child: Text(
-                    'Camera error:\n$error',
-                    style: const TextStyle(color: Color(0xFFFFFFFF)),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
+          controller: _controller,
+          placeholderBuilder: (_) => const ColoredBox(
+            color: Color(0xFF000000),
+            child: Center(
+              child: CircularProgressIndicator(color: Color(0xFFFFFFFF)),
+            ),
+          ),
+          errorBuilder: (_, error) => ColoredBox(
+            color: const Color(0xFF000000),
+            child: Center(
+              child: Text(
+                'Camera error:\n$error',
+                style: const TextStyle(color: Color(0xFFFFFFFF)),
+                textAlign: TextAlign.center,
               ),
             ),
-        _GuidanceOverlay(controller: _controller),
+          ),
+        ),
+        ListenableBuilder(
+          listenable: _controller,
+          builder: (context, _) => switch (_controller.phase) {
+            BlinkIdScanPhase.flip => _FlipOverlay(controller: _controller),
+            _ => _GuidanceOverlay(controller: _controller),
+          },
+        ),
         Positioned(
           top: MediaQuery.of(context).padding.top + 8,
           left: 8,
@@ -88,9 +92,71 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
   );
 }
 
+// Shown during flip phase — persistent, blocks other guidance.
+class _FlipOverlay extends StatefulWidget {
+  const _FlipOverlay({required this.controller});
+  final BlinkIdScannerController controller;
+
+  @override
+  State<_FlipOverlay> createState() => _FlipOverlayState();
+}
+
+class _FlipOverlayState extends State<_FlipOverlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _anim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _anim.forward().then((_) {
+      // Animation done → tell controller to resume back-side scanning.
+      widget.controller.onFlipComplete();
+    });
+  }
+
+  @override
+  void dispose() {
+    _anim.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _anim,
+    builder: (context, _) => Container(
+      color: Colors.black54,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.rotationY(_anim.value * 3.14159),
+              child: const Icon(Icons.credit_card, color: Colors.white, size: 80),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Flip to the back side',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+// Shown during front/back scanning phases.
 class _GuidanceOverlay extends StatelessWidget {
   const _GuidanceOverlay({required this.controller});
-
   final BlinkIdScannerController controller;
 
   @override
@@ -103,12 +169,13 @@ class _GuidanceOverlay extends StatelessWidget {
       child: StreamBuilder<BlinkIdGuidance>(
         stream: controller.guidanceStream,
         builder: (context, snapshot) {
-          final text = _guidanceText(snapshot.data);
+          final text = _guidanceText(snapshot.data, controller.phase);
           return AnimatedSwitcher(
             duration: const Duration(milliseconds: 200),
             child: Container(
               key: ValueKey(text),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.black54,
                 borderRadius: BorderRadius.circular(12),
@@ -125,18 +192,24 @@ class _GuidanceOverlay extends StatelessWidget {
     ),
   );
 
-  String _guidanceText(BlinkIdGuidance? guidance) => switch (guidance) {
-    null || BlinkIdGuidanceSearching() => 'Point camera at your ID',
-    BlinkIdGuidanceTooFar() => 'Move closer',
-    BlinkIdGuidanceTooClose() => 'Move further away',
-    BlinkIdGuidanceTooCloseToEdge() => 'Move the document from the edge',
-    BlinkIdGuidanceTilted() => 'Keep document parallel to phone',
-    BlinkIdGuidanceHoldStill() => 'Hold still…',
-    BlinkIdGuidanceFlipDocument() => 'Flip to the back side',
-    BlinkIdGuidanceBlur() => 'Keep document and phone still',
-    BlinkIdGuidanceGlare() => 'Tilt or move document to remove reflection',
-    BlinkIdGuidanceNotFullyVisible() => 'Keep the document fully visible',
-    BlinkIdGuidanceLowLight() => 'Move to a brighter spot',
-    BlinkIdGuidanceTooMuchLight() => 'Move to a spot with less lighting',
-  };
+  String _guidanceText(BlinkIdGuidance? guidance, BlinkIdScanPhase phase) {
+    final prefix = phase == BlinkIdScanPhase.back ? 'Back side: ' : '';
+    return prefix + switch (guidance) {
+      null || BlinkIdGuidanceSearching() =>
+        phase == BlinkIdScanPhase.back
+          ? 'Scan the back side of a document'
+          : 'Scan the front side of a document',
+      BlinkIdGuidanceTooFar() => 'Move closer',
+      BlinkIdGuidanceTooClose() => 'Move further away',
+      BlinkIdGuidanceTooCloseToEdge() => 'Move the document from the edge',
+      BlinkIdGuidanceTilted() => 'Keep document parallel to phone',
+      BlinkIdGuidanceHoldStill() => 'Hold still…',
+      BlinkIdGuidanceFlipDocument() => 'Flip to the back side',
+      BlinkIdGuidanceBlur() => 'Keep document and phone still',
+      BlinkIdGuidanceGlare() => 'Tilt or move document to remove reflection',
+      BlinkIdGuidanceNotFullyVisible() => 'Keep the document fully visible',
+      BlinkIdGuidanceLowLight() => 'Move to a brighter spot',
+      BlinkIdGuidanceTooMuchLight() => 'Move to a spot with less lighting',
+    };
+  }
 }
