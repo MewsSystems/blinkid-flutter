@@ -3,11 +3,8 @@ import 'package:flutter/material.dart';
 
 import 'custom_scanner_screen.dart';
 
-// TODO: Replace with a valid BlinkID license key from https://developer.microblink.com
-const _licenseKeyAndroid =
-    '***REMOVED***';
-const _licenseKeyIos =
-    '***REMOVED***';
+const _licenseKeyAndroid = String.fromEnvironment('BLINKID_LICENSE_KEY_ANDROID');
+const _licenseKeyIos = String.fromEnvironment('BLINKID_LICENSE_KEY_IOS');
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,28 +19,37 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _scanning = false;
 
   BlinkIdSdkSettings get _sdkSettings => BlinkIdSdkSettings(
-    licenseKey: Theme.of(context).platform == TargetPlatform.iOS
-        ? _licenseKeyIos
-        : _licenseKeyAndroid,
+    licenseKey: switch (Theme.of(context).platform) {
+      .iOS => _licenseKeyIos,
+      .android => _licenseKeyAndroid,
+      .fuchsia || .linux || .macOS || .windows => throw UnsupportedError('BlinkID not supported on this platform'),
+    },
   );
 
-  BlinkIdSessionSettings get _sessionSettings => BlinkIdSessionSettings(
-    scanningSettings: BlinkIdScanningSettings(),
-  );
+  BlinkIdSessionSettings get _sessionSettings => BlinkIdSessionSettings(scanningSettings: BlinkIdScanningSettings());
 
   Future<void> _performScan() async {
-    setState(() { _scanning = true; _result = ''; });
+    setState(() {
+      _scanning = true;
+      _result = '';
+    });
     try {
       final result = await _blinkId.performScan(
         blinkIdSdkSettings: _sdkSettings,
         blinkIdSessionSettings: _sessionSettings,
       );
-      setState(() { _result = _formatResult(result); });
+      setState(() {
+        _result = _formatResult(result);
+      });
     } catch (e, st) {
       debugPrint('BlinkID scan error: $e\n$st');
-      setState(() { _result = 'Error: $e'; });
+      setState(() {
+        _result = 'Error: $e';
+      });
     } finally {
-      setState(() { _scanning = false; });
+      setState(() {
+        _scanning = false;
+      });
     }
   }
 
@@ -51,14 +57,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final result = await Navigator.push<BlinkIdScanningResult>(
       context,
       MaterialPageRoute(
-        builder: (_) => CustomScannerScreen(
-          sdkSettings: _sdkSettings,
-          sessionSettings: _sessionSettings,
-        ),
+        builder: (_) => CustomScannerScreen(sdkSettings: _sdkSettings, sessionSettings: _sessionSettings),
       ),
     );
     if (result != null) {
-      setState(() { _result = _formatResult(result); });
+      setState(() {
+        _result = _formatResult(result);
+      });
     }
   }
 
@@ -78,23 +83,14 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          FilledButton(
-            onPressed: _scanning ? null : _performScan,
-            child: const Text('Scan (Native UI)'),
-          ),
+          FilledButton(onPressed: _scanning ? null : _performScan, child: const Text('Scan (Native UI)')),
           const SizedBox(height: 12),
-          FilledButton.tonal(
-            onPressed: _scanning ? null : _openCustomScanner,
-            child: const Text('Scan (Custom UI)'),
-          ),
+          FilledButton.tonal(onPressed: _scanning ? null : _openCustomScanner, child: const Text('Scan (Custom UI)')),
           const SizedBox(height: 24),
           if (_scanning) const Center(child: CircularProgressIndicator()),
           if (_result.isNotEmpty)
             Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(_result),
-              ),
+              child: Padding(padding: const EdgeInsets.all(16), child: Text(_result)),
             ),
         ],
       ),
