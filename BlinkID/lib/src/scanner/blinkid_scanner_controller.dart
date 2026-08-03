@@ -74,6 +74,7 @@ class BlinkIdScannerController extends ChangeNotifier {
   MethodChannel? _methodChannel;
   StreamSubscription<dynamic>? _guidanceSub;
   Completer<BlinkIdScanningResult>? _scanCompleter;
+  bool _debugLoggingEnabled = false;
 
   // True between onFlipComplete() and the first guidance event after resume.
   bool _awaitingBackSide = false;
@@ -131,6 +132,10 @@ class BlinkIdScannerController extends ChangeNotifier {
       },
     );
 
+    if (_debugLoggingEnabled) {
+      methodChannel.invokeMethod<void>('setDebugLogging', true).ignore();
+    }
+
     _setStatus(BlinkIdScannerStatus.ready);
   }
 
@@ -172,6 +177,17 @@ class BlinkIdScannerController extends ChangeNotifier {
     if (_phase != BlinkIdScanPhase.flip) return;
     _awaitingBackSide = true;
     _methodChannel?.invokeMethod<void>('resumeAfterFlip').ignore();
+  }
+
+  /// Enables or disables native debug log forwarding to [debugPrint].
+  ///
+  /// When enabled, key lifecycle events (scan start, side scanned, errors) are
+  /// forwarded from native via the method channel and printed with `[BlinkID]`
+  /// prefix. Disabled by default — no channel traffic is incurred unless opted in.
+  /// Safe to call before or after the platform view is created.
+  void setDebugLogging(bool enabled) {
+    _debugLoggingEnabled = enabled;
+    _methodChannel?.invokeMethod<void>('setDebugLogging', enabled).ignore();
   }
 
   /// Starts a scan session and returns the [BlinkIdScanningResult] on success.
@@ -252,6 +268,8 @@ class BlinkIdScannerController extends ChangeNotifier {
   Future<dynamic> _handleMethodCall(MethodCall call) async {
     try {
       switch (call.method) {
+        case 'onDebugLog':
+          debugPrint('[BlinkID] ${call.arguments}');
         case 'onDocumentScanned':
           _setStatus(BlinkIdScannerStatus.processing);
         case 'onScanResult':

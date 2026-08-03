@@ -60,6 +60,7 @@ class BlinkIdScannerView(
     )
 
     private var guidanceEventSink: EventChannel.EventSink? = null
+    private var debugLoggingEnabled = false
     private var scanningSession: BlinkIdScanningSession? = null
     private var isScanning = false
     private val analysisExecutor = Executors.newSingleThreadExecutor()
@@ -97,6 +98,10 @@ class BlinkIdScannerView(
             "resumeAfterFlip" -> {
                 // Flip animation completed on Flutter side; re-enable frame processing.
                 isScanning = true
+                result.success(null)
+            }
+            "setDebugLogging" -> {
+                debugLoggingEnabled = call.arguments as? Boolean ?: false
                 result.success(null)
             }
             "dispose" -> {
@@ -175,44 +180,43 @@ class BlinkIdScannerView(
                 val processResult = runBlocking { session.process(inputImage) }
 
                 if (processResult.isFailure) {
-                    android.util.Log.e("BlinkIdScannerView", "process() failed: ${processResult.exceptionOrNull()}")
+                    val msg = "process() failed: ${processResult.exceptionOrNull()}"
+                    scope.launch { if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", msg) }
                 } else if (processResult.isSuccess) {
                     val frameResult = processResult.getOrNull()!!
                     val detectionStatus = frameResult.inputImageAnalysisResult.documentDetectionStatus
                     val scanningStatus = runBlocking { session.getScanningStatus() }
-                    android.util.Log.d("BlinkIdScannerView", "getScanningStatus: $scanningStatus  detection: $detectionStatus")
 
                     when (scanningStatus) {
                         ScanningStatus.DocumentScanned -> {
-                            android.util.Log.d("BlinkIdScannerView", "DocumentScanned — calling getResult()")
                             isScanning = false
                             scope.launch {
+                                if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", "DocumentScanned — calling getResult()")
                                 // Signal Flutter immediately so it can show a spinner while
                                 // getResult() serializes (potentially large) image data.
                                 methodChannel.invokeMethod("onDocumentScanned", null)
                                 val scanResult = session.getResult(null)
                                 if (scanResult.isSuccess) {
-                                    android.util.Log.d("BlinkIdScannerView", "getResult() success, invoking onScanResult")
                                     val jsonString = BlinkIdSerializationUtils.serializeBlinkIdScanningResult(
                                         scanResult.getOrNull()
                                     )
                                     val resultMap = jsonString?.let { org.json.JSONObject(it).toNestedMap() }
                                     methodChannel.invokeMethod("onScanResult", resultMap)
                                 } else {
-                                    android.util.Log.e("BlinkIdScannerView", "getResult() failed: ${scanResult.exceptionOrNull()}")
-                                    methodChannel.invokeMethod(
-                                        "onScanError",
-                                        scanResult.exceptionOrNull()?.message ?: "Scan failed",
-                                    )
+                                    val err = scanResult.exceptionOrNull()?.message ?: "Scan failed"
+                                    if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", "getResult() failed: $err")
+                                    methodChannel.invokeMethod("onScanError", err)
                                 }
                                 scanningSession = null
                             }
                         }
                         ScanningStatus.SideScanned -> {
-                            android.util.Log.d("BlinkIdScannerView", "SideScanned — pausing for flip")
                             // First side done; pause until Flutter calls resumeAfterFlip.
                             isScanning = false
-                            scope.launch { guidanceEventSink?.success("flipDocument") }
+                            scope.launch {
+                                if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", "SideScanned — pausing for flip")
+                                guidanceEventSink?.success("flipDocument")
+                            }
                         }
                         else -> {
                             val processingStatus = frameResult.inputImageAnalysisResult.processingStatus
