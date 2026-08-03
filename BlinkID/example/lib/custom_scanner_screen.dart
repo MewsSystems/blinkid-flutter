@@ -345,9 +345,16 @@ class _GuidanceOverlayState extends State<_GuidanceOverlay> {
   String? _pendingText;
   Timer? _debounce;
   Timer? _resetTimer;
+  Timer? _stickyTimer;
+  bool _sticky = false;
   StreamSubscription<BlinkIdGuidance>? _sub;
 
-  static const _resetDelay = Duration(seconds: 2);
+  // How long to wait before showing a new message (avoids flickering at 30 fps).
+  static const _debounceDelay = Duration(milliseconds: 600);
+  // Minimum time a shown message stays visible before it can be replaced.
+  static const _stickyDuration = Duration(milliseconds: 1500);
+  // How long without any guidance before resetting to the idle prompt.
+  static const _resetDelay = Duration(seconds: 3);
 
   @override
   void initState() {
@@ -361,23 +368,31 @@ class _GuidanceOverlayState extends State<_GuidanceOverlay> {
     _resetTimer = Timer(_resetDelay, _resetToDefault);
 
     final next = guidanceText(g, widget.controller.phase);
-    // Already showing or already queued — let the running debounce finish.
     if (next == _displayText || next == _pendingText) return;
 
     _pendingText = next;
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () {
+
+    // If the current message is still in its sticky window, wait it out first,
+    // then debounce from that point. Otherwise debounce immediately.
+    final delay = _sticky ? _stickyDuration : _debounceDelay;
+    _debounce = Timer(delay, () {
       if (!mounted) return;
       setState(() {
         _displayText = _pendingText!;
         _pendingText = null;
         _switcherKey++;
       });
+      _sticky = true;
+      _stickyTimer?.cancel();
+      _stickyTimer = Timer(_stickyDuration, () => _sticky = false);
     });
   }
 
   void _resetToDefault() {
     _debounce?.cancel();
+    _stickyTimer?.cancel();
+    _sticky = false;
     _pendingText = null;
     final defaultText = guidanceText(null, widget.controller.phase);
     if (!mounted || _displayText == defaultText) return;
@@ -391,6 +406,7 @@ class _GuidanceOverlayState extends State<_GuidanceOverlay> {
   void dispose() {
     _debounce?.cancel();
     _resetTimer?.cancel();
+    _stickyTimer?.cancel();
     _sub?.cancel();
     super.dispose();
   }
