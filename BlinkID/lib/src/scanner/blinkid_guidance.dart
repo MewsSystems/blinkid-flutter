@@ -28,6 +28,9 @@ sealed class BlinkIdGuidance {
   // --- Phase-driven (not emitted via stream; use BlinkIdScanPhase.flip) ---
   const factory BlinkIdGuidance.flipDocument() = BlinkIdGuidanceFlipDocument;
 
+  // --- Wrong side (emitted to stream; no phase change) ---
+  const factory BlinkIdGuidance.wrongSide() = BlinkIdGuidanceWrongSide;
+
   // --- iOS only (unconfirmed; pending iOS SDK verification) ---
   const factory BlinkIdGuidance.holdStill() = BlinkIdGuidanceHoldStill;
   const factory BlinkIdGuidance.blur() = BlinkIdGuidanceBlur;
@@ -42,6 +45,7 @@ sealed class BlinkIdGuidance {
     'tilted' => const BlinkIdGuidance.tilted(),
     'notFullyVisible' => const BlinkIdGuidance.notFullyVisible(),
     'flipDocument' => const BlinkIdGuidance.flipDocument(),
+    'wrongSide' => const BlinkIdGuidance.wrongSide(),
     'holdStill' => const BlinkIdGuidance.holdStill(),
     'blur' => const BlinkIdGuidance.blur(),
     'glare' => const BlinkIdGuidance.glare(),
@@ -77,6 +81,10 @@ final class BlinkIdGuidanceNotFullyVisible extends BlinkIdGuidance {
 
 final class BlinkIdGuidanceFlipDocument extends BlinkIdGuidance {
   const BlinkIdGuidanceFlipDocument() : super._();
+}
+
+final class BlinkIdGuidanceWrongSide extends BlinkIdGuidance {
+  const BlinkIdGuidanceWrongSide() : super._();
 }
 
 final class BlinkIdGuidanceHoldStill extends BlinkIdGuidance {

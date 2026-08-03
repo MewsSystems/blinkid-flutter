@@ -2,10 +2,13 @@ package com.microblink.blinkid.flutter
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.util.Size
 import android.view.View
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
@@ -13,8 +16,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import com.microblink.blinkid.core.BlinkIdSdk
-import com.microblink.blinkid.core.image.ImageRotation
 import com.microblink.blinkid.core.image.InputImage
+import com.microblink.blinkid.core.result.ProcessingStatus
 import com.microblink.blinkid.core.result.ScanningStatus
 import com.microblink.blinkid.core.session.BlinkIdScanningSession
 import com.microblink.blinkid.core.session.DetectionStatus
@@ -60,6 +63,7 @@ class BlinkIdScannerView(
     private var scanningSession: BlinkIdScanningSession? = null
     private var isScanning = false
     private val analysisExecutor = Executors.newSingleThreadExecutor()
+    private var pendingStartResult: MethodChannel.Result? = null
 
     override val lifecycle: Lifecycle get() = lifecycleRegistry
 
@@ -109,7 +113,7 @@ class BlinkIdScannerView(
             result.error("blinkid_error", "SDK not initialized", null)
             return
         }
-
+        pendingStartResult = result
         scope.launch {
             val sessionSettingsMap = creationParams["sessionSettings"] as? Map<*, *>
             @Suppress("UNCHECKED_CAST")
@@ -119,13 +123,15 @@ class BlinkIdScannerView(
                     false,
                 )
             )
+            val pending = pendingStartResult ?: return@launch
+            pendingStartResult = null
             if (sessionResult.isFailure) {
-                result.error("blinkid_error", sessionResult.exceptionOrNull()?.message, null)
+                pending.error("blinkid_error", sessionResult.exceptionOrNull()?.message, null)
                 return@launch
             }
             scanningSession = sessionResult.getOrThrow()
             isScanning = true
-            result.success(null)
+            pending.success(null)
         }
     }
 
@@ -146,7 +152,16 @@ class BlinkIdScannerView(
             }
 
             val imageAnalysis = ImageAnalysis.Builder()
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setResolutionSelector(
+                    ResolutionSelector.Builder()
+                        .setResolutionStrategy(
+                            ResolutionStrategy(
+                                Size(3840, 2160),
+                                ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER,
+                            )
+                        )
+                        .build()
+                )
                 .build()
 
             imageAnalysis.setAnalyzer(analysisExecutor) { imageProxy ->
@@ -156,13 +171,7 @@ class BlinkIdScannerView(
                 }
                 val session = scanningSession ?: run { imageProxy.close(); return@setAnalyzer }
 
-                val imageRotation = when (imageProxy.imageInfo.rotationDegrees) {
-                    90 -> ImageRotation.Rotation90
-                    180 -> ImageRotation.Rotation180
-                    270 -> ImageRotation.Rotation270
-                    else -> ImageRotation.Rotation0
-                }
-                val inputImage = InputImage.createFromCameraXImageProxy(imageProxy, imageRotation)
+                val inputImage = InputImage.createFromCameraXImageProxy(imageProxy)
                 val processResult = runBlocking { session.process(inputImage) }
 
                 if (processResult.isFailure) {
@@ -171,18 +180,26 @@ class BlinkIdScannerView(
                     val frameResult = processResult.getOrNull()!!
                     val detectionStatus = frameResult.inputImageAnalysisResult.documentDetectionStatus
                     val scanningStatus = runBlocking { session.getScanningStatus() }
+                    android.util.Log.d("BlinkIdScannerView", "getScanningStatus: $scanningStatus  detection: $detectionStatus")
 
                     when (scanningStatus) {
                         ScanningStatus.DocumentScanned -> {
+                            android.util.Log.d("BlinkIdScannerView", "DocumentScanned — calling getResult()")
                             isScanning = false
                             scope.launch {
+                                // Signal Flutter immediately so it can show a spinner while
+                                // getResult() serializes (potentially large) image data.
+                                methodChannel.invokeMethod("onDocumentScanned", null)
                                 val scanResult = session.getResult(null)
                                 if (scanResult.isSuccess) {
-                                    val json = BlinkIdSerializationUtils.serializeBlinkIdScanningResult(
+                                    android.util.Log.d("BlinkIdScannerView", "getResult() success, invoking onScanResult")
+                                    val jsonString = BlinkIdSerializationUtils.serializeBlinkIdScanningResult(
                                         scanResult.getOrNull()
                                     )
-                                    methodChannel.invokeMethod("onScanResult", json)
+                                    val resultMap = jsonString?.let { org.json.JSONObject(it).toNestedMap() }
+                                    methodChannel.invokeMethod("onScanResult", resultMap)
                                 } else {
+                                    android.util.Log.e("BlinkIdScannerView", "getResult() failed: ${scanResult.exceptionOrNull()}")
                                     methodChannel.invokeMethod(
                                         "onScanError",
                                         scanResult.exceptionOrNull()?.message ?: "Scan failed",
@@ -192,12 +209,18 @@ class BlinkIdScannerView(
                             }
                         }
                         ScanningStatus.SideScanned -> {
+                            android.util.Log.d("BlinkIdScannerView", "SideScanned — pausing for flip")
                             // First side done; pause until Flutter calls resumeAfterFlip.
                             isScanning = false
                             scope.launch { guidanceEventSink?.success("flipDocument") }
                         }
                         else -> {
-                            val guidance = detectionStatus.toGuidanceString()
+                            val processingStatus = frameResult.inputImageAnalysisResult.processingStatus
+                            val guidance = if (processingStatus == ProcessingStatus.ScanningWrongSide) {
+                                "wrongSide"
+                            } else {
+                                detectionStatus.toGuidanceString()
+                            }
                             scope.launch { guidanceEventSink?.success(guidance) }
                         }
                     }
@@ -218,6 +241,8 @@ class BlinkIdScannerView(
     override fun getView(): View = previewView
 
     override fun dispose() {
+        pendingStartResult?.error("blinkid_error", "Scanner disposed", null)
+        pendingStartResult = null
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         isScanning = false
         scanningSession = null
@@ -227,6 +252,29 @@ class BlinkIdScannerView(
         eventChannel.setStreamHandler(null)
     }
 }
+
+private fun org.json.JSONObject.toNestedMap(): Map<String, Any?> {
+    val map = mutableMapOf<String, Any?>()
+    for (key in keys()) {
+        map[key] = when (val v = get(key)) {
+            is org.json.JSONObject -> v.toNestedMap()
+            is org.json.JSONArray -> v.toNestedList()
+            org.json.JSONObject.NULL -> null
+            else -> v
+        }
+    }
+    return map
+}
+
+private fun org.json.JSONArray.toNestedList(): List<Any?> =
+    (0 until length()).map { i ->
+        when (val v = get(i)) {
+            is org.json.JSONObject -> v.toNestedMap()
+            is org.json.JSONArray -> v.toNestedList()
+            org.json.JSONObject.NULL -> null
+            else -> v
+        }
+    }
 
 private fun DetectionStatus.toGuidanceString(): String = when (this) {
     DetectionStatus.CameraTooFar -> "tooFar"

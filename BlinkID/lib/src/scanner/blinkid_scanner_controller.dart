@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:meta/meta.dart';
 
 import '../blinkid_flutter_platform_interface.dart';
 import '../blinkid_result.dart';
@@ -10,13 +12,24 @@ import 'blinkid_guidance.dart';
 
 enum BlinkIdScannerStatus {
   uninitialized,
+
   /// SDK resources are downloading / license is being verified.
   loadingSdk,
+
   /// SDK loaded; platform view not yet attached.
   initializing,
+
   ready,
   scanning,
+
+  /// [DocumentScanned] fired natively; awaiting result serialization and
+  /// transfer. Transient — lasts milliseconds.
+  processing,
+
+  /// Result delivered. Transient — callers typically show a brief success UI
+  /// then pop the screen.
   done,
+
   error,
 }
 
@@ -24,12 +37,17 @@ enum BlinkIdScanPhase {
   /// Scanning the front side.
   front,
 
-  /// Front side complete. Caller should show flip animation and call
-  /// [BlinkIdScannerController.onFlipComplete] when animation finishes.
-  /// Guidance events are suppressed during this phase.
+  /// Front side complete. Show a flip animation, then call
+  /// [BlinkIdScannerController.onFlipComplete] when the animation finishes so
+  /// native scanning resumes. The phase remains [flip] until the camera
+  /// produces its first frame after resuming — i.e. until the user has
+  /// physically flipped the document. Failing to call [onFlipComplete] leaves
+  /// the scanner paused indefinitely.
+  ///
+  /// Guidance events are suppressed during this phase; use [phase] instead.
   flip,
 
-  /// Flip animation done; scanning the back side.
+  /// User flipped the document; scanning the back side.
   back,
 }
 
@@ -40,23 +58,39 @@ class BlinkIdScannerController extends ChangeNotifier {
   BlinkIdScanPhase _phase = BlinkIdScanPhase.front;
   BlinkIdScanPhase get phase => _phase;
 
-  Object? _lastError;
-  Object? get lastError => _lastError;
+  /// The last error set when [status] is [BlinkIdScannerStatus.error].
+  /// Call [reset] to recover — the controller is reusable after an error.
+  Exception? _lastError;
+  Exception? get lastError => _lastError;
 
   final _guidanceController = StreamController<BlinkIdGuidance>.broadcast();
+
+  /// Guidance events emitted during scanning. Events are suppressed while
+  /// [phase] is [BlinkIdScanPhase.flip]; use [phase] to drive flip UI instead.
+  /// [BlinkIdGuidanceFlipDocument] is never emitted here — it drives the
+  /// phase transition internally.
   Stream<BlinkIdGuidance> get guidanceStream => _guidanceController.stream;
 
   MethodChannel? _methodChannel;
-  EventChannel? _eventChannel;
   StreamSubscription<dynamic>? _guidanceSub;
   Completer<BlinkIdScanningResult>? _scanCompleter;
 
+  // True between onFlipComplete() and the first guidance event after resume.
+  bool _awaitingBackSide = false;
+
   Map<String, dynamic> _creationParams = {};
+
+  /// Internal: creation params forwarded to the native platform view.
+  @internal
   Map<String, dynamic> get creationParams => _creationParams;
 
   /// Loads the BlinkID SDK (model download + license check) then prepares
-  /// the controller for view attachment. Shows [loadingSdk] status during
-  /// the SDK init so callers can render a loading spinner.
+  /// the controller for view attachment. Transitions to
+  /// [BlinkIdScannerStatus.loadingSdk] during init so callers can render a
+  /// loading indicator, then to [BlinkIdScannerStatus.initializing] once the
+  /// SDK is ready and the platform view can be mounted.
+  ///
+  /// No-op if called more than once.
   Future<void> initialize(
     BlinkIdSdkSettings sdkSettings,
     BlinkIdSessionSettings sessionSettings,
@@ -76,17 +110,20 @@ class BlinkIdScannerController extends ChangeNotifier {
     };
   }
 
+  /// Called by [BlinkIdScannerView] once the platform view is attached.
+  /// Do not call this directly.
+  @internal
   void onPlatformViewCreated(int id) {
-    _methodChannel = MethodChannel(
+    final methodChannel = MethodChannel(
       'com.microblink.blinkid.flutter/scanner/$id',
     );
-    _eventChannel = EventChannel(
+    final eventChannel = EventChannel(
       'com.microblink.blinkid.flutter/scanner/$id/guidance',
     );
 
-    _methodChannel!.setMethodCallHandler(_handleMethodCall);
-
-    _guidanceSub = _eventChannel!.receiveBroadcastStream().listen(
+    methodChannel.setMethodCallHandler(_handleMethodCall);
+    _methodChannel = methodChannel;
+    _guidanceSub = eventChannel.receiveBroadcastStream().listen(
       _onGuidanceEvent,
       onError: (Object e) {
         _guidanceController.addError(e);
@@ -101,40 +138,64 @@ class BlinkIdScannerController extends ChangeNotifier {
     if (event is! String) return;
     final guidance = BlinkIdGuidance.fromString(event);
 
-    if (guidance is BlinkIdGuidanceFlipDocument) {
-      if (_phase == BlinkIdScanPhase.front) {
-        // Latch into flip phase — suppress further guidance until onFlipComplete().
-        _phase = BlinkIdScanPhase.flip;
-        notifyListeners();
-      }
-      // Don't emit flipDocument to guidanceStream; caller uses phase instead.
-      return;
+    switch (guidance) {
+      case BlinkIdGuidanceFlipDocument():
+        if (_phase == BlinkIdScanPhase.front) {
+          _phase = BlinkIdScanPhase.flip;
+          notifyListeners();
+        }
+        // Never emitted to guidanceStream; callers use phase instead.
+        return;
+      default:
+        break;
     }
 
-    // Suppress all guidance during flip phase — analyzer should ideally be
-    // paused natively, but filter here as a safety net.
+    // First event after resumeAfterFlip — user has flipped; go to back phase.
+    if (_awaitingBackSide) {
+      _awaitingBackSide = false;
+      _phase = BlinkIdScanPhase.back;
+      notifyListeners();
+    }
+
     if (_phase == BlinkIdScanPhase.flip) return;
 
     _guidanceController.add(guidance);
   }
 
-  /// Call this after your flip animation completes to resume back-side scanning.
+  /// Resumes back-side scanning after the flip animation completes.
+  ///
+  /// **You must call this** after showing your flip animation; failure to do so
+  /// leaves the scanner paused indefinitely. [phase] transitions from [flip]
+  /// to [back] automatically once the camera produces its first frame, i.e.
+  /// once the user has physically flipped the document.
   void onFlipComplete() {
     if (_phase != BlinkIdScanPhase.flip) return;
-    _phase = BlinkIdScanPhase.back;
-    notifyListeners();
-    // Resume the native analyzer.
+    _awaitingBackSide = true;
     _methodChannel?.invokeMethod<void>('resumeAfterFlip').ignore();
   }
 
+  /// Starts a scan session and returns the [BlinkIdScanningResult] on success.
+  ///
+  /// If the controller is still initializing (status [BlinkIdScannerStatus.loadingSdk]
+  /// or [BlinkIdScannerStatus.initializing]), this call suspends and resumes
+  /// automatically once the platform view is ready — so calling immediately
+  /// after [initialize] is safe without an explicit status check.
+  ///
+  /// Throws [BlinkIdScanCancelException] on cancel, [BlinkIdScanResetException]
+  /// on [reset], or [StateError] if [initialize] was never called.
   Future<BlinkIdScanningResult> scan() async {
-    if (_status != BlinkIdScannerStatus.ready) {
-      throw StateError('Controller not ready (status: $_status)');
+    switch (_status) {
+      case BlinkIdScannerStatus.loadingSdk ||
+          BlinkIdScannerStatus.initializing:
+        await _awaitReady();
+      case BlinkIdScannerStatus.ready:
+        break;
+      default:
+        throw StateError('Controller not ready (status: $_status)');
     }
+
     final channel = _methodChannel;
-    if (channel == null) {
-      throw StateError('Platform view not yet created');
-    }
+    if (channel == null) throw StateError('Platform view not yet created');
 
     _phase = BlinkIdScanPhase.front;
     _setStatus(BlinkIdScannerStatus.scanning);
@@ -150,30 +211,108 @@ class BlinkIdScannerController extends ChangeNotifier {
     return _scanCompleter!.future;
   }
 
+  /// Cancels the current scan and returns to [BlinkIdScannerStatus.ready].
+  /// The [Future] from [scan] completes with [BlinkIdScanCancelException].
   void cancel() {
     _methodChannel?.invokeMethod<void>('cancelScan');
-    if (_status == BlinkIdScannerStatus.scanning) {
-      _setStatus(BlinkIdScannerStatus.ready);
-      _scanCompleter?.completeError(const _CancelException());
-      _scanCompleter = null;
+    switch (_status) {
+      case BlinkIdScannerStatus.scanning || BlinkIdScannerStatus.processing:
+        _abortWithCancel();
+      default:
+        break;
+    }
+  }
+
+  /// Cancels any in-flight scan and returns the controller to
+  /// [BlinkIdScannerStatus.ready], ready for a new [scan] call. Use this to
+  /// implement retry flows (e.g. after a timeout).
+  ///
+  /// The [Future] from [scan] completes with [BlinkIdScanResetException].
+  ///
+  /// Can also be called when [status] is [BlinkIdScannerStatus.error] to
+  /// recover and allow a new scan.
+  void reset() {
+    _methodChannel?.invokeMethod<void>('cancelScan');
+    _phase = BlinkIdScanPhase.front;
+    _awaitingBackSide = false;
+    _lastError = null;
+    final completer = _scanCompleter;
+    _scanCompleter = null;
+    completer?.completeError(const BlinkIdScanResetException());
+    switch (_status) {
+      case BlinkIdScannerStatus.uninitialized ||
+          BlinkIdScannerStatus.loadingSdk ||
+          BlinkIdScannerStatus.initializing:
+        break;
+      default:
+        _setStatus(BlinkIdScannerStatus.ready);
     }
   }
 
   Future<dynamic> _handleMethodCall(MethodCall call) async {
-    switch (call.method) {
-      case 'onScanResult':
-        final json = Map<String, dynamic>.from(call.arguments as Map);
-        final result = BlinkIdScanningResult(json);
-        _setStatus(BlinkIdScannerStatus.done);
-        _scanCompleter?.complete(result);
-        _scanCompleter = null;
-      case 'onScanError':
-        _failScan(call.arguments as String? ?? 'Scan error');
-      case 'onScanCanceled':
-        _setStatus(BlinkIdScannerStatus.ready);
-        _scanCompleter?.completeError(const _CancelException());
-        _scanCompleter = null;
+    try {
+      switch (call.method) {
+        case 'onDocumentScanned':
+          _setStatus(BlinkIdScannerStatus.processing);
+        case 'onScanResult':
+          _completeScan(_parseResult(call.arguments));
+        case 'onScanError':
+          _failScan(call.arguments as String? ?? 'Scan error');
+        case 'onScanCanceled':
+          _abortWithCancel();
+      }
+    } catch (e, st) {
+      debugPrint('BlinkID _handleMethodCall error (${call.method}): $e\n$st');
+      _failScan('Handler error: $e');
     }
+  }
+
+  BlinkIdScanningResult _parseResult(dynamic rawArgs) {
+    final Map<String, dynamic> json = switch (rawArgs) {
+      final Map m => Map<String, dynamic>.from(m),
+      final String s => Map<String, dynamic>.from(jsonDecode(s) as Map),
+      _ => throw ArgumentError(
+          'Unexpected scan result type: ${rawArgs?.runtimeType}',
+        ),
+    };
+    return BlinkIdScanningResult(json);
+  }
+
+  Future<void> _awaitReady() {
+    if (_status == BlinkIdScannerStatus.ready) return Future.value();
+    final completer = Completer<void>();
+    void listener() {
+      switch (_status) {
+        case BlinkIdScannerStatus.ready:
+          removeListener(listener);
+          if (!completer.isCompleted) completer.complete();
+        case BlinkIdScannerStatus.error:
+          removeListener(listener);
+          if (!completer.isCompleted) {
+            completer.completeError(
+              _lastError ?? Exception('Controller initialization failed'),
+            );
+          }
+        default:
+          break;
+      }
+    }
+    addListener(listener);
+    return completer.future;
+  }
+
+  void _completeScan(BlinkIdScanningResult result) {
+    _setStatus(BlinkIdScannerStatus.done);
+    final completer = _scanCompleter;
+    _scanCompleter = null;
+    completer?.complete(result);
+  }
+
+  void _abortWithCancel() {
+    _setStatus(BlinkIdScannerStatus.ready);
+    final completer = _scanCompleter;
+    _scanCompleter = null;
+    completer?.completeError(const BlinkIdScanCancelException());
   }
 
   void _failScan(String message) {
@@ -195,13 +334,34 @@ class BlinkIdScannerController extends ChangeNotifier {
     _guidanceSub?.cancel();
     _guidanceController.close();
     _methodChannel?.invokeMethod<void>('dispose').ignore();
-    _failScan('Controller disposed');
+    // Drain in-flight scan without corrupting status — widget tree tearing down.
+    final completer = _scanCompleter;
+    _scanCompleter = null;
+    completer?.completeError(const BlinkIdScanDisposeException());
     super.dispose();
   }
 }
 
-class _CancelException implements Exception {
-  const _CancelException();
+/// Thrown when the user explicitly cancels scanning via
+/// [BlinkIdScannerController.cancel].
+class BlinkIdScanCancelException implements Exception {
+  const BlinkIdScanCancelException();
   @override
   String toString() => 'Scan canceled';
+}
+
+/// Thrown when [BlinkIdScannerController.reset] is called while a scan is in
+/// progress. Distinct from a user-initiated cancel so callers can branch on
+/// retry vs. dismiss.
+class BlinkIdScanResetException implements Exception {
+  const BlinkIdScanResetException();
+  @override
+  String toString() => 'Scan reset';
+}
+
+/// Thrown when the controller is [dispose]d while a scan is in progress.
+class BlinkIdScanDisposeException implements Exception {
+  const BlinkIdScanDisposeException();
+  @override
+  String toString() => 'Scanner disposed';
 }
