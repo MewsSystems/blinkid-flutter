@@ -89,20 +89,33 @@ struct BlinkIdDeserializationUtils {
             return scanningSettings
         }
 
-        if let barcodeModuleDict = scanningSettingsDict["barcodeModule"] as? Dictionary<String, Any> {
-            scanningSettings.barcodeModule = deserializeBarcodeModule(barcodeModuleDict)
+        // NSNull means the caller explicitly disabled the module; absent key keeps the .init() default.
+        let barcodeValue = scanningSettingsDict["barcodeModule"]
+        if barcodeValue is NSNull {
+            scanningSettings.barcodeModule = nil
+        } else if let dict = barcodeValue as? Dictionary<String, Any> {
+            scanningSettings.barcodeModule = deserializeBarcodeModule(dict)
         }
 
-        if let documentCaptureDict = scanningSettingsDict["documentCaptureModule"] as? Dictionary<String, Any> {
-            scanningSettings.documentCaptureModule = deserializeDocumentCaptureModule(documentCaptureDict)
+        let documentCaptureValue = scanningSettingsDict["documentCaptureModule"]
+        if documentCaptureValue is NSNull {
+            scanningSettings.documentCaptureModule = nil
+        } else if let dict = documentCaptureValue as? Dictionary<String, Any> {
+            scanningSettings.documentCaptureModule = deserializeDocumentCaptureModule(dict)
         }
 
-        if let mrzModuleDict = scanningSettingsDict["mrzModule"] as? Dictionary<String, Any> {
-            scanningSettings.mrzModule = deserializeMrzModule(mrzModuleDict)
+        let mrzValue = scanningSettingsDict["mrzModule"]
+        if mrzValue is NSNull {
+            scanningSettings.mrzModule = nil
+        } else if let dict = mrzValue as? Dictionary<String, Any> {
+            scanningSettings.mrzModule = deserializeMrzModule(dict)
         }
 
-        if let vizModuleDict = scanningSettingsDict["vizModule"] as? Dictionary<String, Any> {
-            scanningSettings.vizModule = deserializeVizModule(vizModuleDict)
+        let vizValue = scanningSettingsDict["vizModule"]
+        if vizValue is NSNull {
+            scanningSettings.vizModule = nil
+        } else if let dict = vizValue as? Dictionary<String, Any> {
+            scanningSettings.vizModule = deserializeVizModule(dict)
         }
 
         if let maxAllowedMismatchesPerField = scanningSettingsDict["maxAllowedMismatchesPerField"] as? Int {
