@@ -28,6 +28,7 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.platform.PlatformView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -114,16 +115,20 @@ class BlinkIdScannerView(
                     val provider = cameraProvider ?: run { result.success(null); return@launch }
                     val wasScanning = isScanning
                     isScanning = false
+                    // Drain the analyzer thread before unbinding. CameraX frees image
+                    // buffers on unbindAll(); any runBlocking { session.process() } still
+                    // executing natively would SIGSEGV if those buffers disappear under it.
+                    // Posting a no-op to the single-thread executor and awaiting it
+                    // guarantees the in-flight process() call has returned first.
+                    withContext(analysisExecutor.asCoroutineDispatcher()) {}
                     val newSelector = resolveCameraSelector(preferred, provider)
-                    withContext(Dispatchers.Main) {
-                        provider.unbindAll()
-                        provider.bindToLifecycle(
-                            this@BlinkIdScannerView,
-                            newSelector,
-                            previewUseCase!!,
-                            imageAnalysisUseCase!!,
-                        )
-                    }
+                    provider.unbindAll()
+                    provider.bindToLifecycle(
+                        this@BlinkIdScannerView,
+                        newSelector,
+                        previewUseCase!!,
+                        imageAnalysisUseCase!!,
+                    )
                     isScanning = wasScanning
                     result.success(null)
                 }
