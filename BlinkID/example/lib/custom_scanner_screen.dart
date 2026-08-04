@@ -37,23 +37,10 @@ class CustomScannerScreen extends StatefulWidget {
 }
 
 class _CustomScannerScreenState extends State<CustomScannerScreen> {
-  PreferredCamera _activeCamera = PreferredCamera.back;
-  int _cameraKey = 0;
-
-  void _switchCamera() {
-    setState(() {
-      _activeCamera = _activeCamera == PreferredCamera.back ? PreferredCamera.front : PreferredCamera.back;
-      _cameraKey++;
-    });
-  }
-
   @override
   Widget build(BuildContext context) => _ScannerInstance(
-    key: ValueKey(_cameraKey),
     sdkSettings: widget.sdkSettings,
     sessionSettings: widget.sessionSettings,
-    preferredCamera: _activeCamera,
-    onSwitchCamera: _switchCamera,
   );
 }
 
@@ -61,15 +48,11 @@ class _ScannerInstance extends StatefulWidget {
   const _ScannerInstance({
     required this.sdkSettings,
     required this.sessionSettings,
-    required this.preferredCamera,
-    required this.onSwitchCamera,
     super.key,
   });
 
   final BlinkIdSdkSettings sdkSettings;
   final BlinkIdSessionSettings sessionSettings;
-  final PreferredCamera preferredCamera;
-  final VoidCallback onSwitchCamera;
 
   @override
   State<_ScannerInstance> createState() => _ScannerInstanceState();
@@ -99,7 +82,7 @@ class _ScannerInstanceState extends State<_ScannerInstance> {
     _controller = BlinkIdScannerController();
     _controller.addListener(_onScanStateChanged);
     _guidanceSub = _controller.guidanceStream.listen(_onGuidanceForTimer);
-    unawaited(_startScanning(widget.preferredCamera));
+    unawaited(_startScanning());
   }
 
   // Manages the per-side scan timer based on status/phase transitions.
@@ -166,9 +149,9 @@ class _ScannerInstanceState extends State<_ScannerInstance> {
     }
   }
 
-  Future<void> _startScanning(PreferredCamera preferredCamera) async {
+  Future<void> _startScanning() async {
     try {
-      await _controller.initialize(widget.sdkSettings, widget.sessionSettings, preferredCamera: preferredCamera);
+      await _controller.initialize(widget.sdkSettings, widget.sessionSettings);
     } catch (e, st) {
       debugPrint('BlinkID init error: $e\n$st');
       if (mounted) {
@@ -272,15 +255,6 @@ class _ScannerInstanceState extends State<_ScannerInstance> {
                     _controller.cancel();
                     _safePop();
                   },
-                ),
-              ),
-            if (status == BlinkIdScannerStatus.scanning && _controller.phase != BlinkIdScanPhase.flip)
-              Positioned(
-                top: MediaQuery.of(context).padding.top + 8,
-                right: 8,
-                child: IconButton(
-                  icon: const Icon(Icons.cameraswitch, color: Colors.white),
-                  onPressed: widget.onSwitchCamera,
                 ),
               ),
           ],
