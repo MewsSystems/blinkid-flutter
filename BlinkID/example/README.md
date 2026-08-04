@@ -12,12 +12,7 @@ Launches the built-in BlinkID UX — full-screen native camera scanning with aut
 - Class filter (restrict accepted document types)
 - Redaction (anonymize sensitive fields)
 
-### 2. DirectAPI scanning
-Extracts document data from static images selected from the device gallery:
-- **MultiSide** — front + back image pair
-- **SingleSide** — single image
-
-### 3. Custom scanner UI (`BlinkIdScannerView`)
+### 2. Custom scanner UI (`BlinkIdScannerView`)
 A fully custom Flutter scanning screen built on `BlinkIdScannerView`:
 - Source: [`lib/custom_scanner_screen.dart`](lib/custom_scanner_screen.dart)
 - Custom guidance text overlay with debounced animations
@@ -37,9 +32,11 @@ This is the reference implementation for `BlinkIdScannerView` + `BlinkIdScannerC
    ```
    Free trial keys available at [developer.microblink.com](https://developer.microblink.com/).
 
-2. Run:
+2. Run via VS Code using the **`blinkid_example`** launch configuration (recommended) — it passes `--dart-define-from-file` automatically.
+
+   Or from the CLI:
    ```bash
-   flutter run
+   flutter run --dart-define-from-file=.env
    ```
 
 ### iOS additional setup
@@ -58,7 +55,7 @@ flutter run
 
 ## Project structure
 
-```
+```text
 lib/
   main.dart                  — app entry point, settings screen
   custom_scanner_screen.dart — custom scanner UI reference implementation

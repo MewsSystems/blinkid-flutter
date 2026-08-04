@@ -1,19 +1,21 @@
-// Guidance states emitted by [BlinkIdScannerController.guidanceStream].
-//
-// Android-verified DetectionStatus mapping (from compiled SDK):
-//   CameraTooFar              → tooFar
-//   CameraTooClose            → tooClose
-//   DocumentTooCloseToCameraEdge → tooCloseToEdge
-//   CameraAngleTooSteep       → tilted
-//   DocumentPartiallyVisible  → notFullyVisible
-//   Success / Failed          → searching
-//
-// flipDocument is NOT a DetectionStatus — it is emitted by the controller
-// when ScanningStatus.SideScanned fires (front side complete). The guidance
-// stream goes silent during the flip phase; use BlinkIdScanPhase instead.
-//
-// blur / glare / holdStill / lowLight / tooMuchLight are reserved for iOS;
-// Android's DetectionStatus does not include these cases.
+import 'package:flutter/foundation.dart';
+
+/// Guidance states emitted by [BlinkIdScannerController.guidanceStream].
+///
+/// Android-verified DetectionStatus mapping (from compiled SDK):
+///   CameraTooFar              → tooFar
+///   CameraTooClose            → tooClose
+///   DocumentTooCloseToCameraEdge → tooCloseToEdge
+///   CameraAngleTooSteep       → tilted
+///   DocumentPartiallyVisible  → notFullyVisible
+///   Success / Failed          → searching
+///
+/// [flipDocument] is NOT a DetectionStatus — it is emitted by the controller
+/// when ScanningStatus.SideScanned fires (front side complete). The guidance
+/// stream goes silent during the flip phase; use [BlinkIdScanPhase] instead.
+///
+/// blur / glare / holdStill / lowLight / tooMuchLight are reserved for iOS;
+/// Android's DetectionStatus does not include these cases.
 sealed class BlinkIdGuidance {
   const BlinkIdGuidance._();
 
@@ -51,8 +53,16 @@ sealed class BlinkIdGuidance {
     'glare' => const BlinkIdGuidance.glare(),
     'lowLight' => const BlinkIdGuidance.lowLight(),
     'tooMuchLight' => const BlinkIdGuidance.tooMuchLight(),
-    _ => const BlinkIdGuidance.searching(),
+    _ => _unknown(value),
   };
+
+  static BlinkIdGuidance _unknown(String value) {
+    assert(() {
+      debugPrint('[BlinkID] Unknown guidance value: "$value"');
+      return true;
+    }());
+    return const BlinkIdGuidance.searching();
+  }
 }
 
 final class BlinkIdGuidanceSearching extends BlinkIdGuidance {

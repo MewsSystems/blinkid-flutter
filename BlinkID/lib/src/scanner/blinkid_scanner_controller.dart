@@ -100,6 +100,7 @@ class BlinkIdScannerController extends ChangeNotifier {
   MethodChannel? _methodChannel;
   StreamSubscription<dynamic>? _guidanceSub;
   Completer<BlinkIdScanningResult>? _scanCompleter;
+  final List<Completer<void>> _pendingReady = [];
   bool _debugLoggingEnabled = false;
 
   // True between onFlipComplete() and the first guidance event after resume.
@@ -128,9 +129,8 @@ class BlinkIdScannerController extends ChangeNotifier {
     try {
       await BlinkIdFlutterPlatform.instance.loadBlinkIdSdk(sdkSettings);
     } on PlatformException catch (e) {
-      final wrapped = BlinkIdSdkInitException(e.message ?? 'SDK load failed');
-      _failScan(wrapped.message);
-      throw wrapped;
+      _setStatus(BlinkIdScannerStatus.uninitialized);
+      throw BlinkIdSdkInitException(e.message ?? 'SDK load failed');
     }
     _setStatus(BlinkIdScannerStatus.initializing);
     _creationParams = {
@@ -144,6 +144,8 @@ class BlinkIdScannerController extends ChangeNotifier {
   /// Do not call this directly.
   @internal
   void onPlatformViewCreated(int id) {
+    _guidanceSub?.cancel().ignore();
+    _guidanceSub = null;
     final methodChannel = MethodChannel('com.microblink.blinkid.flutter/scanner/$id');
     final eventChannel = EventChannel('com.microblink.blinkid.flutter/scanner/$id/guidance');
 
@@ -418,19 +420,23 @@ class BlinkIdScannerController extends ChangeNotifier {
   Future<void> _awaitReady() {
     if (_status == BlinkIdScannerStatus.ready) return Future.value();
     final completer = Completer<void>();
+    _pendingReady.add(completer);
     void listener() {
       switch (_status) {
         case BlinkIdScannerStatus.ready:
           removeListener(listener);
+          _pendingReady.remove(completer);
           if (!completer.isCompleted) completer.complete();
         case BlinkIdScannerStatus.error:
           removeListener(listener);
+          _pendingReady.remove(completer);
           if (!completer.isCompleted) {
             completer.completeError(_lastError ?? Exception('Controller initialization failed'));
           }
         case BlinkIdScannerStatus.cameraPermissionRequired:
           // Permission was denied before the platform view reached 'ready'.
           removeListener(listener);
+          _pendingReady.remove(completer);
           if (!completer.isCompleted) {
             completer.completeError(_lastPermissionException ?? const BlinkIdCameraPermissionException());
           }
@@ -480,6 +486,10 @@ class BlinkIdScannerController extends ChangeNotifier {
     final completer = _scanCompleter;
     _scanCompleter = null;
     completer?.completeError(const BlinkIdScanDisposeException());
+    for (final c in _pendingReady) {
+      if (!c.isCompleted) c.completeError(const BlinkIdScanDisposeException());
+    }
+    _pendingReady.clear();
     super.dispose();
   }
 }

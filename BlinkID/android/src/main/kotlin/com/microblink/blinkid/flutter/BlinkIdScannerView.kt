@@ -273,76 +273,86 @@ class BlinkIdScannerView(
                         return@setAnalyzer
                     }
 
-                val inputImage = InputImage.createFromCameraXImageProxy(imageProxy)
-                val processResult = runBlocking { session.process(inputImage) }
+                try {
+                    val inputImage = InputImage.createFromCameraXImageProxy(imageProxy)
+                    val processResult = runBlocking { session.process(inputImage) }
 
-                if (processResult.isFailure) {
-                    val msg = "process() failed: ${processResult.exceptionOrNull()}"
-                    scope.launch { if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", msg) }
-                } else if (processResult.isSuccess) {
-                    val frameResult = processResult.getOrNull()!!
-                    val detectionStatus = frameResult.inputImageAnalysisResult.documentDetectionStatus
-                    val scanningStatus = runBlocking { session.getScanningStatus() }
+                    if (processResult.isFailure) {
+                        val msg = "process() failed: ${processResult.exceptionOrNull()}"
+                        scope.launch { if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", msg) }
+                    } else if (processResult.isSuccess) {
+                        val frameResult = processResult.getOrNull()!!
+                        val detectionStatus = frameResult.inputImageAnalysisResult.documentDetectionStatus
+                        val scanningStatus = runBlocking { session.getScanningStatus() }
 
-                    when (scanningStatus) {
-                        ScanningStatus.DocumentScanned -> {
-                            isScanning = false
-                            scope.launch {
-                                if (scanningSession !== session) return@launch
-                                if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", "DocumentScanned — calling getResult()")
-                                // Signal Flutter immediately so it can show a spinner while
-                                // getResult() serializes (potentially large) image data.
-                                methodChannel.invokeMethod("onDocumentScanned", null)
-                                val scanResult = withContext(Dispatchers.Default) { session.getResult(null) }
-                                if (scanningSession !== session) return@launch
-                                if (scanResult.isSuccess) {
-                                    val resultMap =
-                                        withContext(Dispatchers.Default) {
-                                            val jsonString =
-                                                BlinkIdSerializationUtils.serializeBlinkIdScanningResult(
-                                                    scanResult.getOrNull(),
-                                                )
-                                            jsonString?.let { org.json.JSONObject(it).toNestedMap() }
-                                        }
-                                    methodChannel.invokeMethod("onScanResult", resultMap)
-                                } else {
-                                    val err = scanResult.exceptionOrNull()?.message ?: "Scan failed"
-                                    if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", "getResult() failed: $err")
-                                    methodChannel.invokeMethod("onScanError", err)
+                        when (scanningStatus) {
+                            ScanningStatus.DocumentScanned -> {
+                                isScanning = false
+                                scope.launch {
+                                    if (scanningSession !== session) return@launch
+                                    if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", "DocumentScanned — calling getResult()")
+                                    // Signal Flutter immediately so it can show a spinner while
+                                    // getResult() serializes (potentially large) image data.
+                                    methodChannel.invokeMethod("onDocumentScanned", null)
+                                    val scanResult = withContext(Dispatchers.Default) { session.getResult(null) }
+                                    if (scanningSession !== session) return@launch
+                                    if (scanResult.isSuccess) {
+                                        val resultMap =
+                                            withContext(Dispatchers.Default) {
+                                                val jsonString =
+                                                    BlinkIdSerializationUtils.serializeBlinkIdScanningResult(
+                                                        scanResult.getOrNull(),
+                                                    )
+                                                jsonString?.let { org.json.JSONObject(it).toNestedMap() }
+                                            }
+                                        methodChannel.invokeMethod("onScanResult", resultMap)
+                                    } else {
+                                        val err = scanResult.exceptionOrNull()?.message ?: "Scan failed"
+                                        if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", "getResult() failed: $err")
+                                        methodChannel.invokeMethod("onScanError", err)
+                                    }
+                                    scanningSession = null
                                 }
-                                scanningSession = null
                             }
-                        }
 
-                        ScanningStatus.SideScanned -> {
-                            // First side done; pause until Flutter calls resumeAfterFlip.
-                            isScanning = false
-                            scope.launch {
-                                if (scanningSession !== session) return@launch
-                                if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", "SideScanned — pausing for flip")
-                                guidanceEventSink?.success("flipDocument")
-                            }
-                        }
-
-                        else -> {
-                            val processingStatus = frameResult.inputImageAnalysisResult.processingStatus
-                            val guidance =
-                                if (processingStatus == ProcessingStatus.ScanningWrongSide) {
-                                    "wrongSide"
-                                } else {
-                                    detectionStatus.toGuidanceString()
+                            ScanningStatus.SideScanned -> {
+                                // First side done; pause until Flutter calls resumeAfterFlip.
+                                isScanning = false
+                                scope.launch {
+                                    if (scanningSession !== session) return@launch
+                                    if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", "SideScanned — pausing for flip")
+                                    guidanceEventSink?.success("flipDocument")
                                 }
-                            scope.launch { guidanceEventSink?.success(guidance) }
+                            }
+
+                            else -> {
+                                val processingStatus = frameResult.inputImageAnalysisResult.processingStatus
+                                val guidance =
+                                    if (processingStatus == ProcessingStatus.ScanningWrongSide) {
+                                        "wrongSide"
+                                    } else {
+                                        detectionStatus.toGuidanceString()
+                                    }
+                                scope.launch {
+                                    if (scanningSession !== session) return@launch
+                                    guidanceEventSink?.success(guidance)
+                                }
+                            }
                         }
                     }
+                } finally {
+                    imageProxy.close()
                 }
-                imageProxy.close()
             }
 
-            val preferred = preferredCameraOverride ?: creationParams["preferredCamera"] as? String
-            val cameraSelector = resolveCameraSelector(preferred, cameraProvider)
-            cameraProvider.unbindAll()
-            cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalysis)
+            try {
+                val preferred = preferredCameraOverride ?: creationParams["preferredCamera"] as? String
+                val cameraSelector = resolveCameraSelector(preferred, cameraProvider)
+                cameraProvider.unbindAll()
+                cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalysis)
+            } catch (e: Exception) {
+                scope.launch { methodChannel.invokeMethod("onScanError", "Camera bind failed: ${e.message}") }
+            }
         }, ContextCompat.getMainExecutor(context))
     }
 
