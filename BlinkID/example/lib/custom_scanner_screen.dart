@@ -277,10 +277,7 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
                 left: 8,
                 child: IconButton(
                   icon: const Icon(Icons.close, color: Colors.white),
-                  onPressed: () {
-                    _controller.cancel();
-                    _safePop();
-                  },
+                  onPressed: _controller.cancel,
                 ),
               ),
             // Camera switch button — top-right
