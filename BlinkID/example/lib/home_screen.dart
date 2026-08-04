@@ -60,6 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openCustomScanner() async {
+    setState(() { _result = null; _error = null; });
     final result = await Navigator.push<BlinkIdScanningResult>(
       context,
       MaterialPageRoute(

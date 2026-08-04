@@ -3,6 +3,7 @@ import 'dart:math' show pi;
 
 import 'package:blinkid_flutter/blinkid_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class CustomScannerScreen extends StatefulWidget {
   const CustomScannerScreen({required this.sdkSettings, required this.sessionSettings, super.key});
@@ -22,12 +23,15 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
   BlinkIdScanPhase _lastPhase = BlinkIdScanPhase.front;
   Timer? _scanTimer;
   PreferredCamera _camera = PreferredCamera.back;
+  bool _isPopping = false;
+  bool _isSwitchingCamera = false;
 
   static const _timeoutSeconds = 10;
 
   void _safePop([BlinkIdScanningResult? result]) {
+    if (_isPopping || !mounted) return;
+    _isPopping = true;
     _scanTimer?.cancel();
-    if (!mounted) return;
     Navigator.pop(context, result);
   }
 
@@ -102,8 +106,25 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
   }
 
   Future<void> _switchCamera() async {
-    _camera = _camera == .back ? .front : .back;
-    await _controller.switchCamera(_camera);
+    if (_isSwitchingCamera) return;
+    _isSwitchingCamera = true;
+    try {
+      _camera = _camera == .back ? .front : .back;
+      await _controller.switchCamera(_camera);
+    } finally {
+      _isSwitchingCamera = false;
+    }
+  }
+
+  Future<void> _requestPermission() async {
+    final status = await Permission.camera.request();
+    if (!mounted) return;
+    if (status.isGranted) {
+      _controller.retryAfterPermissionGrant();
+      unawaited(_startScanning());
+    } else if (status.isPermanentlyDenied) {
+      await openAppSettings();
+    }
   }
 
   Future<void> _startScanning() async {
@@ -242,10 +263,7 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
                         const SizedBox(height: 24),
                         if (!permanentlyDenied)
                           ElevatedButton(
-                            onPressed: () {
-                              _controller.retryAfterPermissionGrant();
-                              unawaited(_startScanning());
-                            },
+                            onPressed: () => unawaited(_requestPermission()),
                             child: const Text('Request Permission'),
                           ),
                       ],

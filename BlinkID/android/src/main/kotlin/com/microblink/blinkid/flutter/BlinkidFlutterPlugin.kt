@@ -388,6 +388,10 @@ class BlinkIdFlutterPlugin :
 
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
         flutterPluginActivity = binding.activity
+        binding.addActivityResultListener { requestCode, resultCode, data ->
+            onActivityResult(requestCode, resultCode, data)
+            true
+        }
         binding.addRequestPermissionsResultListener { requestCode, _, grantResults ->
             if (requestCode == CAMERA_PERMISSION_REQUEST_CODE) {
                 val granted =
