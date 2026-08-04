@@ -4,370 +4,440 @@ import Flutter
 import UIKit
 
 private final class CameraContainerView: UIView {
-    weak var previewLayer: AVCaptureVideoPreviewLayer?
+  weak var previewLayer: AVCaptureVideoPreviewLayer?
 
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        previewLayer?.frame = bounds
-    }
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    previewLayer?.frame = bounds
+  }
 }
 
 public class BlinkIdScannerView: NSObject, FlutterPlatformView {
-    private let containerView: CameraContainerView
-    private let viewId: Int64
-    private let creationParams: [String: Any]
-    private let sdkProvider: () -> AnyObject?
+  private let containerView: CameraContainerView
+  private let viewId: Int64
+  private let creationParams: [String: Any]
+  private let sdkProvider: () -> AnyObject?
 
-    private let methodChannel: FlutterMethodChannel
-    private let eventChannel: FlutterEventChannel
-    private var guidanceEventSink: FlutterEventSink?
+  private let methodChannel: FlutterMethodChannel
+  private let eventChannel: FlutterEventChannel
+  private var guidanceEventSink: FlutterEventSink?
 
-    private var captureSession: AVCaptureSession?
-    private var previewLayer: AVCaptureVideoPreviewLayer?
-    private var videoOutput: AVCaptureVideoDataOutput?
-    nonisolated(unsafe) private var isScanning = false
-    nonisolated(unsafe) private var isProcessingResult = false
-    nonisolated(unsafe) private var isProcessingFrame = false
-    nonisolated(unsafe) private var currentFrameOrientation: CameraFrameVideoOrientation = .portrait
-    nonisolated(unsafe) private var debugLoggingEnabled = false
-    nonisolated(unsafe) private var blinkIdSession: BlinkIDSession?
-    private var cameraSetupFailed = false
+  private var captureSession: AVCaptureSession?
+  private var previewLayer: AVCaptureVideoPreviewLayer?
+  private var videoOutput: AVCaptureVideoDataOutput?
+  nonisolated(unsafe) private var isScanning = false
+  nonisolated(unsafe) private var isProcessingResult = false
+  nonisolated(unsafe) private var isProcessingFrame = false
+  nonisolated(unsafe) private var currentFrameOrientation: CameraFrameVideoOrientation = .portrait
+  nonisolated(unsafe) private var debugLoggingEnabled = false
+  nonisolated(unsafe) private var blinkIdSession: BlinkIDSession?
+  private var cameraSetupFailed = false
+  private var preferredCameraOverride: String?
 
-    init(
-        frame: CGRect,
-        viewId: Int64,
-        messenger: FlutterBinaryMessenger,
-        creationParams: [String: Any],
-        sdkProvider: @escaping () -> AnyObject?,
-    ) {
-        self.viewId = viewId
-        self.creationParams = creationParams
-        self.sdkProvider = sdkProvider
-        self.containerView = CameraContainerView(frame: frame)
+  init(
+    frame: CGRect,
+    viewId: Int64,
+    messenger: FlutterBinaryMessenger,
+    creationParams: [String: Any],
+    sdkProvider: @escaping () -> AnyObject?,
+  ) {
+    self.viewId = viewId
+    self.creationParams = creationParams
+    self.sdkProvider = sdkProvider
+    self.containerView = CameraContainerView(frame: frame)
 
-        methodChannel = FlutterMethodChannel(
-            name: "com.microblink.blinkid.flutter/scanner/\(viewId)",
-            binaryMessenger: messenger,
+    methodChannel = FlutterMethodChannel(
+      name: "com.microblink.blinkid.flutter/scanner/\(viewId)",
+      binaryMessenger: messenger,
+    )
+    eventChannel = FlutterEventChannel(
+      name: "com.microblink.blinkid.flutter/scanner/\(viewId)/guidance",
+      binaryMessenger: messenger,
+    )
+
+    super.init()
+
+    eventChannel.setStreamHandler(self)
+    methodChannel.setMethodCallHandler { [weak self] call, result in
+      self?.handleMethodCall(call, result: result)
+    }
+
+    UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(deviceOrientationDidChange),
+      name: UIDevice.orientationDidChangeNotification,
+      object: nil,
+    )
+
+    setupCamera()
+  }
+
+  public func view() -> UIView { containerView }
+
+  @objc private func deviceOrientationDidChange() {
+    updateVideoOrientation()
+  }
+
+  private func updateVideoOrientation() {
+    let deviceOrientation = UIDevice.current.orientation
+    guard deviceOrientation.isValidInterfaceOrientation else { return }
+
+    currentFrameOrientation = deviceOrientation.cameraFrameOrientation
+
+    if #available(iOS 17.0, *) {
+      let angle = deviceOrientation.videoRotationAngle
+      videoOutput?.connection(with: .video)?.videoRotationAngle = angle
+      previewLayer?.connection?.videoRotationAngle = angle
+    } else {
+      let avOrientation = deviceOrientation.avCaptureOrientation
+      videoOutput?.connection(with: .video)?.videoOrientation = avOrientation
+      previewLayer?.connection?.videoOrientation = avOrientation
+    }
+  }
+
+  private func handleMethodCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    switch call.method {
+    case "startScan":
+      startScan(result: result)
+    case "cancelScan":
+      isScanning = false
+      isProcessingResult = false
+      blinkIdSession = nil
+      result(nil)
+    case "resumeAfterFlip":
+      isScanning = true
+      result(nil)
+    case "retryCamera":
+      cameraSetupFailed = false
+      setupCamera()
+      result(nil)
+    case "switchCamera":
+      isScanning = false
+      blinkIdSession = nil
+      preferredCameraOverride = call.arguments as? String
+      cameraSetupFailed = false
+      stopCaptureSession()
+      setupCamera()
+      result(nil)
+    case "setDebugLogging":
+      debugLoggingEnabled = (call.arguments as? Bool) ?? false
+      result(nil)
+    case "dispose":
+      teardown()
+      result(nil)
+    default:
+      result(FlutterMethodNotImplemented)
+    }
+  }
+
+  private func startScan(result: @escaping FlutterResult) {
+    if cameraSetupFailed {
+      result(FlutterError(code: "blinkid_error", message: "Camera unavailable", details: nil))
+      return
+    }
+    guard let sdk = sdkProvider() as? BlinkIDSdk else {
+      result(FlutterError(code: "blinkid_error", message: "SDK not initialized", details: nil))
+      return
+    }
+    guard let sessionSettingsDict = creationParams["sessionSettings"] as? [String: Any] else {
+      result(FlutterError(code: "blinkid_error", message: "Missing sessionSettings", details: nil))
+      return
+    }
+    Task { @MainActor [weak self] in
+      guard let self else { return }
+      do {
+        let sessionSettings = BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
+          sessionSettingsDict,
+          isFromDirectApi: false,
         )
-        eventChannel = FlutterEventChannel(
-            name: "com.microblink.blinkid.flutter/scanner/\(viewId)/guidance",
-            binaryMessenger: messenger,
-        )
+        let session = try await sdk.createScanningSession(sessionSettings: sessionSettings)
+        self.blinkIdSession = session
+        self.isScanning = true
+        result(nil)
+      } catch {
+        result(
+          FlutterError(code: "blinkid_error", message: error.localizedDescription, details: nil))
+      }
+    }
+  }
 
-        super.init()
-
-        eventChannel.setStreamHandler(self)
-        methodChannel.setMethodCallHandler { [weak self] call, result in
-            self?.handleMethodCall(call, result: result)
+  private func setupCamera() {
+    switch AVCaptureDevice.authorizationStatus(for: .video) {
+    case .authorized:
+      performCameraSetup()
+    case .notDetermined:
+      AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+        DispatchQueue.main.async {
+          if granted {
+            self?.performCameraSetup()
+          } else {
+            // User denied the system prompt — not permanently denied yet
+            // (they can still grant via Settings).
+            self?.handleCameraPermissionDenied(permanentlyDenied: false)
+          }
         }
+      }
+    case .denied:
+      // User previously denied and must re-enable in Settings.
+      handleCameraPermissionDenied(permanentlyDenied: true)
+    case .restricted:
+      // Device policy prevents camera access entirely.
+      handleCameraPermissionDenied(permanentlyDenied: true)
+    @unknown default:
+      performCameraSetup()
+    }
+  }
 
-        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(deviceOrientationDidChange),
-            name: UIDevice.orientationDidChangeNotification,
-            object: nil,
-        )
+  private func handleCameraPermissionDenied(permanentlyDenied: Bool) {
+    cameraSetupFailed = true
+    methodChannel.invokeMethod(
+      "onPermissionRequired",
+      arguments: ["permanentlyDenied": permanentlyDenied],
+    )
+  }
 
-        setupCamera()
+  private func stopCaptureSession() {
+    captureSession?.stopRunning()
+    captureSession = nil
+    previewLayer?.removeFromSuperlayer()
+    previewLayer = nil
+    videoOutput = nil
+  }
+
+  private func performCameraSetup() {
+    let session = AVCaptureSession()
+    session.sessionPreset = .high
+
+    let position = resolvePosition(
+      preferredCameraOverride ?? creationParams["preferredCamera"] as? String)
+    guard
+      let device = AVCaptureDevice.default(
+        .builtInWideAngleCamera, for: .video, position: position),
+      let input = try? AVCaptureDeviceInput(device: device)
+    else {
+      cameraSetupFailed = true
+      return
     }
 
-    public func view() -> UIView { containerView }
+    let output = AVCaptureVideoDataOutput()
+    output.alwaysDiscardsLateVideoFrames = true
+    output.setSampleBufferDelegate(
+      self,
+      queue: DispatchQueue(label: "com.microblink.blinkid.scanner.\(viewId)"),
+    )
 
-    @objc private func deviceOrientationDidChange() {
-        updateVideoOrientation()
+    guard session.canAddInput(input), session.canAddOutput(output) else {
+      cameraSetupFailed = true
+      return
+    }
+    session.addInput(input)
+    session.addOutput(output)
+    self.videoOutput = output
+
+    let preview = AVCaptureVideoPreviewLayer(session: session)
+    preview.videoGravity = .resizeAspectFill
+    preview.frame = containerView.bounds
+    containerView.layer.addSublayer(preview)
+    containerView.previewLayer = preview
+    self.previewLayer = preview
+    self.captureSession = session
+
+    // Apply initial orientation and mirroring after connections exist.
+    updateVideoOrientation()
+    if position == .front {
+      preview.connection?.automaticallyAdjustsVideoMirroring = false
+      preview.connection?.isVideoMirrored = true
     }
 
-    private func updateVideoOrientation() {
-        let deviceOrientation = UIDevice.current.orientation
-        guard deviceOrientation.isValidInterfaceOrientation else { return }
+    DispatchQueue.global(qos: .userInitiated).async { session.startRunning() }
+  }
 
-        currentFrameOrientation = deviceOrientation.cameraFrameOrientation
-
-        if #available(iOS 17.0, *) {
-            let angle = deviceOrientation.videoRotationAngle
-            videoOutput?.connection(with: .video)?.videoRotationAngle = angle
-            previewLayer?.connection?.videoRotationAngle = angle
-        } else {
-            let avOrientation = deviceOrientation.avCaptureOrientation
-            videoOutput?.connection(with: .video)?.videoOrientation = avOrientation
-            previewLayer?.connection?.videoOrientation = avOrientation
-        }
+  private func resolvePosition(_ preferred: String?) -> AVCaptureDevice.Position {
+    if preferred == "front",
+      AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) != nil
+    {
+      return .front
     }
+    return .back
+  }
 
-    private func handleMethodCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        switch call.method {
-        case "startScan":
-            startScan(result: result)
-        case "cancelScan":
-            isScanning = false
-            isProcessingResult = false
-            blinkIdSession = nil
-            result(nil)
-        case "resumeAfterFlip":
-            isScanning = true
-            result(nil)
-        case "setDebugLogging":
-            debugLoggingEnabled = (call.arguments as? Bool) ?? false
-            result(nil)
-        case "dispose":
-            teardown()
-            result(nil)
-        default:
-            result(FlutterMethodNotImplemented)
-        }
-    }
-
-    private func startScan(result: @escaping FlutterResult) {
-        if cameraSetupFailed {
-            result(FlutterError(code: "blinkid_error", message: "Camera unavailable", details: nil))
-            return
-        }
-        guard let sdk = sdkProvider() as? BlinkIDSdk else {
-            result(FlutterError(code: "blinkid_error", message: "SDK not initialized", details: nil))
-            return
-        }
-        guard let sessionSettingsDict = creationParams["sessionSettings"] as? [String: Any] else {
-            result(FlutterError(code: "blinkid_error", message: "Missing sessionSettings", details: nil))
-            return
-        }
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            do {
-                let sessionSettings = BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
-                    sessionSettingsDict,
-                    isFromDirectApi: false,
-                )
-                let session = try await sdk.createScanningSession(sessionSettings: sessionSettings)
-                self.blinkIdSession = session
-                self.isScanning = true
-                result(nil)
-            } catch {
-                result(FlutterError(code: "blinkid_error", message: error.localizedDescription, details: nil))
-            }
-        }
-    }
-
-    private func setupCamera() {
-        let session = AVCaptureSession()
-        session.sessionPreset = .high
-
-        let position = resolvePosition(creationParams["preferredCamera"] as? String)
-        guard
-            let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position),
-            let input = try? AVCaptureDeviceInput(device: device)
-        else {
-            cameraSetupFailed = true
-            return
-        }
-
-        let output = AVCaptureVideoDataOutput()
-        output.alwaysDiscardsLateVideoFrames = true
-        output.setSampleBufferDelegate(
-            self,
-            queue: DispatchQueue(label: "com.microblink.blinkid.scanner.\(viewId)"),
-        )
-
-        guard session.canAddInput(input), session.canAddOutput(output) else {
-            cameraSetupFailed = true
-            return
-        }
-        session.addInput(input)
-        session.addOutput(output)
-        self.videoOutput = output
-
-        let preview = AVCaptureVideoPreviewLayer(session: session)
-        preview.videoGravity = .resizeAspectFill
-        preview.frame = containerView.bounds
-        containerView.layer.addSublayer(preview)
-        containerView.previewLayer = preview
-        self.previewLayer = preview
-        self.captureSession = session
-
-        // Apply initial orientation and mirroring after connections exist.
-        updateVideoOrientation()
-        if position == .front {
-            preview.connection?.automaticallyAdjustsVideoMirroring = false
-            preview.connection?.isVideoMirrored = true
-        }
-
-        DispatchQueue.global(qos: .userInitiated).async { session.startRunning() }
-    }
-
-    private func resolvePosition(_ preferred: String?) -> AVCaptureDevice.Position {
-        if preferred == "front",
-           AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) != nil {
-            return .front
-        }
-        return .back
-    }
-
-    private func teardown() {
-        NotificationCenter.default.removeObserver(self, name: UIDevice.orientationDidChangeNotification, object: nil)
-        UIDevice.current.endGeneratingDeviceOrientationNotifications()
-        isScanning = false
-        blinkIdSession = nil
-        captureSession?.stopRunning()
-        captureSession = nil
-        previewLayer?.removeFromSuperlayer()
-        methodChannel.setMethodCallHandler(nil)
-        eventChannel.setStreamHandler(nil)
-    }
+  private func teardown() {
+    NotificationCenter.default.removeObserver(
+      self, name: UIDevice.orientationDidChangeNotification, object: nil)
+    UIDevice.current.endGeneratingDeviceOrientationNotifications()
+    isScanning = false
+    blinkIdSession = nil
+    captureSession?.stopRunning()
+    captureSession = nil
+    previewLayer?.removeFromSuperlayer()
+    methodChannel.setMethodCallHandler(nil)
+    eventChannel.setStreamHandler(nil)
+  }
 }
 
 extension BlinkIdScannerView: AVCaptureVideoDataOutputSampleBufferDelegate {
-    public func captureOutput(
-        _ output: AVCaptureOutput,
-        didOutput sampleBuffer: CMSampleBuffer,
-        from connection: AVCaptureConnection,
-    ) {
-        guard isScanning, !isProcessingResult, !isProcessingFrame, let session = blinkIdSession else { return }
-        isProcessingFrame = true
-
-        let frameOrientation = currentFrameOrientation
-        let inputImage = InputImage(
-            cameraFrame: CameraFrame(buffer: sampleBuffer, orientation: frameOrientation),
-        )
-
-        Task { @ProcessingActor [weak self] in
-            defer { self?.isProcessingFrame = false }
-            guard let self else { return }
-            do {
-                let frameResult = try await session.process(inputImage: inputImage)
-
-                if let sessionErr = frameResult.sessionError {
-                    await MainActor.run {
-                        if self.debugLoggingEnabled {
-                            self.methodChannel.invokeMethod("onDebugLog", arguments: "process sessionError: \(sessionErr)")
-                        }
-                    }
-                }
-
-                let processingStatus = frameResult.processResult?.inputImageAnalysisResult.processingStatus
-                if processingStatus == .scanningWrongSide {
-                    await MainActor.run { self.guidanceEventSink?("wrongSide") }
-                } else if let detectionStatus = frameResult.processResult?.inputImageAnalysisResult.documentDetectionStatus {
-                    let guidance = detectionStatus.guidanceString
-                    await MainActor.run { self.guidanceEventSink?(guidance) }
-                }
-
-                let status = session.getScanningStatus()
-
-                switch status {
-                case .sideScanned:
-                    self.isScanning = false
-                    await MainActor.run {
-                        guard self.blinkIdSession === session else { return }
-                        if self.debugLoggingEnabled {
-                            self.methodChannel.invokeMethod("onDebugLog", arguments: "SideScanned — pausing for flip")
-                        }
-                        self.guidanceEventSink?("flipDocument")
-                    }
-
-                case .documentScanned:
-                    guard !self.isProcessingResult else { return }
-                    self.isProcessingResult = true
-                    self.isScanning = false
-                    await MainActor.run {
-                        guard self.blinkIdSession === session else {
-                            self.isProcessingResult = false
-                            return
-                        }
-                        if self.debugLoggingEnabled {
-                            self.methodChannel.invokeMethod("onDebugLog", arguments: "DocumentScanned — calling getResult()")
-                        }
-                        self.methodChannel.invokeMethod("onDocumentScanned", arguments: nil)
-                    }
-                    guard self.blinkIdSession === session else {
-                        self.isProcessingResult = false
-                        return
-                    }
-                    let scanResult = session.getResult(redactionSettings: nil)
-                    let jsonString = BlinkIdSerializationUtils.serializeBlinkIdScanningResult(scanResult)
-                    let resultDict: [String: Any]? = jsonString.flatMap { str in
-                        guard let data = str.data(using: .utf8),
-                              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-                        else { return nil }
-                        return obj
-                    }
-                    await MainActor.run {
-                        guard self.blinkIdSession === session else {
-                            self.isProcessingResult = false
-                            return
-                        }
-                        self.methodChannel.invokeMethod("onScanResult", arguments: resultDict)
-                        self.blinkIdSession = nil
-                        self.isProcessingResult = false
-                    }
-
-                default:
-                    break
-                }
-            } catch {
-                await MainActor.run {
-                    if self.debugLoggingEnabled {
-                        self.methodChannel.invokeMethod("onDebugLog", arguments: "process() threw: \(error)")
-                    }
-                }
-            }
-        }
+  public func captureOutput(
+    _ output: AVCaptureOutput,
+    didOutput sampleBuffer: CMSampleBuffer,
+    from connection: AVCaptureConnection,
+  ) {
+    guard isScanning, !isProcessingResult, !isProcessingFrame, let session = blinkIdSession else {
+      return
     }
+    isProcessingFrame = true
+
+    let frameOrientation = currentFrameOrientation
+    let inputImage = InputImage(
+      cameraFrame: CameraFrame(buffer: sampleBuffer, orientation: frameOrientation),
+    )
+
+    Task { @ProcessingActor [weak self] in
+      defer { self?.isProcessingFrame = false }
+      guard let self else { return }
+      do {
+        let frameResult = try await session.process(inputImage: inputImage)
+
+        if let sessionErr = frameResult.sessionError {
+          await MainActor.run {
+            if self.debugLoggingEnabled {
+              self.methodChannel.invokeMethod(
+                "onDebugLog", arguments: "process sessionError: \(sessionErr)")
+            }
+          }
+        }
+
+        let processingStatus = frameResult.processResult?.inputImageAnalysisResult.processingStatus
+        if processingStatus == .scanningWrongSide {
+          await MainActor.run { self.guidanceEventSink?("wrongSide") }
+        } else if let detectionStatus = frameResult.processResult?.inputImageAnalysisResult
+          .documentDetectionStatus
+        {
+          let guidance = detectionStatus.guidanceString
+          await MainActor.run { self.guidanceEventSink?(guidance) }
+        }
+
+        let status = session.getScanningStatus()
+
+        switch status {
+        case .sideScanned:
+          self.isScanning = false
+          await MainActor.run {
+            guard self.blinkIdSession === session else { return }
+            if self.debugLoggingEnabled {
+              self.methodChannel.invokeMethod(
+                "onDebugLog", arguments: "SideScanned — pausing for flip")
+            }
+            self.guidanceEventSink?("flipDocument")
+          }
+
+        case .documentScanned:
+          guard !self.isProcessingResult else { return }
+          self.isProcessingResult = true
+          self.isScanning = false
+          await MainActor.run {
+            guard self.blinkIdSession === session else {
+              self.isProcessingResult = false
+              return
+            }
+            if self.debugLoggingEnabled {
+              self.methodChannel.invokeMethod(
+                "onDebugLog", arguments: "DocumentScanned — calling getResult()")
+            }
+            self.methodChannel.invokeMethod("onDocumentScanned", arguments: nil)
+          }
+          guard self.blinkIdSession === session else {
+            self.isProcessingResult = false
+            return
+          }
+          let scanResult = session.getResult(redactionSettings: nil)
+          let jsonString = BlinkIdSerializationUtils.serializeBlinkIdScanningResult(scanResult)
+          let resultDict: [String: Any]? = jsonString.flatMap { str in
+            guard let data = str.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { return nil }
+            return obj
+          }
+          await MainActor.run {
+            guard self.blinkIdSession === session else {
+              self.isProcessingResult = false
+              return
+            }
+            self.methodChannel.invokeMethod("onScanResult", arguments: resultDict)
+            self.blinkIdSession = nil
+            self.isProcessingResult = false
+          }
+
+        default:
+          break
+        }
+      } catch {
+        await MainActor.run {
+          if self.debugLoggingEnabled {
+            self.methodChannel.invokeMethod("onDebugLog", arguments: "process() threw: \(error)")
+          }
+        }
+      }
+    }
+  }
 }
 
 extension BlinkIdScannerView: FlutterStreamHandler {
-    public func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
-        guidanceEventSink = events
-        return nil
-    }
+  public func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink)
+    -> FlutterError?
+  {
+    guidanceEventSink = events
+    return nil
+  }
 
-    public func onCancel(withArguments arguments: Any?) -> FlutterError? {
-        guidanceEventSink = nil
-        return nil
-    }
+  public func onCancel(withArguments arguments: Any?) -> FlutterError? {
+    guidanceEventSink = nil
+    return nil
+  }
 }
 
 // MARK: - Orientation helpers
 
-private extension UIDeviceOrientation {
-    var cameraFrameOrientation: CameraFrameVideoOrientation {
-        switch self {
-        case .portraitUpsideDown: return .portraitUpsideDown
-        case .landscapeLeft:      return .landscapeLeft
-        case .landscapeRight:     return .landscapeRight
-        default:                  return .portrait
-        }
+extension UIDeviceOrientation {
+  fileprivate var cameraFrameOrientation: CameraFrameVideoOrientation {
+    switch self {
+    case .portraitUpsideDown: return .portraitUpsideDown
+    case .landscapeLeft: return .landscapeLeft
+    case .landscapeRight: return .landscapeRight
+    default: return .portrait
     }
+  }
 
-    // AVCaptureVideoOrientation landscape axes are inverted vs UIDeviceOrientation.
-    var avCaptureOrientation: AVCaptureVideoOrientation {
-        switch self {
-        case .portraitUpsideDown: return .portraitUpsideDown
-        case .landscapeLeft:      return .landscapeRight
-        case .landscapeRight:     return .landscapeLeft
-        default:                  return .portrait
-        }
+  // AVCaptureVideoOrientation landscape axes are inverted vs UIDeviceOrientation.
+  fileprivate var avCaptureOrientation: AVCaptureVideoOrientation {
+    switch self {
+    case .portraitUpsideDown: return .portraitUpsideDown
+    case .landscapeLeft: return .landscapeRight
+    case .landscapeRight: return .landscapeLeft
+    default: return .portrait
     }
+  }
 
-    @available(iOS 17.0, *)
-    var videoRotationAngle: CGFloat {
-        switch self {
-        case .portraitUpsideDown: return 270
-        case .landscapeLeft:      return 0
-        case .landscapeRight:     return 180
-        default:                  return 90
-        }
+  @available(iOS 17.0, *)
+  fileprivate var videoRotationAngle: CGFloat {
+    switch self {
+    case .portraitUpsideDown: return 270
+    case .landscapeLeft: return 0
+    case .landscapeRight: return 180
+    default: return 90
     }
+  }
 }
 
-private extension DetectionStatus {
-    var guidanceString: String {
-        switch self {
-        case .cameraTooFar: return "tooFar"
-        case .cameraTooClose: return "tooClose"
-        case .documentTooCloseToCameraEdge: return "tooCloseToEdge"
-        case .cameraAngleTooSteep: return "tilted"
-        case .documentPartiallyVisible: return "notFullyVisible"
-        default: return "searching"
-        }
+extension DetectionStatus {
+  fileprivate var guidanceString: String {
+    switch self {
+    case .cameraTooFar: return "tooFar"
+    case .cameraTooClose: return "tooClose"
+    case .documentTooCloseToCameraEdge: return "tooCloseToEdge"
+    case .cameraAngleTooSteep: return "tilted"
+    case .documentPartiallyVisible: return "notFullyVisible"
+    default: return "searching"
     }
+  }
 }

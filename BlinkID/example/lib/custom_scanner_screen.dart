@@ -37,42 +37,19 @@ class CustomScannerScreen extends StatefulWidget {
 }
 
 class _CustomScannerScreenState extends State<CustomScannerScreen> {
-  @override
-  Widget build(BuildContext context) => _ScannerInstance(
-    sdkSettings: widget.sdkSettings,
-    sessionSettings: widget.sessionSettings,
-  );
-}
-
-class _ScannerInstance extends StatefulWidget {
-  const _ScannerInstance({
-    required this.sdkSettings,
-    required this.sessionSettings,
-    super.key,
-  });
-
-  final BlinkIdSdkSettings sdkSettings;
-  final BlinkIdSessionSettings sessionSettings;
-
-  @override
-  State<_ScannerInstance> createState() => _ScannerInstanceState();
-}
-
-class _ScannerInstanceState extends State<_ScannerInstance> {
   late final BlinkIdScannerController _controller;
   StreamSubscription<BlinkIdGuidance>? _guidanceSub;
-  bool _popping = false;
   bool _showingTimeoutDialog = false;
   BlinkIdScannerStatus _lastStatus = BlinkIdScannerStatus.uninitialized;
   BlinkIdScanPhase _lastPhase = BlinkIdScanPhase.front;
   Timer? _scanTimer;
+  PreferredCamera _camera = PreferredCamera.back;
 
   static const _timeoutSeconds = 10;
 
   void _safePop([BlinkIdScanningResult? result]) {
     _scanTimer?.cancel();
-    if (_popping || !mounted) return;
-    _popping = true;
+    if (!mounted) return;
     Navigator.pop(context, result);
   }
 
@@ -85,7 +62,6 @@ class _ScannerInstanceState extends State<_ScannerInstance> {
     unawaited(_startScanning());
   }
 
-  // Manages the per-side scan timer based on status/phase transitions.
   void _onScanStateChanged() {
     final status = _controller.status;
     final phase = _controller.phase;
@@ -109,8 +85,6 @@ class _ScannerInstanceState extends State<_ScannerInstance> {
   }
 
   void _onGuidanceForTimer(BlinkIdGuidance guidance) {
-    // Active detection resets the timeout. Searching = nothing visible;
-    // wrongSide = can't proceed — neither counts as progress.
     if (guidance is BlinkIdGuidanceSearching || guidance is BlinkIdGuidanceWrongSide) return;
     if (_controller.status == BlinkIdScannerStatus.scanning) _startScanTimer();
   }
@@ -142,27 +116,26 @@ class _ScannerInstanceState extends State<_ScannerInstance> {
 
     if (retry == true) {
       _lastPhase = BlinkIdScanPhase.front;
-      _controller.reset(); // → BlinkIdScanResetException → _startScanning loop continues
+      _controller.reset();
     } else {
       _controller.cancel();
       _safePop();
     }
   }
 
+  Future<void> _switchCamera() async {
+    _camera = _camera == PreferredCamera.back ? PreferredCamera.front : PreferredCamera.back;
+    await _controller.switchCamera(_camera);
+  }
+
   Future<void> _startScanning() async {
     try {
-      await _controller.initialize(widget.sdkSettings, widget.sessionSettings);
-    } catch (e, st) {
+      await _controller.initialize(widget.sdkSettings, widget.sessionSettings, preferredCamera: _camera);
+    } on BlinkIdSdkInitException catch (e, st) {
       debugPrint('BlinkID init error: $e\n$st');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Scan error: $e')));
-      }
-      _safePop();
       return;
     }
 
-    // scan() suspends internally until the platform view is ready, then starts.
-    // The loop continues on reset() so the user can retry without rebuilding.
     while (mounted) {
       try {
         final result = await _controller.scan();
@@ -172,13 +145,23 @@ class _ScannerInstanceState extends State<_ScannerInstance> {
         return;
       } on BlinkIdScanCancelException {
         _scanTimer?.cancel();
+        // switchCamera internally cancels the scan and moves to initializing;
+        // let the loop continue so scan() awaits the new camera being ready.
+        if (_controller.status == BlinkIdScannerStatus.initializing) continue;
         _safePop();
         return;
       } on BlinkIdScanResetException {
         _scanTimer?.cancel();
-        // Controller is back to ready — loop restarts scan().
       } on BlinkIdScanDisposeException {
         _scanTimer?.cancel();
+        return;
+      } on BlinkIdCameraPermissionException catch (e, st) {
+        _scanTimer?.cancel();
+        debugPrint('BlinkID camera permission: $e\n$st');
+        return;
+      } on BlinkIdSdkInitException catch (e, st) {
+        _scanTimer?.cancel();
+        debugPrint('BlinkID sdk error: $e\n$st');
         return;
       } catch (e, st) {
         _scanTimer?.cancel();
@@ -218,15 +201,41 @@ class _ScannerInstanceState extends State<_ScannerInstance> {
         if (status == BlinkIdScannerStatus.error) {
           return ColoredBox(
             color: const Color(0xFF000000),
-            child: Center(
-              child: Text(
-                'Camera error:\n${_controller.lastError}',
-                style: const TextStyle(color: Color(0xFFFFFFFF)),
-                textAlign: TextAlign.center,
-              ),
+            child: Stack(
+              children: [
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Text(
+                      '${_controller.lastError}',
+                      style: const TextStyle(color: Color(0xFFFFFFFF)),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: SafeArea(
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: _safePop,
+                    ),
+                  ),
+                ),
+              ],
             ),
           );
         }
+
+        final permRequired = status == BlinkIdScannerStatus.cameraPermissionRequired;
+        final permException = _controller.lastPermissionException;
+        final permanentlyDenied = permException?.permanentlyDenied ?? false;
+
+        final canInteract =
+            !permRequired &&
+            status != BlinkIdScannerStatus.processing &&
+            status != BlinkIdScannerStatus.done;
 
         return Stack(
           fit: StackFit.expand,
@@ -237,15 +246,57 @@ class _ScannerInstanceState extends State<_ScannerInstance> {
                 color: Color(0xFF000000),
                 child: Center(child: CircularProgressIndicator(color: Color(0xFFFFFFFF))),
               ),
-            if (status != BlinkIdScannerStatus.initializing &&
-                status != BlinkIdScannerStatus.processing &&
-                status != BlinkIdScannerStatus.done)
+            if (permRequired)
+              ColoredBox(
+                color: const Color(0xFF000000),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.camera_alt, color: Color(0xFFFFFFFF), size: 48),
+                        const SizedBox(height: 16),
+                        Text(
+                          permanentlyDenied
+                              ? 'Camera access is blocked.\nPlease enable it in your device Settings.'
+                              : 'Camera access is required to scan documents.',
+                          style: const TextStyle(color: Color(0xFFFFFFFF), fontSize: 16),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 24),
+                        if (!permanentlyDenied)
+                          ElevatedButton(
+                            onPressed: () {
+                              _controller.retryAfterPermissionGrant();
+                              unawaited(_startScanning());
+                            },
+                            child: const Text('Request Permission'),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            if (canInteract)
               switch (_controller.phase) {
                 BlinkIdScanPhase.flip => _FlipOverlay(controller: _controller),
                 _ => _GuidanceOverlay(controller: _controller),
               },
             if (status == BlinkIdScannerStatus.done) const _ScanSuccessOverlay(message: 'Document scanned!'),
-            if (status != BlinkIdScannerStatus.processing && status != BlinkIdScannerStatus.done)
+            // Close button — top-left
+            if (permRequired)
+              Positioned(
+                top: 8,
+                left: 8,
+                child: SafeArea(
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: _safePop,
+                  ),
+                ),
+              ),
+            if (canInteract)
               Positioned(
                 top: MediaQuery.of(context).padding.top + 8,
                 left: 8,
@@ -255,6 +306,16 @@ class _ScannerInstanceState extends State<_ScannerInstance> {
                     _controller.cancel();
                     _safePop();
                   },
+                ),
+              ),
+            // Camera switch button — top-right
+            if (canInteract)
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 8,
+                right: 8,
+                child: IconButton(
+                  icon: const Icon(Icons.cameraswitch, color: Colors.white),
+                  onPressed: () => unawaited(_switchCamera()),
                 ),
               ),
           ],
@@ -287,8 +348,6 @@ class _FlipOverlayState extends State<_FlipOverlay> with SingleTickerProviderSta
       setState(() => _stage = _FlipStage.animating);
       _anim.forward().then((_) {
         if (!mounted) return;
-        // Resume native scanning. Phase stays 'flip' until the camera detects
-        // the first back-side frame (_awaitingBackSide in controller).
         widget.controller.onFlipComplete();
         setState(() => _stage = _FlipStage.persistent);
       });
@@ -371,11 +430,8 @@ class _GuidanceOverlayState extends State<_GuidanceOverlay> {
   bool _sticky = false;
   StreamSubscription<BlinkIdGuidance>? _sub;
 
-  // How long to wait before showing a new message (avoids flickering at 30 fps).
   static const _debounceDelay = Duration(milliseconds: 600);
-  // Minimum time a shown message stays visible before it can be replaced.
   static const _stickyDuration = Duration(milliseconds: 1500);
-  // How long without any guidance before resetting to the idle prompt.
   static const _resetDelay = Duration(seconds: 3);
 
   @override
@@ -395,8 +451,6 @@ class _GuidanceOverlayState extends State<_GuidanceOverlay> {
     _pendingText = next;
     _debounce?.cancel();
 
-    // If the current message is still in its sticky window, wait it out first,
-    // then debounce from that point. Otherwise debounce immediately.
     final delay = _sticky ? _stickyDuration : _debounceDelay;
     _debounce = Timer(delay, () {
       if (!mounted) return;

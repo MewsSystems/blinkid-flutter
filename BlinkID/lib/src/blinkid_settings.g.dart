@@ -86,10 +86,10 @@ BlinkIdScanningSettings _$BlinkIdScanningSettingsFromJson(
 Map<String, dynamic> _$BlinkIdScanningSettingsToJson(
   BlinkIdScanningSettings instance,
 ) => <String, dynamic>{
-  'documentCaptureModule': instance.documentCaptureModule?.toJson(),
-  'mrzModule': instance.mrzModule?.toJson(),
-  'barcodeModule': instance.barcodeModule?.toJson(),
-  'vizModule': instance.vizModule?.toJson(),
+  'documentCaptureModule': ?instance.documentCaptureModule?.toJson(),
+  'mrzModule': ?instance.mrzModule?.toJson(),
+  'barcodeModule': ?instance.barcodeModule?.toJson(),
+  'vizModule': ?instance.vizModule?.toJson(),
   'maxAllowedMismatchesPerField': instance.maxAllowedMismatchesPerField,
 };
 

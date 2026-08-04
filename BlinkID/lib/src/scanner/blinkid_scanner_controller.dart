@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:meta/meta.dart';
 
 import '../blinkid_flutter_platform_interface.dart';
 import '../blinkid_result.dart';
@@ -32,6 +31,22 @@ enum BlinkIdScannerStatus {
   done,
 
   error,
+
+  /// Camera permission has not been granted. Call
+  /// [BlinkIdScannerController.retryAfterPermissionGrant] after the host app
+  /// successfully grants the CAMERA permission.
+  ///
+  /// **Permission request responsibility:** this plugin detects the missing
+  /// permission and reports it, but the host app owns the request flow.
+  /// Use the `permission_handler` package (or platform-native APIs) to request
+  /// `Permission.camera`, then call [BlinkIdScannerController.retryAfterPermissionGrant].
+  ///
+  /// The [BlinkIdCameraPermissionException] thrown by [BlinkIdScannerController.scan]
+  /// carries a `permanentlyDenied` flag. When `true`, direct the user to open
+  /// the system Settings instead of re-requesting. On Android, this flag may
+  /// also be `true` on the very first launch before any prompt — use
+  /// `permission_handler`'s `isPermanentlyDenied` for a definitive check.
+  cameraPermissionRequired,
 }
 
 enum BlinkIdScanPhase {
@@ -63,6 +78,16 @@ class BlinkIdScannerController extends ChangeNotifier {
   /// Call [reset] to recover — the controller is reusable after an error.
   Exception? _lastError;
   Exception? get lastError => _lastError;
+
+  // Stored so _awaitReady() can surface it when permission is denied before
+  // the platform view reaches 'ready'.
+  BlinkIdCameraPermissionException? _lastPermissionException;
+
+  /// The last camera-permission exception set when [status] is
+  /// [BlinkIdScannerStatus.cameraPermissionRequired].
+  /// Use [permanentlyDenied] to decide between "open Settings" and
+  /// "re-request permission + call [retryAfterPermissionGrant]".
+  BlinkIdCameraPermissionException? get lastPermissionException => _lastPermissionException;
 
   final _guidanceController = StreamController<BlinkIdGuidance>.broadcast();
 
@@ -103,8 +128,9 @@ class BlinkIdScannerController extends ChangeNotifier {
     try {
       await BlinkIdFlutterPlatform.instance.loadBlinkIdSdk(sdkSettings);
     } on PlatformException catch (e) {
-      _failScan(e.message ?? 'SDK load failed');
-      rethrow;
+      final wrapped = BlinkIdSdkInitException(e.message ?? 'SDK load failed');
+      _failScan(wrapped.message);
+      throw wrapped;
     }
     _setStatus(BlinkIdScannerStatus.initializing);
     _creationParams = {
@@ -118,12 +144,8 @@ class BlinkIdScannerController extends ChangeNotifier {
   /// Do not call this directly.
   @internal
   void onPlatformViewCreated(int id) {
-    final methodChannel = MethodChannel(
-      'com.microblink.blinkid.flutter/scanner/$id',
-    );
-    final eventChannel = EventChannel(
-      'com.microblink.blinkid.flutter/scanner/$id/guidance',
-    );
+    final methodChannel = MethodChannel('com.microblink.blinkid.flutter/scanner/$id');
+    final eventChannel = EventChannel('com.microblink.blinkid.flutter/scanner/$id/guidance');
 
     methodChannel.setMethodCallHandler(_handleMethodCall);
     _methodChannel = methodChannel;
@@ -179,7 +201,7 @@ class BlinkIdScannerController extends ChangeNotifier {
   void onFlipComplete() {
     if (_phase != BlinkIdScanPhase.flip) return;
     _awaitingBackSide = true;
-    _methodChannel?.invokeMethod<void>('resumeAfterFlip').ignore();
+    _resumeAfterFlip();
   }
 
   /// Enables or disables native debug log forwarding to [debugPrint].
@@ -190,7 +212,7 @@ class BlinkIdScannerController extends ChangeNotifier {
   /// Safe to call before or after the platform view is created.
   void setDebugLogging(bool enabled) {
     _debugLoggingEnabled = enabled;
-    _methodChannel?.invokeMethod<void>('setDebugLogging', enabled).ignore();
+    _setDebugLogging(enabled);
   }
 
   /// Starts a scan session and returns the [BlinkIdScanningResult] on success.
@@ -204,8 +226,7 @@ class BlinkIdScannerController extends ChangeNotifier {
   /// on [reset], or [StateError] if [initialize] was never called.
   Future<BlinkIdScanningResult> scan() async {
     switch (_status) {
-      case BlinkIdScannerStatus.loadingSdk ||
-          BlinkIdScannerStatus.initializing:
+      case BlinkIdScannerStatus.loadingSdk || BlinkIdScannerStatus.initializing:
         await _awaitReady();
       case BlinkIdScannerStatus.ready:
         break;
@@ -219,27 +240,103 @@ class BlinkIdScannerController extends ChangeNotifier {
     _phase = BlinkIdScanPhase.front;
     _setStatus(BlinkIdScannerStatus.scanning);
     _scanCompleter = Completer<BlinkIdScanningResult>();
+    // Capture before the await — _handleMethodCall can null _scanCompleter
+    // during the async gap (e.g. onPermissionRequired fires mid-startScan).
+    final completer = _scanCompleter!;
+    // Silence unhandled-future errors: if _handleMethodCall completes the
+    // completer (e.g. onPermissionRequired) before we reach `return completer.future`,
+    // Dart would report the error as unhandled. ignore() marks it as handled now;
+    // the actual error still propagates when the caller awaits completer.future.
+    completer.future.ignore();
 
     try {
       await channel.invokeMethod<void>('startScan');
     } on PlatformException catch (e) {
-      _failScan(e.message ?? 'startScan failed');
-      rethrow;
+      if (completer.isCompleted) {
+        // _handleMethodCall already resolved this completer (e.g. onPermissionRequired
+        // fired, notifyListeners tore down BlinkIdScannerView, and the native
+        // dispose() replied to the pending startScan with "Scanner disposed").
+        // Fall through and return completer.future so the caller sees the real error.
+      } else {
+        _lastError = Exception(e.message ?? 'startScan failed');
+        _setStatus(BlinkIdScannerStatus.error);
+        _scanCompleter = null;
+        rethrow;
+      }
     }
 
-    return _scanCompleter!.future;
+    return completer.future;
   }
 
   /// Cancels the current scan and returns to [BlinkIdScannerStatus.ready].
   /// The [Future] from [scan] completes with [BlinkIdScanCancelException].
   void cancel() {
-    _methodChannel?.invokeMethod<void>('cancelScan').ignore();
+    _cancelScan();
     switch (_status) {
       case BlinkIdScannerStatus.scanning || BlinkIdScannerStatus.processing:
         _abortWithCancel();
       default:
         break;
     }
+  }
+
+  /// Call after the host app successfully grants the CAMERA permission.
+  ///
+  /// Dispatches a `retryCamera` command to the native view and transitions
+  /// status to [BlinkIdScannerStatus.ready] optimistically — `ready` here means
+  /// "retry dispatched", not "camera confirmed running". If the grant did not
+  /// actually take effect the native side will re-fire `onPermissionRequired`
+  /// and status will return to [BlinkIdScannerStatus.cameraPermissionRequired].
+  ///
+  /// No-op if [status] is not [BlinkIdScannerStatus.cameraPermissionRequired].
+  void retryAfterPermissionGrant() {
+    if (_status != BlinkIdScannerStatus.cameraPermissionRequired) return;
+    _lastPermissionException = null;
+    _retryCamera();
+    _setStatus(BlinkIdScannerStatus.ready);
+  }
+
+  /// Switches the active camera without tearing down the scanner view.
+  ///
+  /// Cancels any in-flight scan and transitions to
+  /// [BlinkIdScannerStatus.initializing] while the native camera rebinds, then
+  /// back to [BlinkIdScannerStatus.ready]. Call [scan] again after this returns
+  /// to start scanning with the new camera.
+  ///
+  /// Any [Future] from an in-progress [scan] completes with
+  /// [BlinkIdScanCancelException].
+  ///
+  /// Throws [StateError] if the platform view is not yet attached or if the
+  /// controller is in a state that does not support camera switching (e.g.
+  /// [BlinkIdScannerStatus.uninitialized], [BlinkIdScannerStatus.error]).
+  Future<void> switchCamera(PreferredCamera camera) async {
+    if (_methodChannel == null) throw StateError('Platform view not ready; cannot switch camera');
+    switch (_status) {
+      case BlinkIdScannerStatus.ready ||
+          BlinkIdScannerStatus.scanning ||
+          BlinkIdScannerStatus.processing ||
+          BlinkIdScannerStatus.done:
+        break;
+      default:
+        throw StateError('Cannot switch camera in state $_status');
+    }
+
+    _cancelScan();
+    final completer = _scanCompleter;
+    _scanCompleter = null;
+    completer?.completeError(const BlinkIdScanCancelException());
+
+    _creationParams = {..._creationParams, 'preferredCamera': camera.name};
+    _setStatus(BlinkIdScannerStatus.initializing);
+
+    try {
+      await _methodChannel!.invokeMethod<void>('switchCamera', camera.name);
+    } on PlatformException catch (e) {
+      _failScan(e.message ?? 'Camera switch failed');
+      rethrow;
+    }
+
+    _setStatus(BlinkIdScannerStatus.ready);
   }
 
   /// Cancels any in-flight scan and returns the controller to
@@ -251,7 +348,7 @@ class BlinkIdScannerController extends ChangeNotifier {
   /// Can also be called when [status] is [BlinkIdScannerStatus.error] to
   /// recover and allow a new scan.
   void reset() {
-    _methodChannel?.invokeMethod<void>('cancelScan').ignore();
+    _cancelScan();
     _phase = BlinkIdScanPhase.front;
     _awaitingBackSide = false;
     _lastError = null;
@@ -261,7 +358,10 @@ class BlinkIdScannerController extends ChangeNotifier {
     switch (_status) {
       case BlinkIdScannerStatus.uninitialized ||
           BlinkIdScannerStatus.loadingSdk ||
-          BlinkIdScannerStatus.initializing:
+          BlinkIdScannerStatus.initializing ||
+          // Permission denial can't be reset away — the host must grant the
+          // permission and call retryAfterPermissionGrant() instead.
+          BlinkIdScannerStatus.cameraPermissionRequired:
         break;
       default:
         _setStatus(BlinkIdScannerStatus.ready);
@@ -272,7 +372,7 @@ class BlinkIdScannerController extends ChangeNotifier {
     try {
       switch (call.method) {
         case 'onDebugLog':
-          debugPrint('[BlinkID] ${call.arguments}');
+          if (_debugLoggingEnabled) debugPrint('[BlinkID] ${call.arguments}');
         case 'onDocumentScanned':
           _setStatus(BlinkIdScannerStatus.processing);
         case 'onScanResult':
@@ -281,6 +381,16 @@ class BlinkIdScannerController extends ChangeNotifier {
           _failScan(call.arguments as String? ?? 'Scan error');
         case 'onScanCanceled':
           _abortWithCancel();
+        case 'onPermissionRequired':
+          final args = call.arguments as Map?;
+          final permanentlyDenied = args?['permanentlyDenied'] as bool? ?? false;
+          final permissionException = BlinkIdCameraPermissionException(permanentlyDenied: permanentlyDenied);
+          _lastPermissionException = permissionException;
+          _setStatus(BlinkIdScannerStatus.cameraPermissionRequired);
+          _cancelScan();
+          final completer = _scanCompleter;
+          _scanCompleter = null;
+          completer?.completeError(permissionException);
       }
     } catch (e, st) {
       debugPrint('BlinkID _handleMethodCall error (${call.method}): $e\n$st');
@@ -288,13 +398,19 @@ class BlinkIdScannerController extends ChangeNotifier {
     }
   }
 
+  void _cancelScan() => _methodChannel?.invokeMethod<void>('cancelScan').ignore();
+
+  void _resumeAfterFlip() => _methodChannel?.invokeMethod<void>('resumeAfterFlip').ignore();
+
+  void _retryCamera() => _methodChannel?.invokeMethod<void>('retryCamera').ignore();
+
+  void _setDebugLogging(bool enabled) => _methodChannel?.invokeMethod<void>('setDebugLogging', enabled).ignore();
+
   BlinkIdScanningResult _parseResult(dynamic rawArgs) {
     final Map<String, dynamic> json = switch (rawArgs) {
       final Map m => Map<String, dynamic>.from(m),
       final String s => Map<String, dynamic>.from(jsonDecode(s) as Map),
-      _ => throw ArgumentError(
-          'Unexpected scan result type: ${rawArgs?.runtimeType}',
-        ),
+      _ => throw ArgumentError('Unexpected scan result type: ${rawArgs?.runtimeType}'),
     };
     return BlinkIdScanningResult(json);
   }
@@ -310,14 +426,19 @@ class BlinkIdScannerController extends ChangeNotifier {
         case BlinkIdScannerStatus.error:
           removeListener(listener);
           if (!completer.isCompleted) {
-            completer.completeError(
-              _lastError ?? Exception('Controller initialization failed'),
-            );
+            completer.completeError(_lastError ?? Exception('Controller initialization failed'));
+          }
+        case BlinkIdScannerStatus.cameraPermissionRequired:
+          // Permission was denied before the platform view reached 'ready'.
+          removeListener(listener);
+          if (!completer.isCompleted) {
+            completer.completeError(_lastPermissionException ?? const BlinkIdCameraPermissionException());
           }
         default:
           break;
       }
     }
+
     addListener(listener);
     return completer.future;
   }
@@ -352,7 +473,7 @@ class BlinkIdScannerController extends ChangeNotifier {
 
   @override
   void dispose() {
-    _guidanceSub?.cancel();
+    _guidanceSub?.cancel().ignore();
     _guidanceController.close();
     _methodChannel?.invokeMethod<void>('dispose').ignore();
     // Drain in-flight scan without corrupting status — widget tree tearing down.
@@ -385,4 +506,45 @@ class BlinkIdScanDisposeException implements Exception {
   const BlinkIdScanDisposeException();
   @override
   String toString() => 'Scanner disposed';
+}
+
+/// Thrown by [BlinkIdScannerController.initialize] when the BlinkID SDK fails
+/// to load (network error, license check failure, etc.).
+class BlinkIdSdkInitException implements Exception {
+  const BlinkIdSdkInitException(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
+
+/// Thrown when camera permission has not been granted.
+///
+/// Check [permanentlyDenied] to decide whether to show a "Go to Settings"
+/// prompt or to request the permission again:
+///
+/// ```dart
+/// } catch (e) {
+///   if (e is BlinkIdCameraPermissionException) {
+///     if (e.permanentlyDenied) {
+///       // open app settings
+///     } else {
+///       // request permission, then call controller.retryAfterPermissionGrant()
+///     }
+///   }
+/// }
+/// ```
+///
+/// **Note:** On Android, [permanentlyDenied] may be `true` on the very first
+/// launch before any permission prompt has been shown.  Use
+/// `permission_handler`'s `Permission.camera.isPermanentlyDenied` for a
+/// definitive check on Android.
+class BlinkIdCameraPermissionException implements Exception {
+  const BlinkIdCameraPermissionException({this.permanentlyDenied = false});
+
+  final bool permanentlyDenied;
+
+  @override
+  String toString() => permanentlyDenied
+      ? 'Camera permission permanently denied; direct user to app Settings'
+      : 'Camera permission required';
 }
