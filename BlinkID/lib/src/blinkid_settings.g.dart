@@ -50,7 +50,7 @@ Map<String, dynamic> _$BlinkIdSessionSettingsToJson(
   BlinkIdSessionSettings instance,
 ) => <String, dynamic>{
   'scanningMode': _$ScanningModeEnumMap[instance.scanningMode]!,
-  'scanningSettings': instance.scanningSettings,
+  'scanningSettings': instance.scanningSettings.toJson(),
   'stepTimeoutDuration': instance.stepTimeoutDuration,
   'inactivityTimeoutDuration': instance.inactivityTimeoutDuration,
 };
@@ -86,10 +86,10 @@ BlinkIdScanningSettings _$BlinkIdScanningSettingsFromJson(
 Map<String, dynamic> _$BlinkIdScanningSettingsToJson(
   BlinkIdScanningSettings instance,
 ) => <String, dynamic>{
-  'documentCaptureModule': instance.documentCaptureModule,
-  'mrzModule': instance.mrzModule,
-  'barcodeModule': instance.barcodeModule,
-  'vizModule': instance.vizModule,
+  'documentCaptureModule': ?instance.documentCaptureModule?.toJson(),
+  'mrzModule': ?instance.mrzModule?.toJson(),
+  'barcodeModule': ?instance.barcodeModule?.toJson(),
+  'vizModule': ?instance.vizModule?.toJson(),
   'maxAllowedMismatchesPerField': instance.maxAllowedMismatchesPerField,
 };
 

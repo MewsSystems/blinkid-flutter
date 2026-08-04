@@ -829,7 +829,7 @@ enum Country {
   uae,
   @JsonValue("gganda")
   gganda,
-  @JsonValue("uK") // TODO should be uk
+  @JsonValue("uK")
   uK,
   @JsonValue("ukraine")
   ukraine,
@@ -2095,9 +2095,6 @@ class Location {
 }
 
 /// Side of the document on which the specific result is located.
-// TODO: Native SDK returns ScanningSide (first/second), not front/back. Remove
-// DocumentSide, use ScanningSide here, and parse string values from native
-// (see blinkid-react-native BlinkID/src/types.ts).
 class Side {
   /// Document side of the result extracted from the OCR in the latin alphabet.
   DocumentSide? latin;
@@ -2121,7 +2118,6 @@ class Side {
 }
 
 /// Define document side where the document field is located
-// TODO: Remove DocumentSide; StringResult.side uses ScanningSide in blinkid-core.
 enum DocumentSide {
   ///The field was not detected
   none,
@@ -2838,8 +2834,6 @@ class MrzResult {
 
   /// Represents the result of the MRZ recognition.
   MrzResult(Map<String, dynamic> nativeMRZResult) {
-    // TODO: Serialize documentType as string on native side (e.g. "passport") instead
-    // of int ordinal; update enumFromValue usage accordingly.
     documentType = enumFromValue(
       MRZDocumentType.values,
       nativeMRZResult["documentType"],
