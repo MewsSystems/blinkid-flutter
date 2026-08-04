@@ -182,14 +182,6 @@ class BlinkIdScannerController extends ChangeNotifier {
     _methodChannel?.invokeMethod<void>('resumeAfterFlip').ignore();
   }
 
-  /// Switches the active camera lens at runtime. Safe to call while scanning —
-  /// the native analyzer pauses for the duration of the hardware swap then
-  /// resumes automatically. No-op if the platform view is not yet attached or
-  /// if the requested lens is unavailable (native falls back silently).
-  Future<void> switchCamera(PreferredCamera camera) async {
-    await _methodChannel?.invokeMethod<void>('switchCamera', camera.name);
-  }
-
   /// Enables or disables native debug log forwarding to [debugPrint].
   ///
   /// When enabled, key lifecycle events (scan start, side scanned, errors) are

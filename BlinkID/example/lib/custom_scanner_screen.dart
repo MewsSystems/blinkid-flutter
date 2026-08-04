@@ -37,6 +37,45 @@ class CustomScannerScreen extends StatefulWidget {
 }
 
 class _CustomScannerScreenState extends State<CustomScannerScreen> {
+  PreferredCamera _activeCamera = PreferredCamera.back;
+  int _cameraKey = 0;
+
+  void _switchCamera() {
+    setState(() {
+      _activeCamera = _activeCamera == PreferredCamera.back ? PreferredCamera.front : PreferredCamera.back;
+      _cameraKey++;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => _ScannerInstance(
+    key: ValueKey(_cameraKey),
+    sdkSettings: widget.sdkSettings,
+    sessionSettings: widget.sessionSettings,
+    preferredCamera: _activeCamera,
+    onSwitchCamera: _switchCamera,
+  );
+}
+
+class _ScannerInstance extends StatefulWidget {
+  const _ScannerInstance({
+    required this.sdkSettings,
+    required this.sessionSettings,
+    required this.preferredCamera,
+    required this.onSwitchCamera,
+    super.key,
+  });
+
+  final BlinkIdSdkSettings sdkSettings;
+  final BlinkIdSessionSettings sessionSettings;
+  final PreferredCamera preferredCamera;
+  final VoidCallback onSwitchCamera;
+
+  @override
+  State<_ScannerInstance> createState() => _ScannerInstanceState();
+}
+
+class _ScannerInstanceState extends State<_ScannerInstance> {
   late final BlinkIdScannerController _controller;
   StreamSubscription<BlinkIdGuidance>? _guidanceSub;
   bool _popping = false;
@@ -44,7 +83,6 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
   BlinkIdScannerStatus _lastStatus = BlinkIdScannerStatus.uninitialized;
   BlinkIdScanPhase _lastPhase = BlinkIdScanPhase.front;
   Timer? _scanTimer;
-  PreferredCamera _activeCamera = PreferredCamera.back;
 
   static const _timeoutSeconds = 10;
 
@@ -61,7 +99,7 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
     _controller = BlinkIdScannerController();
     _controller.addListener(_onScanStateChanged);
     _guidanceSub = _controller.guidanceStream.listen(_onGuidanceForTimer);
-    unawaited(_startScanning());
+    unawaited(_startScanning(widget.preferredCamera));
   }
 
   // Manages the per-side scan timer based on status/phase transitions.
@@ -128,9 +166,9 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
     }
   }
 
-  Future<void> _startScanning() async {
+  Future<void> _startScanning(PreferredCamera preferredCamera) async {
     try {
-      await _controller.initialize(widget.sdkSettings, widget.sessionSettings);
+      await _controller.initialize(widget.sdkSettings, widget.sessionSettings, preferredCamera: preferredCamera);
     } catch (e, st) {
       debugPrint('BlinkID init error: $e\n$st');
       if (mounted) {
@@ -242,11 +280,7 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
                 right: 8,
                 child: IconButton(
                   icon: const Icon(Icons.cameraswitch, color: Colors.white),
-                  onPressed: () {
-                    final next = _activeCamera == PreferredCamera.back ? PreferredCamera.front : PreferredCamera.back;
-                    setState(() => _activeCamera = next);
-                    _controller.switchCamera(next);
-                  },
+                  onPressed: widget.onSwitchCamera,
                 ),
               ),
           ],
