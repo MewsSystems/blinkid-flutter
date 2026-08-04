@@ -44,6 +44,7 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
   BlinkIdScannerStatus _lastStatus = BlinkIdScannerStatus.uninitialized;
   BlinkIdScanPhase _lastPhase = BlinkIdScanPhase.front;
   Timer? _scanTimer;
+  PreferredCamera _activeCamera = PreferredCamera.back;
 
   static const _timeoutSeconds = 10;
 
@@ -232,6 +233,19 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
                   onPressed: () {
                     _controller.cancel();
                     _safePop();
+                  },
+                ),
+              ),
+            if (status == BlinkIdScannerStatus.scanning && _controller.phase != BlinkIdScanPhase.flip)
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 8,
+                right: 8,
+                child: IconButton(
+                  icon: const Icon(Icons.cameraswitch, color: Colors.white),
+                  onPressed: () {
+                    final next = _activeCamera == PreferredCamera.back ? PreferredCamera.front : PreferredCamera.back;
+                    setState(() => _activeCamera = next);
+                    _controller.switchCamera(next);
                   },
                 ),
               ),
