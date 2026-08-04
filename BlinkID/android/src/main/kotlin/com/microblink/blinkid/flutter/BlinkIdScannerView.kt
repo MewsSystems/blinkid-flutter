@@ -64,6 +64,9 @@ class BlinkIdScannerView(
     private var debugLoggingEnabled = false
     private var scanningSession: BlinkIdScanningSession? = null
     private var isScanning = false
+    private var cameraProvider: ProcessCameraProvider? = null
+    private var previewUseCase: Preview? = null
+    private var imageAnalysisUseCase: ImageAnalysis? = null
     private val analysisExecutor = Executors.newSingleThreadExecutor()
     private var pendingStartResult: MethodChannel.Result? = null
 
@@ -104,6 +107,26 @@ class BlinkIdScannerView(
             "setDebugLogging" -> {
                 debugLoggingEnabled = call.arguments as? Boolean ?: false
                 result.success(null)
+            }
+            "switchCamera" -> {
+                val preferred = call.arguments as? String
+                scope.launch {
+                    val provider = cameraProvider ?: run { result.success(null); return@launch }
+                    val wasScanning = isScanning
+                    isScanning = false
+                    val newSelector = resolveCameraSelector(preferred, provider)
+                    withContext(Dispatchers.Main) {
+                        provider.unbindAll()
+                        provider.bindToLifecycle(
+                            this@BlinkIdScannerView,
+                            newSelector,
+                            previewUseCase!!,
+                            imageAnalysisUseCase!!,
+                        )
+                    }
+                    isScanning = wasScanning
+                    result.success(null)
+                }
             }
             "dispose" -> {
                 dispose()
@@ -238,14 +261,21 @@ class BlinkIdScannerView(
                 imageProxy.close()
             }
 
+            this.cameraProvider = cameraProvider
+            this.previewUseCase = preview
+            this.imageAnalysisUseCase = imageAnalysis
+
+            val preferred = creationParams["preferredCamera"] as? String
+            val cameraSelector = resolveCameraSelector(preferred, cameraProvider)
             cameraProvider.unbindAll()
-            cameraProvider.bindToLifecycle(
-                this,
-                CameraSelector.DEFAULT_BACK_CAMERA,
-                preview,
-                imageAnalysis,
-            )
+            cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalysis)
         }, ContextCompat.getMainExecutor(context))
+    }
+
+    private fun resolveCameraSelector(preferred: String?, provider: ProcessCameraProvider?): CameraSelector {
+        if (preferred == "front" && provider?.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) == true)
+            return CameraSelector.DEFAULT_FRONT_CAMERA
+        return CameraSelector.DEFAULT_BACK_CAMERA
     }
 
     override fun getView(): View = previewView

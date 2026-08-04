@@ -104,6 +104,9 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
             isProcessingResult = false
             blinkIdSession = nil
             result(nil)
+        case "switchCamera":
+            let preferred = call.arguments as? String
+            switchCamera(to: resolvePosition(preferred), result: result)
         case "resumeAfterFlip":
             isScanning = true
             result(nil)
@@ -152,8 +155,9 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
         let session = AVCaptureSession()
         session.sessionPreset = .high
 
+        let position = resolvePosition(creationParams["preferredCamera"] as? String)
         guard
-            let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+            let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position),
             let input = try? AVCaptureDeviceInput(device: device)
         else {
             cameraSetupFailed = true
@@ -183,10 +187,48 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
         self.previewLayer = preview
         self.captureSession = session
 
-        // Apply initial orientation after connections exist.
+        // Apply initial orientation and mirroring after connections exist.
         updateVideoOrientation()
+        if position == .front {
+            preview.connection?.automaticallyAdjustsVideoMirroring = false
+            preview.connection?.isVideoMirrored = true
+        }
 
         DispatchQueue.global(qos: .userInitiated).async { session.startRunning() }
+    }
+
+    private func resolvePosition(_ preferred: String?) -> AVCaptureDevice.Position {
+        if preferred == "front",
+           AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) != nil {
+            return .front
+        }
+        return .back
+    }
+
+    private func switchCamera(to position: AVCaptureDevice.Position, result: @escaping FlutterResult) {
+        guard let session = captureSession else { result(nil); return }
+        let wasScanning = isScanning
+        isScanning = false
+        DispatchQueue.global(qos: .userInitiated).async {
+            while self.isProcessingFrame { Thread.sleep(forTimeInterval: 0.016) }
+            guard
+                let newDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position),
+                let newInput = try? AVCaptureDeviceInput(device: newDevice)
+            else {
+                self.isScanning = wasScanning
+                DispatchQueue.main.async { result(nil) }
+                return
+            }
+            session.beginConfiguration()
+            session.inputs.forEach { session.removeInput($0) }
+            if session.canAddInput(newInput) { session.addInput(newInput) }
+            self.previewLayer?.connection?.automaticallyAdjustsVideoMirroring = false
+            self.previewLayer?.connection?.isVideoMirrored = (position == .front)
+            session.commitConfiguration()
+            self.updateVideoOrientation()
+            self.isScanning = wasScanning
+            DispatchQueue.main.async { result(nil) }
+        }
     }
 
     private func teardown() {

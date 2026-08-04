@@ -8,6 +8,7 @@ import 'package:meta/meta.dart';
 import '../blinkid_flutter_platform_interface.dart';
 import '../blinkid_result.dart';
 import '../blinkid_settings.dart';
+import '../types.dart';
 import 'blinkid_guidance.dart';
 
 enum BlinkIdScannerStatus {
@@ -94,8 +95,9 @@ class BlinkIdScannerController extends ChangeNotifier {
   /// No-op if called more than once.
   Future<void> initialize(
     BlinkIdSdkSettings sdkSettings,
-    BlinkIdSessionSettings sessionSettings,
-  ) async {
+    BlinkIdSessionSettings sessionSettings, {
+    PreferredCamera preferredCamera = PreferredCamera.back,
+  }) async {
     if (_status != BlinkIdScannerStatus.uninitialized) return;
     _setStatus(BlinkIdScannerStatus.loadingSdk);
     try {
@@ -108,6 +110,7 @@ class BlinkIdScannerController extends ChangeNotifier {
     _creationParams = {
       'sdkSettings': sdkSettings.toJson(),
       'sessionSettings': sessionSettings.toJson(),
+      'preferredCamera': preferredCamera.name,
     };
   }
 
@@ -177,6 +180,14 @@ class BlinkIdScannerController extends ChangeNotifier {
     if (_phase != BlinkIdScanPhase.flip) return;
     _awaitingBackSide = true;
     _methodChannel?.invokeMethod<void>('resumeAfterFlip').ignore();
+  }
+
+  /// Switches the active camera lens at runtime. Safe to call while scanning —
+  /// the native analyzer pauses for the duration of the hardware swap then
+  /// resumes automatically. No-op if the platform view is not yet attached or
+  /// if the requested lens is unavailable (native falls back silently).
+  Future<void> switchCamera(PreferredCamera camera) async {
+    await _methodChannel?.invokeMethod<void>('switchCamera', camera.name);
   }
 
   /// Enables or disables native debug log forwarding to [debugPrint].
