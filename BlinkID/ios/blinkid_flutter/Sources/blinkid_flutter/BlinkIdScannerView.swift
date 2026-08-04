@@ -149,7 +149,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
       do {
         let sessionSettings = BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
           sessionSettingsDict,
-          isFromDirectApi: false,
+          source: "customScanner"
         )
         let session = try await sdk.createScanningSession(sessionSettings: sessionSettings)
         self.blinkIdSession = session

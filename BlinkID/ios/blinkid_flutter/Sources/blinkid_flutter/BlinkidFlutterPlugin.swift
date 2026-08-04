@@ -141,7 +141,7 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
       let analyzer = try await BlinkIDAnalyzer(
         sdk: blinkIdSdk,
         blinkIdSessionSettings: BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
-          sessionSettings),
+          sessionSettings, source: "performScan"),
         eventStream: BlinkIDEventStream(),
         classFilter: self,
         redactionSettingsResolver: self
@@ -215,7 +215,7 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
       }
 
       let sessionSettings = BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
-        sessionSettingsClean, isFromDirectApi: true)
+        sessionSettingsClean, source: "directApi", isDirectApi: true)
       let session = try await blinkIdSdk.createScanningSession(sessionSettings: sessionSettings)
 
       await addFlutterPinglet(with: session.getSessionNumber())

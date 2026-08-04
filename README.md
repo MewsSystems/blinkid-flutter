@@ -485,6 +485,27 @@ widget.controller.onFlipComplete();
 
 Failing to call `onFlipComplete()` leaves the scanner paused indefinitely.
 
+##### Camera selection
+
+Pass `preferredCamera` to `initialize()` to choose the starting lens:
+
+```dart
+await _controller.initialize(
+  sdkSettings,
+  sessionSettings,
+  preferredCamera: PreferredCamera.back, // or PreferredCamera.front
+);
+```
+
+To switch cameras at runtime call `switchCamera()`. It cancels any in-progress scan (the current `scan()` future completes with `BlinkIdScanCancelException`), rebinds the native camera, and returns once the controller is back in `ready` state. Call `scan()` again to resume:
+
+```dart
+await _controller.switchCamera(PreferredCamera.front);
+final result = await _controller.scan();
+```
+
+`switchCamera()` throws `StateError` if the platform view is not yet attached or the controller is in `uninitialized` / `error` state.
+
 ##### Debug logging
 
 Enable native lifecycle log forwarding to Flutter's `debugPrint`:

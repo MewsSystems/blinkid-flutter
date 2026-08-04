@@ -55,18 +55,20 @@ struct BlinkIdDeserializationUtils {
   }
 
   static func deserializeBlinkIdSessionSettings(
-    _ sessionSettingsDict: [String: Any]?, isFromDirectApi: Bool = false
+    _ sessionSettingsDict: [String: Any]?, source: String = "performScan", isDirectApi: Bool = false
   ) -> BlinkIDSessionSettings {
     var blinkidSessionSettings = BlinkIDSessionSettings()
 
     if let scanningSettings = sessionSettingsDict?["scanningSettings"] as? [String: Any] {
       blinkidSessionSettings.scanningSettings = deserializeBlinkIdScanningSettings(scanningSettings)
+      #if DEBUG
       logSessionSettings(
-        source: isFromDirectApi ? "directApi" : "performScan",
+        source: source,
         sessionSettingsDict: sessionSettingsDict,
         scanningSettingsDict: scanningSettings,
         scanningSettings: blinkidSessionSettings.scanningSettings
       )
+      #endif
     }
 
     if let scanningMode = sessionSettingsDict?["scanningMode"] as? String {
@@ -81,7 +83,7 @@ struct BlinkIdDeserializationUtils {
       blinkidSessionSettings.inactivityTimeoutDuration = Double(inactivityTimeoutDuration) / 1000.0
     }
 
-    if isFromDirectApi {
+    if isDirectApi {
       blinkidSessionSettings.inputImageSource = .photo
     }
 

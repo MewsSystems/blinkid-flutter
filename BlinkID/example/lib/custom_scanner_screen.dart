@@ -4,28 +4,6 @@ import 'dart:math' show pi;
 import 'package:blinkid_flutter/blinkid_flutter.dart';
 import 'package:flutter/material.dart';
 
-// Pure top-level function — no state, easily testable.
-String guidanceText(BlinkIdGuidance? guidance, BlinkIdScanPhase phase) {
-  final prefix = phase == BlinkIdScanPhase.back ? 'Back side: ' : '';
-  return prefix +
-      switch (guidance) {
-        null || BlinkIdGuidanceSearching() =>
-          phase == BlinkIdScanPhase.back ? 'Scan the back side of a document' : 'Scan the front side of a document',
-        BlinkIdGuidanceTooFar() => 'Move closer',
-        BlinkIdGuidanceTooClose() => 'Move further away',
-        BlinkIdGuidanceTooCloseToEdge() => 'Move the document from the edge',
-        BlinkIdGuidanceTilted() => 'Keep document parallel to phone',
-        BlinkIdGuidanceHoldStill() => 'Hold still…',
-        BlinkIdGuidanceFlipDocument() => 'Flip to the back side',
-        BlinkIdGuidanceWrongSide() => 'Flip the document',
-        BlinkIdGuidanceBlur() => 'Keep document and phone still',
-        BlinkIdGuidanceGlare() => 'Tilt or move document to remove reflection',
-        BlinkIdGuidanceNotFullyVisible() => 'Keep the document fully visible',
-        BlinkIdGuidanceLowLight() => 'Move to a brighter spot',
-        BlinkIdGuidanceTooMuchLight() => 'Move to a spot with less lighting',
-      };
-}
-
 class CustomScannerScreen extends StatefulWidget {
   const CustomScannerScreen({required this.sdkSettings, required this.sessionSettings, super.key});
 
@@ -56,8 +34,9 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
   @override
   void initState() {
     super.initState();
-    _controller = BlinkIdScannerController();
-    _controller.addListener(_onScanStateChanged);
+    _controller = BlinkIdScannerController()
+      ..setDebugLogging(true)
+      ..addListener(_onScanStateChanged);
     _guidanceSub = _controller.guidanceStream.listen(_onGuidanceForTimer);
     unawaited(_startScanning());
   }
@@ -68,17 +47,17 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
 
     if (status != _lastStatus) {
       _lastStatus = status;
-      if (status == BlinkIdScannerStatus.scanning) _startScanTimer();
+      if (status == .scanning) _startScanTimer();
     }
 
     if (phase != _lastPhase) {
       _lastPhase = phase;
       switch (phase) {
-        case BlinkIdScanPhase.flip:
+        case .flip:
           _scanTimer?.cancel();
-        case BlinkIdScanPhase.back:
+        case .back:
           _startScanTimer();
-        case BlinkIdScanPhase.front:
+        case .front:
           break;
       }
     }
@@ -86,12 +65,12 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
 
   void _onGuidanceForTimer(BlinkIdGuidance guidance) {
     if (guidance is BlinkIdGuidanceSearching || guidance is BlinkIdGuidanceWrongSide) return;
-    if (_controller.status == BlinkIdScannerStatus.scanning) _startScanTimer();
+    if (_controller.status == .scanning) _startScanTimer();
   }
 
   void _startScanTimer() {
     _scanTimer?.cancel();
-    _scanTimer = Timer(const Duration(seconds: _timeoutSeconds), () => unawaited(_onScanTimeout()));
+    _scanTimer = Timer(const .new(seconds: _timeoutSeconds), () => unawaited(_onScanTimeout()));
   }
 
   Future<void> _onScanTimeout() async {
@@ -115,16 +94,15 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
     if (!mounted) return;
 
     if (retry == true) {
-      _lastPhase = BlinkIdScanPhase.front;
+      _lastPhase = .front;
       _controller.reset();
     } else {
       _controller.cancel();
-      _safePop();
     }
   }
 
   Future<void> _switchCamera() async {
-    _camera = _camera == PreferredCamera.back ? PreferredCamera.front : PreferredCamera.back;
+    _camera = _camera == .back ? .front : .back;
     await _controller.switchCamera(_camera);
   }
 
@@ -147,7 +125,7 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
         _scanTimer?.cancel();
         // switchCamera internally cancels the scan and moves to initializing;
         // let the loop continue so scan() awaits the new camera being ready.
-        if (_controller.status == BlinkIdScannerStatus.initializing) continue;
+        if (_controller.status == .initializing) continue;
         _safePop();
         return;
       } on BlinkIdScanResetException {
@@ -191,14 +169,14 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
       builder: (context, _) {
         final status = _controller.status;
 
-        if (status == BlinkIdScannerStatus.uninitialized || status == BlinkIdScannerStatus.loadingSdk) {
+        if (status == .uninitialized || status == .loadingSdk) {
           return const ColoredBox(
             color: Color(0xFF000000),
             child: Center(child: CircularProgressIndicator(color: Color(0xFFFFFFFF))),
           );
         }
 
-        if (status == BlinkIdScannerStatus.error) {
+        if (status == .error) {
           return ColoredBox(
             color: const Color(0xFF000000),
             child: Stack(
@@ -228,20 +206,17 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
           );
         }
 
-        final permRequired = status == BlinkIdScannerStatus.cameraPermissionRequired;
+        final permRequired = status == .cameraPermissionRequired;
         final permException = _controller.lastPermissionException;
         final permanentlyDenied = permException?.permanentlyDenied ?? false;
 
-        final canInteract =
-            !permRequired &&
-            status != BlinkIdScannerStatus.processing &&
-            status != BlinkIdScannerStatus.done;
+        final canInteract = !permRequired && status != .processing && status != .done;
 
         return Stack(
           fit: StackFit.expand,
           children: [
             BlinkIdScannerView(controller: _controller),
-            if (status == BlinkIdScannerStatus.initializing)
+            if (status == .initializing)
               const ColoredBox(
                 color: Color(0xFF000000),
                 child: Center(child: CircularProgressIndicator(color: Color(0xFFFFFFFF))),
@@ -362,9 +337,9 @@ class _FlipOverlayState extends State<_FlipOverlay> with SingleTickerProviderSta
 
   @override
   Widget build(BuildContext context) => switch (_stage) {
-    _FlipStage.success => const _ScanSuccessOverlay(message: 'Front side scanned!'),
-    _FlipStage.animating => AnimatedBuilder(animation: _anim, builder: (context, _) => _flipFrame(_anim.value)),
-    _FlipStage.persistent => _flipFrame(0),
+    .success => const _ScanSuccessOverlay(message: 'Front side scanned!'),
+    .animating => AnimatedBuilder(animation: _anim, builder: (context, _) => _flipFrame(_anim.value)),
+    .persistent => _flipFrame(0),
   };
 
   Widget _flipFrame(double t) => Container(
@@ -489,22 +464,43 @@ class _GuidanceOverlayState extends State<_GuidanceOverlay> {
 
   @override
   Widget build(BuildContext context) => Align(
-    alignment: Alignment.bottomCenter,
+    alignment: .bottomCenter,
     child: Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 48),
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 200),
         child: Container(
           key: ValueKey(_switcherKey),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          padding: const .symmetric(horizontal: 24, vertical: 12),
           decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(12)),
           child: Text(
             _displayText,
             style: const TextStyle(color: Colors.white, fontSize: 16),
-            textAlign: TextAlign.center,
+            textAlign: .center,
           ),
         ),
       ),
     ),
   );
+}
+
+String guidanceText(BlinkIdGuidance? guidance, BlinkIdScanPhase phase) {
+  final prefix = phase == .back ? 'Back side: ' : '';
+  return prefix +
+      switch (guidance) {
+        null || BlinkIdGuidanceSearching() =>
+          phase == .back ? 'Scan the back side of a document' : 'Scan the front side of a document',
+        BlinkIdGuidanceTooFar() => 'Move closer',
+        BlinkIdGuidanceTooClose() => 'Move further away',
+        BlinkIdGuidanceTooCloseToEdge() => 'Move the document from the edge',
+        BlinkIdGuidanceTilted() => 'Keep document parallel to phone',
+        BlinkIdGuidanceHoldStill() => 'Hold still…',
+        BlinkIdGuidanceFlipDocument() => 'Flip to the back side',
+        BlinkIdGuidanceWrongSide() => 'Flip the document',
+        BlinkIdGuidanceBlur() => 'Keep document and phone still',
+        BlinkIdGuidanceGlare() => 'Tilt or move document to remove reflection',
+        BlinkIdGuidanceNotFullyVisible() => 'Keep the document fully visible',
+        BlinkIdGuidanceLowLight() => 'Move to a brighter spot',
+        BlinkIdGuidanceTooMuchLight() => 'Move to a spot with less lighting',
+      };
 }
