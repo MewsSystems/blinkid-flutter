@@ -30,6 +30,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -115,14 +116,19 @@ class BlinkIdScannerView(
                     val provider = cameraProvider ?: run { result.success(null); return@launch }
                     val wasScanning = isScanning
                     isScanning = false
-                    // Null the session before draining so the analyzer stops submitting
-                    // frames immediately. The drain then guarantees any in-flight
-                    // runBlocking{session.process()} has returned. Only after both steps
-                    // is it safe to call unbindAll() — at that point no thread holds a
-                    // reference to a CameraX ImageProxy, so CameraX can free its buffers
-                    // without risking a SIGSEGV in BlinkID's internal ProcessingQueue.
+                    // Stop submitting new frames and drain the analyzer thread.
                     scanningSession = null
                     withContext(analysisExecutor.asCoroutineDispatcher()) {}
+                    // BlinkID's session.process() is an async suspend function: it posts
+                    // work to an internal native ProcessingQueue and resumes our coroutine
+                    // via callback before that queue finishes consuming the frame buffer.
+                    // The drain above only guarantees our thread returned from process();
+                    // ProcessingQueue may still hold a reference to the last ImageProxy's
+                    // native buffer. unbindAll() destroys the ImageReader and frees those
+                    // buffers — if ProcessingQueue reads them after that, it SIGSEGVs.
+                    // A fixed delay gives ProcessingQueue time to drain. 500 ms comfortably
+                    // covers even slow-device ML inference on the last frame.
+                    delay(500L)
                     val newSelector = resolveCameraSelector(preferred, provider)
                     provider.unbindAll()
                     provider.bindToLifecycle(
