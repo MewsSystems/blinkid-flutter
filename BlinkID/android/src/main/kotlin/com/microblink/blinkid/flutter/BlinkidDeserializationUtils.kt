@@ -102,26 +102,13 @@ object BlinkIdDeserializationUtils {
         val barcodeModule = optionalBarcodeModuleSettings(scanningSettingsMap["barcodeModule"])
         val mrzModule = optionalMrzModuleSettings(scanningSettingsMap["mrzModule"])
         val vizModule = optionalVizModuleSettings(scanningSettingsMap["vizModule"])
-        // All modules null means "use SDK defaults". Explicitly create module instances to
-        // ensure extraction is enabled — relying on ScanningSettings() constructor defaults is
-        // fragile since the Android SDK may default modules to null (detection succeeds but
-        // extraction never fires, so SideScanned/DocumentScanned is never reached).
-        if (documentCaptureModule == null && barcodeModule == null && mrzModule == null && vizModule == null) {
-            return ScanningSettings(
-                documentCaptureModule = DocumentCaptureModuleSettings(),
-                barcodeModule = BarcodeModuleSettings(),
-                mrzModule = MrzModuleSettings(),
-                vizModule = VizModuleSettings(),
-                maxAllowedMismatchesPerField =
-                    (scanningSettingsMap["maxAllowedMismatchesPerField"] as? Int)?.toUInt()
-                        ?: 0u,
-            )
-        }
+        // Absent or null key → use SDK default (extraction enabled), mirroring iOS where only
+        // NSNull explicitly disables a module. Passing null to ScanningSettings disables extraction.
         return ScanningSettings(
-            documentCaptureModule = documentCaptureModule,
+            documentCaptureModule = documentCaptureModule ?: DocumentCaptureModuleSettings(),
             barcodeModule = barcodeModule,
-            mrzModule = mrzModule,
-            vizModule = vizModule,
+            mrzModule = mrzModule ?: MrzModuleSettings(),
+            vizModule = vizModule ?: VizModuleSettings(),
             maxAllowedMismatchesPerField =
                 (scanningSettingsMap["maxAllowedMismatchesPerField"] as? Int)?.toUInt()
                     ?: 0u,
