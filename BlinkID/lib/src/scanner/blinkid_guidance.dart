@@ -41,6 +41,7 @@ sealed class BlinkIdGuidance {
   const factory BlinkIdGuidance.tooMuchLight() = BlinkIdGuidanceTooMuchLight;
 
   static BlinkIdGuidance fromString(String value) => switch (value) {
+    'searching' => const BlinkIdGuidance.searching(),
     'tooFar' => const BlinkIdGuidance.tooFar(),
     'tooClose' => const BlinkIdGuidance.tooClose(),
     'tooCloseToEdge' => const BlinkIdGuidance.tooCloseToEdge(),
