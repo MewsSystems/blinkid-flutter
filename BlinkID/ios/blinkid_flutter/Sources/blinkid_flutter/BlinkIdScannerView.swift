@@ -206,9 +206,18 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     }
 
     private func switchCamera(to position: AVCaptureDevice.Position, result: @escaping FlutterResult) {
-        guard let session = captureSession else { result(nil); return }
+        guard let avSession = captureSession else { result(nil); return }
+        guard let sdk = sdkProvider() as? BlinkIDSdk else { result(nil); return }
+        guard let sessionSettingsDict = creationParams["sessionSettings"] as? [String: Any] else { result(nil); return }
         let wasScanning = isScanning
         isScanning = false
+        // Null blinkIdSession before spinning — captureOutput's guard checks blinkIdSession,
+        // so once nil no new frames are submitted to BlinkID's internal ProcessingQueue.
+        // Spinning until !isProcessingFrame guarantees any in-flight session.process() Task
+        // has completed. Only then is it safe to swap the input device; this also avoids
+        // feeding a stale session frames at a new resolution, which crashes BlinkID's
+        // internal ProcessingQueue.
+        blinkIdSession = nil
         DispatchQueue.global(qos: .userInitiated).async {
             while self.isProcessingFrame { Thread.sleep(forTimeInterval: 0.016) }
             guard
@@ -219,15 +228,31 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
                 DispatchQueue.main.async { result(nil) }
                 return
             }
-            session.beginConfiguration()
-            session.inputs.forEach { session.removeInput($0) }
-            if session.canAddInput(newInput) { session.addInput(newInput) }
+            avSession.beginConfiguration()
+            avSession.inputs.forEach { avSession.removeInput($0) }
+            if avSession.canAddInput(newInput) { avSession.addInput(newInput) }
             self.previewLayer?.connection?.automaticallyAdjustsVideoMirroring = false
             self.previewLayer?.connection?.isVideoMirrored = (position == .front)
-            session.commitConfiguration()
+            avSession.commitConfiguration()
             self.updateVideoOrientation()
-            self.isScanning = wasScanning
-            DispatchQueue.main.async { result(nil) }
+            if wasScanning {
+                Task { @MainActor in
+                    do {
+                        let sessionSettings = BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
+                            sessionSettingsDict,
+                            isFromDirectApi: false,
+                        )
+                        let newSession = try await sdk.createScanningSession(sessionSettings: sessionSettings)
+                        self.blinkIdSession = newSession
+                        self.isScanning = true
+                    } catch {
+                        // Session recreation failed; scanning won't resume but camera switch succeeds.
+                    }
+                    result(nil)
+                }
+            } else {
+                DispatchQueue.main.async { result(nil) }
+            }
         }
     }
 

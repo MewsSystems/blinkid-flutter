@@ -115,11 +115,13 @@ class BlinkIdScannerView(
                     val provider = cameraProvider ?: run { result.success(null); return@launch }
                     val wasScanning = isScanning
                     isScanning = false
-                    // Drain the analyzer thread before unbinding. CameraX frees image
-                    // buffers on unbindAll(); any runBlocking { session.process() } still
-                    // executing natively would SIGSEGV if those buffers disappear under it.
-                    // Posting a no-op to the single-thread executor and awaiting it
-                    // guarantees the in-flight process() call has returned first.
+                    // Null the session before draining so the analyzer stops submitting
+                    // frames immediately. The drain then guarantees any in-flight
+                    // runBlocking{session.process()} has returned. Only after both steps
+                    // is it safe to call unbindAll() — at that point no thread holds a
+                    // reference to a CameraX ImageProxy, so CameraX can free its buffers
+                    // without risking a SIGSEGV in BlinkID's internal ProcessingQueue.
+                    scanningSession = null
                     withContext(analysisExecutor.asCoroutineDispatcher()) {}
                     val newSelector = resolveCameraSelector(preferred, provider)
                     provider.unbindAll()
@@ -129,7 +131,22 @@ class BlinkIdScannerView(
                         previewUseCase!!,
                         imageAnalysisUseCase!!,
                     )
-                    isScanning = wasScanning
+                    if (wasScanning) {
+                        val sdk = sdkProvider()
+                        if (sdk != null) {
+                            @Suppress("UNCHECKED_CAST")
+                            val sessionResult = sdk.createScanningSession(
+                                BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
+                                    creationParams["sessionSettings"] as? Map<String, Any>,
+                                    false,
+                                )
+                            )
+                            if (sessionResult.isSuccess) {
+                                scanningSession = sessionResult.getOrThrow()
+                                isScanning = true
+                            }
+                        }
+                    }
                     result.success(null)
                 }
             }
