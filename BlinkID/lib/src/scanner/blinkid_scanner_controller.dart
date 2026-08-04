@@ -230,7 +230,7 @@ class BlinkIdScannerController extends ChangeNotifier {
   /// Cancels the current scan and returns to [BlinkIdScannerStatus.ready].
   /// The [Future] from [scan] completes with [BlinkIdScanCancelException].
   void cancel() {
-    _methodChannel?.invokeMethod<void>('cancelScan');
+    _methodChannel?.invokeMethod<void>('cancelScan').ignore();
     switch (_status) {
       case BlinkIdScannerStatus.scanning || BlinkIdScannerStatus.processing:
         _abortWithCancel();
@@ -248,7 +248,7 @@ class BlinkIdScannerController extends ChangeNotifier {
   /// Can also be called when [status] is [BlinkIdScannerStatus.error] to
   /// recover and allow a new scan.
   void reset() {
-    _methodChannel?.invokeMethod<void>('cancelScan');
+    _methodChannel?.invokeMethod<void>('cancelScan').ignore();
     _phase = BlinkIdScanPhase.front;
     _awaitingBackSide = false;
     _lastError = null;

@@ -25,12 +25,12 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     private var captureSession: AVCaptureSession?
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private var videoOutput: AVCaptureVideoDataOutput?
-    private var blinkIdSession: BlinkIDSession?
     nonisolated(unsafe) private var isScanning = false
     nonisolated(unsafe) private var isProcessingResult = false
     nonisolated(unsafe) private var isProcessingFrame = false
     nonisolated(unsafe) private var currentFrameOrientation: CameraFrameVideoOrientation = .portrait
     nonisolated(unsafe) private var debugLoggingEnabled = false
+    nonisolated(unsafe) private var blinkIdSession: BlinkIDSession?
     private var cameraSetupFailed = false
 
     init(
@@ -101,6 +101,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
             startScan(result: result)
         case "cancelScan":
             isScanning = false
+            isProcessingResult = false
             blinkIdSession = nil
             result(nil)
         case "resumeAfterFlip":
@@ -243,6 +244,7 @@ extension BlinkIdScannerView: AVCaptureVideoDataOutputSampleBufferDelegate {
                 case .sideScanned:
                     self.isScanning = false
                     await MainActor.run {
+                        guard self.blinkIdSession === session else { return }
                         if self.debugLoggingEnabled {
                             self.methodChannel.invokeMethod("onDebugLog", arguments: "SideScanned — pausing for flip")
                         }
@@ -254,10 +256,18 @@ extension BlinkIdScannerView: AVCaptureVideoDataOutputSampleBufferDelegate {
                     self.isProcessingResult = true
                     self.isScanning = false
                     await MainActor.run {
+                        guard self.blinkIdSession === session else {
+                            self.isProcessingResult = false
+                            return
+                        }
                         if self.debugLoggingEnabled {
                             self.methodChannel.invokeMethod("onDebugLog", arguments: "DocumentScanned — calling getResult()")
                         }
                         self.methodChannel.invokeMethod("onDocumentScanned", arguments: nil)
+                    }
+                    guard self.blinkIdSession === session else {
+                        self.isProcessingResult = false
+                        return
                     }
                     let scanResult = session.getResult(redactionSettings: nil)
                     let jsonString = BlinkIdSerializationUtils.serializeBlinkIdScanningResult(scanResult)
@@ -268,6 +278,10 @@ extension BlinkIdScannerView: AVCaptureVideoDataOutputSampleBufferDelegate {
                         return obj
                     }
                     await MainActor.run {
+                        guard self.blinkIdSession === session else {
+                            self.isProcessingResult = false
+                            return
+                        }
                         self.methodChannel.invokeMethod("onScanResult", arguments: resultDict)
                         self.blinkIdSession = nil
                         self.isProcessingResult = false

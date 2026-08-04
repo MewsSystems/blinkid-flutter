@@ -31,6 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.util.concurrent.Executors
 
 @SuppressLint("ViewConstructor")
@@ -191,16 +192,20 @@ class BlinkIdScannerView(
                         ScanningStatus.DocumentScanned -> {
                             isScanning = false
                             scope.launch {
+                                if (scanningSession == null) return@launch
                                 if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", "DocumentScanned — calling getResult()")
                                 // Signal Flutter immediately so it can show a spinner while
                                 // getResult() serializes (potentially large) image data.
                                 methodChannel.invokeMethod("onDocumentScanned", null)
-                                val scanResult = session.getResult(null)
+                                val scanResult = withContext(Dispatchers.Default) { session.getResult(null) }
+                                if (scanningSession == null) return@launch
                                 if (scanResult.isSuccess) {
-                                    val jsonString = BlinkIdSerializationUtils.serializeBlinkIdScanningResult(
-                                        scanResult.getOrNull()
-                                    )
-                                    val resultMap = jsonString?.let { org.json.JSONObject(it).toNestedMap() }
+                                    val resultMap = withContext(Dispatchers.Default) {
+                                        val jsonString = BlinkIdSerializationUtils.serializeBlinkIdScanningResult(
+                                            scanResult.getOrNull()
+                                        )
+                                        jsonString?.let { org.json.JSONObject(it).toNestedMap() }
+                                    }
                                     methodChannel.invokeMethod("onScanResult", resultMap)
                                 } else {
                                     val err = scanResult.exceptionOrNull()?.message ?: "Scan failed"
@@ -214,6 +219,7 @@ class BlinkIdScannerView(
                             // First side done; pause until Flutter calls resumeAfterFlip.
                             isScanning = false
                             scope.launch {
+                                if (scanningSession == null) return@launch
                                 if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", "SideScanned — pausing for flip")
                                 guidanceEventSink?.success("flipDocument")
                             }
