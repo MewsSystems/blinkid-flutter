@@ -242,11 +242,11 @@ class _DocumentFilterRuleEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final regionOptions =
-        rule.country == Country.usa ? sampleUsaRegions : const <Region>[];
+        rule.country == CountryId.usa ? sampleUsaRegions : const <RegionId>[];
 
     return Column(
       children: [
-        SampleOptionalEnumDropdown<Country>(
+        SampleOptionalEnumDropdown<CountryId>(
           label: 'Country',
           value: rule.country,
           options: sampleCountries,
@@ -261,7 +261,7 @@ class _DocumentFilterRuleEditor extends StatelessWidget {
           },
         ),
         if (regionOptions.isNotEmpty)
-          SampleOptionalEnumDropdown<Region>(
+          SampleOptionalEnumDropdown<RegionId>(
             label: 'Region',
             value: rule.region,
             options: regionOptions,
@@ -275,7 +275,7 @@ class _DocumentFilterRuleEditor extends StatelessWidget {
               );
             },
           ),
-        SampleOptionalEnumDropdown<DocumentType>(
+        SampleOptionalEnumDropdown<DocumentTypeId>(
           label: 'Document type',
           value: rule.documentType,
           options: sampleDocumentTypes,

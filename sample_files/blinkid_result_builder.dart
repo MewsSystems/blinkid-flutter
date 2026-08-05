@@ -255,7 +255,12 @@ class BlinkIdResultBuilder {
       return "";
     }
 
-    return "\nDocument class information:\nCountry: ${result.country?.name}\nRegion: ${result.region?.name}\nDocument type: ${result.documentType?.name}\n";
+    // .id is the strongly-typed enum, or null for a class delivered via OTA that this
+    // compiled build doesn't recognize yet — fall back to .rawValue in that case.
+    final country = result.country?.id?.name ?? result.country?.rawValue;
+    final region = result.region?.id?.name ?? result.region?.rawValue;
+    final documentType = result.documentType?.id?.name ?? result.documentType?.rawValue;
+    return "\nDocument class information:\nCountry: $country\nRegion: $region\nDocument type: $documentType\n";
   }
 
   static String buildDateResult(DateResult? result, String propertyName) {

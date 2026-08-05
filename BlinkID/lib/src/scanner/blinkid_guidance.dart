@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 ///   wrongSide          — ProcessingStatus.ScanningWrongSide
 ///   blur               — blurDetectionStatus == Detected
 ///   glare              — glareDetectionStatus == Detected
+///   holdStill          — ProcessingStatus.AwaitingMoreStableInputImages (v8001+)
 ///   tooFar             — DetectionStatus.CameraTooFar
 ///   tooClose           — DetectionStatus.CameraTooClose
 ///   tooCloseToEdge     — DetectionStatus.DocumentTooCloseToCameraEdge
@@ -18,7 +19,7 @@ import 'package:flutter/foundation.dart';
 /// when ScanningStatus.SideScanned fires (front side complete). The guidance
 /// stream goes silent during the flip phase; use [BlinkIdScanPhase] instead.
 ///
-/// holdStill / lowLight / tooMuchLight are reserved for forward-compat.
+/// lowLight / tooMuchLight are reserved for forward-compat.
 sealed class BlinkIdGuidance {
   const BlinkIdGuidance._();
 
@@ -40,8 +41,10 @@ sealed class BlinkIdGuidance {
   const factory BlinkIdGuidance.blur() = BlinkIdGuidanceBlur;
   const factory BlinkIdGuidance.glare() = BlinkIdGuidanceGlare;
 
-  // --- Reserved (not emitted by either platform SDK; kept for forward-compat) ---
+  // --- Stability hint (v8001+; ProcessingStatus.AwaitingMoreStableInputImages) ---
   const factory BlinkIdGuidance.holdStill() = BlinkIdGuidanceHoldStill;
+
+  // --- Reserved (not emitted by either platform SDK; kept for forward-compat) ---
   const factory BlinkIdGuidance.lowLight() = BlinkIdGuidanceLowLight;
   const factory BlinkIdGuidance.tooMuchLight() = BlinkIdGuidanceTooMuchLight;
 

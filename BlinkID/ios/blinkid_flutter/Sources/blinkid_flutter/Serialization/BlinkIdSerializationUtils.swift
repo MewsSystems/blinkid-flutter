@@ -12,6 +12,13 @@ import UIKit
 class BlinkIdSerializationUtils {
 
   static func serializeBlinkIdScanningResult(_ scanningResult: BlinkIDScanningResult?) -> String? {
+    return encodeToJson(serializeBlinkIdScanningResultDict(scanningResult))
+  }
+
+  // Split out from serializeBlinkIdScanningResult so callers that need to embed the result inside
+  // a larger payload (e.g. performDirectApiScanWithAnalysis's {"result": ..., "analysis": ...})
+  // can use the raw dictionary directly, instead of encoding to JSON and parsing it back.
+  static func serializeBlinkIdScanningResultDict(_ scanningResult: BlinkIDScanningResult?) -> [String: Any] {
     var scanningResultDict = [String: Any]()
 
     if let scanningResult {
@@ -220,6 +227,9 @@ class BlinkIdSerializationUtils {
       if let workRestriction = scanningResult.workRestriction {
         scanningResultDict["workRestriction"] = serializeStringResult(workRestriction)
       }
+      if let ethnicity = scanningResult.ethnicity {
+        scanningResultDict["ethnicity"] = serializeStringResult(ethnicity)
+      }
       scanningResultDict["subResults"] = scanningResult.subResults.map(
         serializeSingleSideScanningResult(_:))
 
@@ -246,23 +256,47 @@ class BlinkIdSerializationUtils {
       }
     }
 
-    return encodeToJson(scanningResultDict)
+    return scanningResultDict
   }
 
+  // Each classification (country/region/documentType) is serialized as {"id": ..., "rawValue": ...}.
+  // `id` is nil when the class was delivered via OTA and isn't known to this compiled enum;
+  // `rawValue` is always populated. `empty` is derived — v8001's DocumentClassInfo has no
+  // isEmpty() of its own — as "no classification was detected at all". Bug fix vs. pre-v8001:
+  // this key is now spelled "empty" (matching Android and the Dart model), not "isEmpty".
   static func serializeDocumentClassInfo(_ documentClassInfo: BlinkIDSDK.DocumentClassInfo)
     -> [String: Any?]
   {
-
-    [
-      "country": documentClassInfo.country.rawValue,
-      "region": documentClassInfo.region.rawValue,
-      "documentType": documentClassInfo.documentType.rawValue,
+    var dict: [String: Any?] = [
       "countryName": documentClassInfo.countryName,
       "isoNumericCountryCode": documentClassInfo.isoNumericCountryCode,
       "isoAlpha2CountryCode": documentClassInfo.isoAlpha2CountryCode,
       "isoAlpha3CountryCode": documentClassInfo.isoAlpha3CountryCode,
-      "isEmpty": documentClassInfo.isEmpty(),
+      "empty": documentClassInfo.country == nil && documentClassInfo.region == nil
+        && documentClassInfo.documentType == nil,
     ]
+    if let country = documentClassInfo.country {
+      dict["country"] =
+        [
+          "id": country.countryId.map(BlinkIdDeserializationUtils.countryIdToWireValue),
+          "rawValue": country.rawValue,
+        ] as [String: Any?]
+    }
+    if let region = documentClassInfo.region {
+      dict["region"] =
+        [
+          "id": region.regionId?.rawValue,
+          "rawValue": region.rawValue,
+        ] as [String: Any?]
+    }
+    if let documentType = documentClassInfo.documentType {
+      dict["documentType"] =
+        [
+          "id": documentType.documentTypeId.map(BlinkIdDeserializationUtils.documentTypeIdToWireValue),
+          "rawValue": documentType.rawValue,
+        ] as [String: Any?]
+    }
+    return dict
   }
 
   static func serializeDataMatchResult(_ dataMatchResult: DataMatchResult?) -> [String: Any?] {
@@ -844,6 +878,9 @@ class BlinkIdSerializationUtils {
       if let workRestriction = vizResult.workRestriction {
         vizResultDict["workRestriction"] = serializeStringResult(workRestriction)
       }
+      if let ethnicity = vizResult.ethnicity {
+        vizResultDict["ethnicity"] = serializeStringResult(ethnicity)
+      }
     }
     return vizResultDict
   }
@@ -889,7 +926,70 @@ class BlinkIdSerializationUtils {
     if let lastName = parentInfo.lastName {
       parentInfoDict["lastName"] = serializeStringResult(lastName)
     }
+    if let fullName = parentInfo.fullName {
+      parentInfoDict["fullName"] = serializeStringResult(fullName)
+    }
     return parentInfoDict
+  }
+
+  // Serializes the per-frame analysis result reported alongside a DirectAPI scan, for the
+  // performDirectApiScanWithAnalysis method channel.
+  static func serializeInputImageAnalysisResult(
+    _ analysisResult: BlinkIDSDK.InputImageAnalysisResult?
+  ) -> [String: Any?] {
+    guard let analysisResult else { return [:] }
+    // ProcessingStatus and DetectionStatus are String-backed on iOS with case identifiers that
+    // already match the Dart @JsonValue wire format (verified against the SDK's swiftinterface),
+    // so `.rawValue` is used directly. InputImageCropAnalysis, VizExtractionType and
+    // ImageAnalysisDetectionStatus are Int-backed (ordinal) and need explicit string mapping.
+    var dict: [String: Any?] = [
+      "processingStatus": analysisResult.processingStatus.rawValue,
+      "inputImageCropAnalysis": serializeInputImageCropAnalysis(analysisResult.inputImageCropAnalysis),
+      "vizExtractionType": serializeVizExtractionType(analysisResult.vizExtractionType),
+      "documentDetectionStatus": analysisResult.documentDetectionStatus.rawValue,
+      "blurDetectionStatus": serializeImageAnalysisDetectionStatus(analysisResult.blurDetectionStatus),
+      "glareDetectionStatus": serializeImageAnalysisDetectionStatus(analysisResult.glareDetectionStatus),
+      "scanningSide": analysisResult.scanningSide == .first ? "first" : "second",
+      "missingMandatoryFields": analysisResult.missingMandatoryFields.map { $0.rawValue },
+      "extractedFields": analysisResult.extractedFields.map { $0.rawValue },
+      "invalidCharacterFields": analysisResult.invalidCharacterFields.map { $0.rawValue },
+      "extraPresentFields": analysisResult.extraPresentFields.map { $0.rawValue },
+    ]
+    // Unlike Android/Dart's InputImageAnalysisResult, iOS's documentClassInfo is non-optional here
+    // (its individual country/region/documentType members can still each be nil).
+    dict["documentClassInfo"] = serializeDocumentClassInfo(analysisResult.documentClassInfo)
+    return dict
+  }
+
+  private static func serializeInputImageCropAnalysis(_ value: InputImageCropAnalysis) -> String {
+    switch value {
+    case .notCropped: return "notCropped"
+    case .cropped: return "cropped"
+    case .notAvailable: return "notAvailable"
+    case .undetermined: return "undetermined"
+    @unknown default: return "notAvailable"
+    }
+  }
+
+  private static func serializeVizExtractionType(_ value: VizExtractionType) -> String {
+    switch value {
+    case .notAvailable: return "notAvailable"
+    case .segmentation: return "segmentation"
+    case .templating: return "templating"
+    case .unsupported: return "unsupported"
+    @unknown default: return "notAvailable"
+    }
+  }
+
+  private static func serializeImageAnalysisDetectionStatus(_ value: ImageAnalysisDetectionStatus)
+    -> String
+  {
+    switch value {
+    case .notAvailable: return "notAvailable"
+    case .notDetected: return "notDetected"
+    case .detected: return "detected"
+    @unknown default: return "notAvailable"
+    }
   }
 
   static func encodeToJson(_ dict: [String: Any]) -> String? {

@@ -1,3 +1,58 @@
+## v8001.0.0
+
+### What's new
+- **OTA (over-the-air) resources**: the SDK can now download updated document-model resources without an app update. New `OtaResourcesConfig` (`checkForUpdates`, `strict`, `serviceUrl`, `localFolder`, `requestTimeout`) alongside the renamed `ResourcesConfig` for base resources, both nested on `BlinkIdSdkSettings`.
+- **Standalone `deleteCachedResources()`**: a new top-level `BlinkidFlutter.deleteCachedResources()` method deletes cached SDK resources from disk without requiring the SDK to be initialized first — unlike `unloadBlinkIdSdk(deleteCachedResources: true)`, safe to call at any time (e.g. on logout, or app-start cleanup).
+- **Enhanced frame selection & image quality**: `DocumentCaptureModuleSettings.inputImageSelectionStrategy` (`singleImage` / `optimizeForSpeed` / `balanced` / `optimizeForQuality`) tunes the trade-off between scan speed and image quality. A new `ProcessingStatus.awaitingMoreStableInputImages` / `BlinkIdGuidance.holdStill` guidance event is emitted while the SDK collects stable frames.
+- **Photo-mode crop intelligence**: `inputImageCropped` is replaced by `DocumentCaptureModuleSettings.cropType` (`notCropped` / `unknown` / `cropped`). `cropType: .unknown` lets DirectAPI images be tried both ways; the new `InputImageAnalysisResult.inputImageCropAnalysis` reports which one actually worked. Exposed via the new `performDirectApiScanWithAnalysis` method (returns a `BlinkIdDirectApiResult` pairing the scan result with this per-frame analysis).
+- **Aztec barcode support**: `BarcodeModuleSettings.aztecScanningEnabled`.
+- **Scan sounds**: `BlinkIdScanningUxSettings.allowScanSound` (default `true`) controls the beep played on scan-success events, independent of `allowHapticFeedback`.
+- **New extracted fields**: `ethnicity` on `BlinkIdScanningResult` / `VizResult`; `fullName` on `ParentInfo`; corresponding `FieldType.ethnicity` / `FieldType.parentFullName`.
+- **Document classification restructure**: `DocumentClassInfo.country` / `.region` / `.documentType` are now nested objects (`DocumentClassCountry` / `DocumentClassRegion` / `DocumentClassDocumentType`), each with a strongly-typed `id` (nullable — `null` for a class delivered via OTA that this compiled build doesn't know about yet) and an always-populated `rawValue` string.
+
+### Bug fixes
+- **Classification enum typos**: `CountryId`, `RegionId` and `DocumentTypeId` (renamed from `Country`/`Region`/`DocumentType` — see Breaking changes) had several misspelled `@JsonValue` strings that could never match either native SDK, so matching against them silently always failed:
+  - `CountryId`: `bambodia` → `cambodia`, `gganda` → `uganda`, `uK` → `uk`, `heardIslandAndMcdonaldIslands` → `heardIslandAndMcDonaldIslands`
+  - `RegionId`: `alagos` → `alagoas`, `northWestTerritories` → `northwestTerritories`
+  - `DocumentTypeId`: `drivingPriviligeCard` → `drivingPrivilegeCard`, `eId` → `eid`, `mypolis` → `myPolis`, `myPR` → `myPr`, `mysssCard` → `mySSSCard`; the bogus `docialSecurityCard` (duplicate of the already-correct `socialSecurityCard`) was removed
+- **iOS classification casing**: iOS's native `CountryID`/`DocumentTypeID` case identifiers occasionally disagree in casing with Android's (e.g. `schengen_area` vs. Android/Dart's `schengenArea`, `myPR` vs. `myPr`) — the iOS bridge now normalizes both directions so classification values match the Dart wire format on both platforms.
+- **`DocumentClassInfo.empty`**: iOS previously serialized this as `isEmpty`, which the Dart model never read — always `null` on iOS. Both platforms now emit `empty` consistently.
+- **iOS UX settings all-or-nothing bug**: `BlinkIdScanningUxSettings` deserialization on iOS discarded *every* setting back to defaults if a single expected key was missing (e.g. a client without the new `allowScanSound`); each setting is now read independently.
+- **Resource timeout default**: raised from 10s to 30s to match the v8001 native default, and the settings' `RequestTimeout` is now honored on iOS — a `// TODO Bug in iOS native SDK` in the deserializer previously discarded any configured value there.
+
+### Breaking changes
+- **`DocumentCaptureModuleSettings.inputImageCropped` (bool) → `.cropType` (`InputImageCropType`)**.
+- **`Country` → `CountryId`, `Region` → `RegionId`, `DocumentType` → `DocumentTypeId`** to match both native SDKs' renamed classification enums. The old names remain as `@Deprecated` typedefs.
+- **`DocumentClassInfo.country` / `.region` / `.documentType`** are now nested `DocumentClassCountry` / `DocumentClassRegion` / `DocumentClassDocumentType` objects instead of bare enums — read `.id` (nullable) or `.rawValue` instead of comparing the field directly to an enum value.
+- **`BlinkIdSdkSettings`**: `downloadResources`, `resourceDownloadUrl`, `resourceLocalFolder`, `bundleIdentifier`, `resourceRequestTimeout` move into the new `resourcesConfig: ResourcesConfig`; a new `otaResourcesConfig: OtaResourcesConfig` was added. The old flat constructor parameters are kept as `@Deprecated` one-time construction sugar that folds into `resourcesConfig`, so most existing call sites keep compiling.
+- **Nullable image-quality flags**: `imageWithBlurRejected`, `imageWithGlareRejected` and `imageWithHandOcclusionRejected` on `DocumentCaptureModuleSettings`, and `resultAggregationEnabled` on `VizModuleSettings`, changed from non-null `bool` (defaulting `true`) to `bool?` (defaulting `null`, letting the SDK resolve the value from other settings) — matching the v8001 native defaults. `inputImageMargin` similarly changed its default from `0.02` to `null`.
+
+#### Migration
+```dart
+// Before
+DocumentCaptureModuleSettings(inputImageCropped: true)
+
+// After
+DocumentCaptureModuleSettings(cropType: InputImageCropType.cropped)
+```
+```dart
+// Before
+BlinkIdSdkSettings(licenseKey: key, downloadResources: false, resourceLocalFolder: 'MyModels')
+
+// After (equivalent; the flat params above still work but are deprecated)
+BlinkIdSdkSettings(
+  licenseKey: key,
+  resourcesConfig: ResourcesConfig(download: false, localFolder: 'MyModels'),
+)
+```
+```dart
+// Before
+if (result.documentClassInfo?.country == Country.croatia) { ... }
+
+// After
+if (result.documentClassInfo?.country?.id == CountryId.croatia) { ... }
+```
+
 ## v8000.0.0
 
 ### What's new

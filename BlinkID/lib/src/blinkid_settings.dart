@@ -3,8 +3,128 @@ import 'package:json_annotation/json_annotation.dart';
 
 part 'blinkid_settings.g.dart';
 
-/// Settings for the initialization of the BlinkID SDK.
+/// Timeout settings for resource downloads.
+///
+/// Mirrors the native SDKs' `RequestTimeout`. All three values default to
+/// `30000` ms — the v8001 native default (raised from `10000` ms in earlier
+/// releases).
 @JsonSerializable()
+class RequestTimeout {
+  /// Connection timeout, in milliseconds.
+  int connectionTimeoutMilliseconds;
+
+  /// Read timeout, in milliseconds.
+  int readTimeoutMilliseconds;
+
+  /// Write timeout, in milliseconds.
+  int writeTimeoutMilliseconds;
+
+  RequestTimeout({
+    this.connectionTimeoutMilliseconds = 30000,
+    this.readTimeoutMilliseconds = 30000,
+    this.writeTimeoutMilliseconds = 30000,
+  });
+
+  factory RequestTimeout.fromJson(Map<String, dynamic> json) => _$RequestTimeoutFromJson(json);
+  Map<String, dynamic> toJson() => _$RequestTimeoutToJson(this);
+}
+
+/// Configuration for the SDK's base (non-OTA) resources — the on-device models
+/// required for image processing.
+@JsonSerializable(explicitToJson: true)
+class ResourcesConfig {
+  /// Whether resources required for on-device image processing should be downloaded
+  /// and cached on first initialization of the SDK.
+  ///
+  /// If set to `false`, you need to package all the required resources in your
+  /// application's assets (see [bundleIdentifier] for iOS).
+  bool download;
+
+  /// If resources are to be downloaded, the URL where the resources are hosted.
+  String serviceUrl;
+
+  /// Local folder name where resources will be downloaded and cached, within your
+  /// application's cache folder.
+  String localFolder;
+
+  /// Timeout settings for resource downloads.
+  RequestTimeout requestTimeout;
+
+  /// [iOS-specific] If resource downloading is disabled, this defines the bundle
+  /// identifier of your iOS app where the resources reside.
+  String? bundleIdentifier;
+
+  ResourcesConfig({
+    this.download = true,
+    this.serviceUrl = 'https://models.cdn.microblink.com/resources',
+    this.localFolder = 'MLModels',
+    RequestTimeout? requestTimeout,
+    this.bundleIdentifier,
+  }) : requestTimeout = requestTimeout ?? RequestTimeout();
+
+  factory ResourcesConfig.fromJson(Map<String, dynamic> json) => _$ResourcesConfigFromJson(json);
+  Map<String, dynamic> toJson() => _$ResourcesConfigToJson(this);
+}
+
+/// Configuration for OTA (over-the-air) resources, letting the SDK download
+/// updated document-model resources without requiring an app update.
+///
+/// OTA is enabled by default ([checkForUpdates]: `true`, [strict]: `false`).
+///
+/// Notes:
+/// - First-run downloads are unavoidable for OTA when resources are missing
+///   locally — [checkForUpdates] set to `false` only suppresses *update* checks,
+///   not the initial fetch.
+/// - [strict] set to `true` changes SDK init to a throwing failure path on a
+///   failed OTA download — make sure your error handling accounts for it.
+/// - Base resources and OTA resources use distinct hosts ([ResourcesConfig.serviceUrl]
+///   vs [serviceUrl]) and distinct cache folders ([ResourcesConfig.localFolder] vs
+///   [localFolder]) — don't cross-wire them.
+@JsonSerializable(explicitToJson: true)
+class OtaResourcesConfig {
+  /// When `true`, the SDK checks for and downloads updated OTA resources on init.
+  /// When `false`, cached resources are reused as-is with no update check.
+  ///
+  /// First run is the exception: if resources are missing locally, they are
+  /// downloaded regardless of this flag.
+  bool checkForUpdates;
+
+  /// Controls failure handling for a failed OTA download during init.
+  ///
+  /// When `true`, initialization throws if the OTA update fails to download.
+  /// When `false` (default), init continues silently and falls back to the
+  /// currently bundled/cached version.
+  bool strict;
+
+  /// The URL where OTA resources are hosted.
+  String serviceUrl;
+
+  /// Local folder name where OTA resources will be downloaded and cached, within
+  /// your application's cache folder.
+  String localFolder;
+
+  /// Timeout settings for OTA resource downloads.
+  RequestTimeout requestTimeout;
+
+  /// [iOS-specific] If resource downloading is disabled, this defines the bundle
+  /// identifier of your iOS app where the OTA resources reside.
+  String? bundleIdentifier;
+
+  OtaResourcesConfig({
+    this.checkForUpdates = true,
+    this.strict = false,
+    this.serviceUrl = 'https://blinkid-ota.microblink.com',
+    this.localFolder = 'OTAMLModels',
+    RequestTimeout? requestTimeout,
+    this.bundleIdentifier,
+  }) : requestTimeout = requestTimeout ?? RequestTimeout();
+
+  factory OtaResourcesConfig.fromJson(Map<String, dynamic> json) => _$OtaResourcesConfigFromJson(json);
+  Map<String, dynamic> toJson() => _$OtaResourcesConfigToJson(this);
+}
+
+/// Settings for the initialization of the BlinkID SDK.
+@JsonSerializable(explicitToJson: true)
 class BlinkIdSdkSettings {
   /// License key for the native SDK
   String licenseKey;
@@ -12,26 +132,16 @@ class BlinkIdSdkSettings {
   /// Optional licensee string if the provided license key is not tied to the single application ID
   String? licensee;
 
-  /// Whether resources required for on-device image processing should be downloaded and cached
-  /// on first initialization of the SDK.
-  /// If set to false, you need to package all the required
-  /// resources in your application's assets.
-  bool downloadResources;
+  /// Configuration for the SDK's base (non-OTA) resources.
+  ///
+  /// See [ResourcesConfig] for more information.
+  ResourcesConfig resourcesConfig;
 
-  /// If resources are to be downloaded, the following is the URL where the resources are hosted.
-  /// URL: `"https://models.cdn.microblink.com/resources"`
-  String? resourceDownloadUrl;
-
-  /// Local folder name where resources will be downloaded and cached.
-  /// If resources are being downloaded, this defines the name of the folder within your
-  /// application's cache folder where resources will be cached.
-  String? resourceLocalFolder;
-
-  /// [iOS-specific] If resources downloading is disabled for iOS, this defines the bundle identifier of your iOS app where the resources reside.
-  String? bundleIdentifier;
-
-  /// Timeout settings for resource downloads.
-  int? resourceRequestTimeout; // TODO bug, should be set to RequestTimeout not int
+  /// Configuration for OTA (over-the-air) resources, letting the SDK download
+  /// updated document-model resources without requiring an app update.
+  ///
+  /// See [OtaResourcesConfig] for more information.
+  OtaResourcesConfig otaResourcesConfig;
 
   /// Set a custom HTTPS URL to be used as a proxy for Ping and license checks.
   /// The proxy URL will be applied only if the license has the appropriate rights.
@@ -43,16 +153,38 @@ class BlinkIdSdkSettings {
   String? microblinkProxyUrl;
 
   /// Settings for the initialization of the BlinkID SDK.
+  ///
+  /// The `downloadResources` / `resourceDownloadUrl` / `resourceLocalFolder` /
+  /// `bundleIdentifier` / `resourceRequestTimeout` constructor parameters are
+  /// deprecated as of v8001 — resource configuration now lives on
+  /// [resourcesConfig]. They're kept here only as one-time construction
+  /// convenience for existing call sites and are folded into [resourcesConfig]
+  /// at construction time; prefer passing [resourcesConfig] directly.
   BlinkIdSdkSettings({
     required this.licenseKey,
-    this.downloadResources = true,
     this.licensee,
-    this.resourceDownloadUrl,
-    this.resourceLocalFolder,
-    this.bundleIdentifier,
-    this.resourceRequestTimeout,
+    ResourcesConfig? resourcesConfig,
+    OtaResourcesConfig? otaResourcesConfig,
     this.microblinkProxyUrl,
-  });
+    @Deprecated('Set resourcesConfig.download instead') bool? downloadResources,
+    @Deprecated('Set resourcesConfig.serviceUrl instead') String? resourceDownloadUrl,
+    @Deprecated('Set resourcesConfig.localFolder instead') String? resourceLocalFolder,
+    @Deprecated('Set resourcesConfig.bundleIdentifier instead') String? bundleIdentifier,
+    @Deprecated('Set resourcesConfig.requestTimeout instead') int? resourceRequestTimeout,
+  }) : resourcesConfig = resourcesConfig ?? ResourcesConfig(),
+       otaResourcesConfig = otaResourcesConfig ?? OtaResourcesConfig() {
+    if (downloadResources != null) this.resourcesConfig.download = downloadResources;
+    if (resourceDownloadUrl != null) this.resourcesConfig.serviceUrl = resourceDownloadUrl;
+    if (resourceLocalFolder != null) this.resourcesConfig.localFolder = resourceLocalFolder;
+    if (bundleIdentifier != null) this.resourcesConfig.bundleIdentifier = bundleIdentifier;
+    if (resourceRequestTimeout != null) {
+      this.resourcesConfig.requestTimeout = RequestTimeout(
+        connectionTimeoutMilliseconds: resourceRequestTimeout,
+        readTimeoutMilliseconds: resourceRequestTimeout,
+        writeTimeoutMilliseconds: resourceRequestTimeout,
+      );
+    }
+  }
 
   factory BlinkIdSdkSettings.fromJson(Map<String, dynamic> json) => _$BlinkIdSdkSettingsFromJson(json);
   Map<String, dynamic> toJson() => _$BlinkIdSdkSettingsToJson(this);
@@ -63,7 +195,7 @@ class BlinkIdSdkSettings {
 /// This class holds the settings related to the resources initialization,
 /// scanning mode, and specific scanning configurations that define how the scanning
 /// session should behave.
-@JsonSerializable()
+@JsonSerializable(explicitToJson: true)
 class BlinkIdSessionSettings {
   /// The scanning mode to be used during the scanning session.
   ///
@@ -114,7 +246,7 @@ class BlinkIdSessionSettings {
 // present and null"), so it can't tell "leave the constructor's SDK-default
 // in place" apart from "explicitly disabled" the way the constructor itself
 // can (see the module fields' doc comments and the constructor below).
-@JsonSerializable(createFactory: false)
+@JsonSerializable(createFactory: false, explicitToJson: true)
 class BlinkIdScanningSettings {
   /// Settings for the document capture module.
   ///
@@ -236,6 +368,14 @@ class BlinkIdScanningUxSettings {
   /// Default: `true`
   bool allowHapticFeedback;
 
+  /// Determines whether a sound is played for scanning-success events (such as a
+  /// side being scanned).
+  ///
+  /// When disabled, no sound is produced.
+  ///
+  /// Default: `true`
+  bool allowScanSound;
+
   /// The preferred camera position to use when capturing document.
   /// This value represents the user’s choice of front or back camera.
   ///
@@ -246,6 +386,7 @@ class BlinkIdScanningUxSettings {
 
   BlinkIdScanningUxSettings({
     this.allowHapticFeedback = true,
+    this.allowScanSound = true,
     this.showHelpButton = true,
     this.showOnboardingDialog = true,
     this.preferredCamera = PreferredCamera.back,

@@ -262,6 +262,11 @@ class _BarcodeModuleCard extends StatelessWidget {
           onChanged: (v) =>
               _updateBarcode((s) => s.copyWith(dataMatrixScanningEnabled: v)),
         ),
+        SampleBoolSettingTile(
+          title: 'Aztec',
+          value: b.aztecScanningEnabled,
+          onChanged: (v) => _updateBarcode((s) => s.copyWith(aztecScanningEnabled: v)),
+        ),
       ],
     );
   }
@@ -344,7 +349,8 @@ class _DocumentCaptureModuleCard extends StatelessWidget {
         ),
         SampleBoolSettingTile(
           title: 'Reject image with blur',
-          value: d.imageWithBlurRejected,
+          subtitle: 'Unset (null) lets the SDK resolve this from other settings',
+          value: d.imageWithBlurRejected ?? true,
           onChanged: (v) => _update((s) => s.copyWith(imageWithBlurRejected: v)),
         ),
         _SensitivityDropdown(
@@ -354,7 +360,8 @@ class _DocumentCaptureModuleCard extends StatelessWidget {
         ),
         SampleBoolSettingTile(
           title: 'Reject image with glare',
-          value: d.imageWithGlareRejected,
+          subtitle: 'Unset (null) lets the SDK resolve this from other settings',
+          value: d.imageWithGlareRejected ?? true,
           onChanged: (v) => _update((s) => s.copyWith(imageWithGlareRejected: v)),
         ),
         _SensitivityDropdown(
@@ -370,7 +377,8 @@ class _DocumentCaptureModuleCard extends StatelessWidget {
         ),
         SampleBoolSettingTile(
           title: 'Reject hand occlusion',
-          value: d.imageWithHandOcclusionRejected,
+          subtitle: 'Unset (null) lets the SDK resolve this from other settings',
+          value: d.imageWithHandOcclusionRejected ?? true,
           onChanged: (v) =>
               _update((s) => s.copyWith(imageWithHandOcclusionRejected: v)),
         ),
@@ -391,9 +399,13 @@ class _DocumentCaptureModuleCard extends StatelessWidget {
         SampleSectionLabel('Direct API'),
         SampleBoolSettingTile(
           title: 'Input image cropped',
-          subtitle: 'For pre-cropped Direct API images only',
-          value: d.inputImageCropped,
-          onChanged: (v) => _update((s) => s.copyWith(inputImageCropped: v)),
+          subtitle:
+              'For pre-cropped Direct API images only. Maps to InputImageCropType.cropped / '
+              '.notCropped — use .unknown instead if you\'re not sure and want the SDK to try both.',
+          value: d.cropType == InputImageCropType.cropped,
+          onChanged: (v) => _update(
+            (s) => s.copyWith(cropType: v ? InputImageCropType.cropped : InputImageCropType.notCropped),
+          ),
         ),
         _DoubleSettingField(
           label: 'Input image margin',
@@ -480,8 +492,10 @@ class _VizModuleCard extends StatelessWidget {
         ),
         SampleBoolSettingTile(
           title: 'Result aggregation',
-          subtitle: 'Aggregate data from multiple frames (video only)',
-          value: v.resultAggregationEnabled,
+          subtitle:
+              'Aggregate data from multiple frames (video only). Unset (null) lets the SDK '
+              'resolve this from other settings.',
+          value: v.resultAggregationEnabled ?? true,
           onChanged: (val) => _update((s) => s.copyWith(resultAggregationEnabled: val)),
         ),
       ],

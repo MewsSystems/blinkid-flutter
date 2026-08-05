@@ -25,9 +25,11 @@ However, since the wrapper is open source, you can add the features you need on 
     - [Custom scanner UI](#custom-scanner-ui)
   - [SDK loading & unloading](#sdk-loading--unloading)
   - [BlinkID settings](#blinkid-settings)
+    - [OTA (over-the-air) resources](#ota-resources)
   - [BlinkID results](#blinkid-results)
   - [Class filter & redaction](#class-filter--redaction)
   - [Customizing performScan strings](#customizing-performscan-strings)
+- [Migrating from v8000.x](#migrating-from-v8000x)
 - [Migrating from v7.x](#migrating-from-v7x)
 - [Additional information](#additional-information)
 
@@ -119,7 +121,7 @@ Add `blinkid_flutter` to your `pubspec.yaml`:
 ```yaml
 dependencies:
   ...
-  blinkid_flutter: ^8000.0.0
+  blinkid_flutter: ^8001.0.0
 ```
 
 Then install:
@@ -192,7 +194,10 @@ if (Platform.isAndroid) {
 // SDK initialization settings
 final sdkSettings = BlinkIdSdkSettings(
   licenseKey: sdkLicenseKey,
-  downloadResources: true
+  resourcesConfig: ResourcesConfig(download: true),
+  // Optional: over-the-air resource updates, so new document support can reach your app
+  // without a full SDK update — see the OTA section below.
+  otaResourcesConfig: OtaResourcesConfig(checkForUpdates: true),
 );
 
 // Scanning modules — enable only what your use case needs, for example
@@ -222,17 +227,18 @@ final uxSettings = BlinkIdScanningUxSettings(
   showHelpButton: true,
   showOnboardingDialog: true,
   allowHapticFeedback: true,
+  allowScanSound: true, // beep on scan-success events; independent of allowHapticFeedback
   preferredCamera: PreferredCamera.back,
 );
 
 // Optional document class filter
 final classFilter = ClassFilter()
   ..includeDocuments = [
-    DocumentFilter(country: Country.usa),
+    DocumentFilter(country: CountryId.usa),
     DocumentFilter(
-      country: Country.usa,
-      region: Region.california,
-      documentType: DocumentType.id,
+      country: CountryId.usa,
+      region: RegionId.california,
+      documentType: DocumentTypeId.id,
     ),
   ];
 ```
@@ -267,6 +273,22 @@ final result = await blinkIdPlugin.performDirectApiScan(
   firstImage: frontImageBase64,
   secondImage: backImageBase64, // optional; required for automatic two-sided scan
 );
+```
+
+If you're not sure whether the images you're feeding into DirectAPI are already cropped and
+perspective-corrected, set `cropType: InputImageCropType.unknown` on `DocumentCaptureModuleSettings`
+and use `performDirectApiScanWithAnalysis` instead — it returns a `BlinkIdDirectApiResult` pairing
+the scan result with the per-frame `InputImageAnalysisResult`, which reports back via
+`inputImageCropAnalysis` whether the SDK determined the image was actually cropped:
+```dart
+final directApiResult = await blinkIdPlugin.performDirectApiScanWithAnalysis(
+  blinkIdSdkSettings: sdkSettings,
+  blinkIdSessionSettings: sessionSettings,
+  firstImage: frontImageBase64,
+);
+
+print(directApiResult.result?.firstName?.value);
+print(directApiResult.analysis?.inputImageCropAnalysis); // e.g. InputImageCropAnalysis.cropped
 ```
 
 - The full integration example is in [`sample_files/main.dart`](sample_files/main.dart).
@@ -321,7 +343,7 @@ BlinkIdScanningSettings(
 )
 ```
 
-> **Note:** Retail barcode formats (UPC, EAN, Code128, etc.) can only be enabled when document capture is disabled. PDF417 and QR must be enabled together — the analyzer treats them as a single detection stage.
+> **Note:** Retail barcode formats (UPC, EAN, Code128, Aztec, etc.) can only be enabled when document capture is disabled. PDF417 and QR must be enabled together — the analyzer treats them as a single detection stage.
 
 ### Image and quality settings
 Image return, DPI, blur/glare rejection, and related options now live on `DocumentCaptureModuleSettings` and `VizModuleSettings` instead of the removed `CroppedImageSettings` class from v7.
@@ -330,13 +352,14 @@ Key document capture settings:
 - `documentImageReturnEnabled` / `inputImageReturnEnabled` — return cropped or raw input images in the result.
 - `faceImageExtractionEnabled` / `faceImagePresenceMandatory` — control face photo extraction.
 - `blurSensitivityLevel`, `glareSensitivityLevel`, `tiltSensitivityLevel` — use `SensitivityLevel` (`off`, `low`, `mid`, `high`).
-- `imageWithBlurRejected`, `imageWithGlareRejected`, etc. — reject or accept frames with quality issues.
-- `inputImageCropped` — for DirectAPI only; set to `true` when input images are already cropped.
+- `imageWithBlurRejected`, `imageWithGlareRejected`, `imageWithHandOcclusionRejected` — `bool?`; `true`/`false` force-accepts or rejects frames with that quality issue, `null` (default) lets the SDK resolve the value from other settings.
+- `cropType` — for DirectAPI only. `InputImageCropType.notCropped` (default) runs full detection; `.cropped` skips it for pre-cropped images; `.unknown` tries both and reports which one worked via `InputImageAnalysisResult.inputImageCropAnalysis` (see [`performDirectApiScanWithAnalysis`](#directapi-static-images) above).
+- `inputImageSelectionStrategy` — tunes the trade-off between scan speed and image quality: `singleImage`, `optimizeForSpeed`, `balanced` (default), `optimizeForQuality`. While the SDK is still collecting stable frames it emits a `holdStill` guidance event (see [Custom scanner UI](#custom-scanner-ui) below).
 
 Key VIZ settings:
 - `signatureImageExtractionEnabled` — extract signature images when supported.
 - `characterValidationEnabled` — validate extracted characters against expected field rules.
-- `resultAggregationEnabled` — aggregate data across video frames (camera scanning only).
+- `resultAggregationEnabled` — `bool?`; aggregate data across video frames (camera scanning only). `null` (default) lets the SDK resolve the value from other settings.
 
 ## <a name="plugin-specifics"></a> Plugin specifics
 The BlinkID plugin implementation is located in the `BlinkID/lib` folder, while platform-specific implementation is located in the `BlinkID/android` and `BlinkID/ios` folders.
@@ -474,8 +497,9 @@ _controller.guidanceStream.listen((guidance) {
     case BlinkIdGuidanceTooFar():    showHint('Move closer');
     case BlinkIdGuidanceTooClose():  showHint('Move farther away');
     case BlinkIdGuidanceTilted():    showHint('Keep document flat');
-    case BlinkIdGuidanceBlur():      showHint('Hold still');
+    case BlinkIdGuidanceBlur():      showHint('Reduce blur');
     case BlinkIdGuidanceGlare():     showHint('Reduce glare');
+    case BlinkIdGuidanceHoldStill(): showHint('Hold still');
     default:                         showHint('Align the document');
   }
 });
@@ -575,7 +599,10 @@ This method is automatically called after each successful scan session.
 
 | Setting class | Description |
 |:--------------|:------------|
-| [`BlinkIdSdkSettings`](BlinkID/lib/src/blinkid_settings.dart) | License key, resource download URL/folder, proxy URL, iOS bundle identifier. |
+| [`BlinkIdSdkSettings`](BlinkID/lib/src/blinkid_settings.dart) | License key, `ResourcesConfig`, `OtaResourcesConfig`, proxy URL. |
+| [`ResourcesConfig`](BlinkID/lib/src/blinkid_settings.dart) | Base (non-OTA) resource download URL/folder/timeout, iOS bundle identifier. |
+| [`OtaResourcesConfig`](BlinkID/lib/src/blinkid_settings.dart) | Over-the-air resource config — see [OTA resources](#ota-resources) below. |
+| [`RequestTimeout`](BlinkID/lib/src/blinkid_settings.dart) | Connection/read/write timeouts (ms) for resource downloads. |
 | [`BlinkIdSessionSettings`](BlinkID/lib/src/blinkid_settings.dart) | `ScanningMode`, `BlinkIdScanningSettings`, step and inactivity timeouts. |
 | [`BlinkIdScanningSettings`](BlinkID/lib/src/blinkid_settings.dart) | Module settings and `maxAllowedMismatchesPerField`. |
 | [`DocumentCaptureModuleSettings`](BlinkID/lib/src/types.dart) | Document detection, image quality, face/document image return. |
@@ -594,6 +621,38 @@ Each Dart file documents available properties in detail. Native equivalents:
 Native deserialization implementations:
 - [Android](BlinkID/android/src/main/kotlin/com/microblink/blinkid/flutter/BlinkidDeserializationUtils.kt)
 - [iOS](BlinkID/ios/blinkid_flutter/Sources/blinkid_flutter/BlinkidDeserializationUtils.swift)
+
+#### <a name="ota-resources"></a> OTA (over-the-air) resources
+
+As of v8001, the SDK can download updated document-model resources without an app update, via
+`otaResourcesConfig` on `BlinkIdSdkSettings`. OTA is enabled by default:
+
+```dart
+final sdkSettings = BlinkIdSdkSettings(
+  licenseKey: sdkLicenseKey,
+  otaResourcesConfig: OtaResourcesConfig(
+    checkForUpdates: true,  // check for newer OTA resources on init
+    strict: false,          // fall back to cached/bundled resources if the check fails
+  ),
+);
+```
+
+- **First-run downloads are unavoidable.** If OTA resources are missing locally, they're
+  downloaded regardless of `checkForUpdates` — that flag only suppresses *update* checks on
+  subsequent runs.
+- **`strict: true` changes SDK init to a throwing failure path** if the OTA download fails —
+  make sure your init error handling accounts for it before enabling it. The default (`false`)
+  falls back silently to the cached/bundled version.
+- **Base and OTA resources use distinct hosts and cache folders** — don't cross-wire
+  `resourcesConfig.serviceUrl`/`localFolder` with `otaResourcesConfig.serviceUrl`/`localFolder`.
+- **`BlinkidFlutter.deleteCachedResources()`** clears both caches from disk without requiring the
+  SDK to be initialized first (unlike `unloadBlinkIdSdk(deleteCachedResources: true)`), for use on
+  logout or storage-cleanup flows:
+  ```dart
+  await blinkIdPlugin.deleteCachedResources(); // uses default folder names
+  ```
+  Pass `resourcesLocalFolder` / `otaResourcesLocalFolder` explicitly if you customized them on
+  `resourcesConfig` / `otaResourcesConfig` — otherwise the wrong folders won't be cleared.
 
 ### <a name="blinkid-results"></a> BlinkID Results
 
@@ -630,8 +689,8 @@ Native serialization implementations:
 Restrict which documents are accepted during camera scanning:
 ```dart
 final filter = ClassFilter()
-  ..includeDocuments = [DocumentFilter(country: Country.canada)]
-  ..excludeDocuments = [DocumentFilter(country: Country.usa, documentType: DocumentType.passport)];
+  ..includeDocuments = [DocumentFilter(country: CountryId.canada)]
+  ..excludeDocuments = [DocumentFilter(country: CountryId.usa, documentType: DocumentTypeId.passport)];
 ```
 
 If `includeDocuments` is empty, all documents are accepted unless excluded. Rules can specify any combination of `country`, `region`, and `documentType`.
@@ -650,7 +709,7 @@ final resolver = RedactionSettingsResolver([
       suffixDigitsVisible: 4,
     ),
     documentFilter: [
-      DocumentFilter(country: Country.usa, region: Region.california),
+      DocumentFilter(country: CountryId.usa, region: RegionId.california),
     ],
   ),
 ]);
@@ -696,7 +755,7 @@ Add overrides in your app's `android/app/src/main/res/values/strings.xml` (or a 
 For a complete list of overridable keys, extract them from the blinkid-ux AAR:
 ```bash
 # Unzip the AAR and inspect res/values/values.xml
-unzip -p ~/.gradle/caches/modules-2/files-2.1/com.microblink/blinkid-ux/8000.0.0/*/blinkid-ux-8000.0.0.aar \
+unzip -p ~/.gradle/caches/modules-2/files-2.1/com.microblink/blinkid-ux/8001.0.0/*/blinkid-ux-8001.0.0.aar \
   res/values/values.xml | grep 'name="mb_'
 ```
 
@@ -725,6 +784,26 @@ Add a `BlinkID.strings` file to your `Runner` target for each locale (e.g. `en.l
 Note: iOS keys use the `mb_` prefix (without `blinkid`), while Android uses `mb_blinkid_`.
 
 > **Custom scanner (`BlinkIdScannerView`)**: string customization is fully in Flutter — pass whatever strings you want directly to your overlay widgets.
+
+## <a name="migrating-from-v8000x"></a> Migrating from v8000.x
+
+If you are upgrading from BlinkID Flutter **v8000**, the following changes apply — see the
+[CHANGELOG](BlinkID/CHANGELOG.md#v80010) for the full list and additional migration snippets:
+
+| v8000.x | v8001.0.0 |
+|:--------|:----------|
+| `DocumentCaptureModuleSettings(inputImageCropped: true)` | `DocumentCaptureModuleSettings(cropType: InputImageCropType.cropped)` |
+| `Country` / `Region` / `DocumentType` | `CountryId` / `RegionId` / `DocumentTypeId` (old names kept as `@Deprecated` typedefs) |
+| `documentClassInfo.country == Country.croatia` | `documentClassInfo.country?.id == CountryId.croatia` |
+| `BlinkIdSdkSettings(downloadResources: ..., resourceDownloadUrl: ...)` | `BlinkIdSdkSettings(resourcesConfig: ResourcesConfig(download: ..., serviceUrl: ...))` (old flat params still work, deprecated) |
+| `imageWithBlurRejected` / `imageWithGlareRejected` / `imageWithHandOcclusionRejected` default `true` | Default `null` — SDK resolves the value from other settings |
+| `resultAggregationEnabled` default `true` | Default `null` — SDK resolves the value from other settings |
+
+No code changes are required if you don't reference `Country`/`Region`/`DocumentType`,
+`inputImageCropped`, or the flat `BlinkIdSdkSettings` resource fields directly — those keep working
+via a deprecated shim. The nullable-default changes for `imageWithBlurRejected` and friends are
+automatic and don't require call-site changes, but do mean the SDK — not this plugin — now decides
+those defaults; pass an explicit `true`/`false` if you relied on the old hardcoded behavior.
 
 ## <a name="migrating-from-v7x"></a> Migrating from v7.x
 

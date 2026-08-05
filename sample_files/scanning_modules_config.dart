@@ -60,8 +60,8 @@ class ScanningModulesConfig {
       fields: [FieldType.firstName, FieldType.lastName],
       documentFilter: [
         DocumentFilter(
-          country: Country.croatia,
-          documentType: DocumentType.id,
+          country: CountryId.croatia,
+          documentType: DocumentTypeId.id,
         ),
       ],
     );
@@ -126,6 +126,7 @@ class ScanningModulesConfig {
       showHelpButton: true,
       showOnboardingDialog: showOnboardingDialog,
       allowHapticFeedback: true,
+      allowScanSound: true,
       preferredCamera: PreferredCamera.back,
     );
   }

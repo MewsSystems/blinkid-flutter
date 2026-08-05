@@ -24,6 +24,8 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.PluginRegistry.ActivityResultListener
 import kotlinx.coroutines.*
+import org.json.JSONObject
+import java.io.File
 
 /** BlinkidFlutterPlugin */
 class BlinkIdFlutterPlugin :
@@ -33,8 +35,10 @@ class BlinkIdFlutterPlugin :
     ActivityResultListener {
     private val BLINKID_METHOD_PERFORM_SCAN = "performScan"
     private val BLINKID_METHOD_PERFORM_DIRECTAPI_SCAN = "performDirectApiScan"
+    private val BLINKID_METHOD_PERFORM_DIRECTAPI_SCAN_WITH_ANALYSIS = "performDirectApiScanWithAnalysis"
     private val BLINKID_LOAD_SDK = "loadBlinkIdSdk"
     private val BLINKID_UNLOAD_SDK = "unloadBlinkIdSdk"
+    private val BLINKID_DELETE_CACHED_RESOURCES = "deleteCachedResources"
     private val BLINKID_REQUEST_CODE = 1452
     private val CAMERA_PERMISSION_REQUEST_CODE = 1453
     private val BLINKID_ERROR_RESULT_CODE = "blinkid_android_error"
@@ -92,6 +96,14 @@ class BlinkIdFlutterPlugin :
 
             BLINKID_METHOD_PERFORM_DIRECTAPI_SCAN -> {
                 CoroutineScope(Dispatchers.Main).launch { performDirectApiScan(call, result) }
+            }
+
+            BLINKID_METHOD_PERFORM_DIRECTAPI_SCAN_WITH_ANALYSIS -> {
+                CoroutineScope(Dispatchers.Main).launch { performDirectApiScanWithAnalysis(call, result) }
+            }
+
+            BLINKID_DELETE_CACHED_RESOURCES -> {
+                deleteCachedResources(call, result)
             }
 
             else -> {
@@ -240,6 +252,20 @@ class BlinkIdFlutterPlugin :
     private suspend fun performDirectApiScan(
         call: MethodCall,
         result: Result,
+    ) = runDirectApiScan(call, result, includeAnalysis = false)
+
+    /// Behaves like [performDirectApiScan], but the success payload is
+    /// `{"result": <scanning result JSON or null>, "analysis": <analysis JSON or null>}`
+    /// instead of the bare scanning-result JSON.
+    private suspend fun performDirectApiScanWithAnalysis(
+        call: MethodCall,
+        result: Result,
+    ) = runDirectApiScan(call, result, includeAnalysis = true)
+
+    private suspend fun runDirectApiScan(
+        call: MethodCall,
+        result: Result,
+        includeAnalysis: Boolean,
     ) {
         try {
             val blinkIdSessionSettings = call.argument<Map<String, Any>>("blinkIdSessionSettings")
@@ -266,13 +292,13 @@ class BlinkIdFlutterPlugin :
                     return@let
                 }
                 val session = sessionResult.getOrThrow()
-                var result: kotlin.Result<BlinkIdProcessResult>? = null
+                var processResult: kotlin.Result<BlinkIdProcessResult>? = null
 
                 firstImage?.let { firstImageBase64 ->
                     BlinkIdDeserializationUtils
                         .base64ToBitmap(firstImageBase64)
                         ?.let { image ->
-                            result = session.process(InputImage.createFromBitmap(image))
+                            processResult = session.process(InputImage.createFromBitmap(image))
                         }
                 }
 
@@ -280,20 +306,33 @@ class BlinkIdFlutterPlugin :
                     BlinkIdDeserializationUtils
                         .base64ToBitmap(secondImageBase64)
                         ?.let { image ->
-                            result = session.process(InputImage.createFromBitmap(image))
+                            processResult = session.process(InputImage.createFromBitmap(image))
                         }
                 }
 
-                if (result?.isSuccess == true) {
+                if (processResult?.isSuccess == true) {
                     val redactionSettingsMap = call.argument<Map<String, Any>>("directApiRedactionSettings")
                     val redactionSettings = BlinkIdDeserializationUtils.deserializeRedactionSettings(redactionSettingsMap)
                     val scanningResultKotlinResult = session.getResult(redactionSettings)
                     if (scanningResultKotlinResult.isSuccess) {
-                        flutterResult?.success(
-                            BlinkIdSerializationUtils.serializeBlinkIdScanningResult(
-                                scanningResultKotlinResult.getOrNull(),
-                            ),
-                        )
+                        val scanningResult = scanningResultKotlinResult.getOrNull()
+                        if (includeAnalysis) {
+                            val analysisResult = processResult?.getOrNull()?.inputImageAnalysisResult
+                            val resultJson = BlinkIdSerializationUtils.serializeBlinkIdScanningResult(scanningResult)
+                            val payload = JSONObject()
+                            payload.put("result", resultJson?.let { json -> JSONObject(json) } ?: JSONObject.NULL)
+                            payload.put(
+                                "analysis",
+                                analysisResult?.let { analysis ->
+                                    JSONObject(BlinkIdSerializationUtils.serializeInputImageAnalysisResult(analysis))
+                                } ?: JSONObject.NULL,
+                            )
+                            flutterResult?.success(payload.toString())
+                        } else {
+                            flutterResult?.success(
+                                BlinkIdSerializationUtils.serializeBlinkIdScanningResult(scanningResult),
+                            )
+                        }
                     } else {
                         flutterResult?.error(
                             BLINKID_ERROR_RESULT_CODE,
@@ -317,6 +356,31 @@ class BlinkIdFlutterPlugin :
             )
         } catch (error: Exception) {
             flutterResult?.error(BLINKID_ERROR_RESULT_CODE, error.message, null)
+        }
+    }
+
+    // Deletes cached SDK resources from disk without requiring the SDK to be initialized — unlike
+    // unloadBlinkIdSdk, this never touches blinkIdSdk/BlinkIdSdk.sdkInstance. Android's blinkid-core
+    // has no static equivalent to iOS's BlinkIDSdk.deleteCachedResources(), so this recreates it by
+    // deleting the resource folders directly from the app cache dir (where ResourcesConfig.localFolder
+    // / OtaResourcesConfig.localFolder are documented to live). Errors are swallowed — best-effort,
+    // matching the iOS method's own "errors are silently ignored" contract.
+    private fun deleteCachedResources(
+        call: MethodCall,
+        result: Result,
+    ) {
+        val resourcesLocalFolder = call.argument<String>("resourcesLocalFolder") ?: "MLModels"
+        val otaResourcesLocalFolder = call.argument<String>("otaResourcesLocalFolder") ?: "OTAMLModels"
+        deleteCacheSubFolder(resourcesLocalFolder)
+        deleteCacheSubFolder(otaResourcesLocalFolder)
+        result.success(null)
+    }
+
+    private fun deleteCacheSubFolder(folderName: String) {
+        try {
+            File(context.cacheDir, folderName).deleteRecursively()
+        } catch (_: Exception) {
+            // best-effort — mirrors the native SDK's own silent-failure contract
         }
     }
 

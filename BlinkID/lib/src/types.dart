@@ -82,6 +82,11 @@ class BarcodeModuleSettings {
   /// This setting can be enabled only if `documentCaptureEnabled` is disabled.
   final bool dataMatrixScanningEnabled;
 
+  /// Enables the scanning and processing of Aztec barcodes.
+  ///
+  /// This setting can be enabled only if `documentCaptureModule` is set to `null`.
+  final bool aztecScanningEnabled;
+
   const BarcodeModuleSettings({
     this.presenceMandatory = false,
     this.barcodeImageReturnEnabled = false,
@@ -95,6 +100,7 @@ class BarcodeModuleSettings {
     this.ean13ScanningEnabled = false,
     this.itfScanningEnabled = false,
     this.dataMatrixScanningEnabled = false,
+    this.aztecScanningEnabled = false,
   });
 
   /// Returns a copy with the given fields replaced.
@@ -111,6 +117,7 @@ class BarcodeModuleSettings {
     bool? ean13ScanningEnabled,
     bool? itfScanningEnabled,
     bool? dataMatrixScanningEnabled,
+    bool? aztecScanningEnabled,
   }) => BarcodeModuleSettings(
     presenceMandatory: presenceMandatory ?? this.presenceMandatory,
     barcodeImageReturnEnabled: barcodeImageReturnEnabled ?? this.barcodeImageReturnEnabled,
@@ -124,6 +131,7 @@ class BarcodeModuleSettings {
     ean13ScanningEnabled: ean13ScanningEnabled ?? this.ean13ScanningEnabled,
     itfScanningEnabled: itfScanningEnabled ?? this.itfScanningEnabled,
     dataMatrixScanningEnabled: dataMatrixScanningEnabled ?? this.dataMatrixScanningEnabled,
+    aztecScanningEnabled: aztecScanningEnabled ?? this.aztecScanningEnabled,
   );
 
   factory BarcodeModuleSettings.fromJson(Map<String, dynamic> json) => _$BarcodeModuleSettingsFromJson(json);
@@ -138,11 +146,15 @@ class BarcodeModuleSettings {
 /// and lighting checks).
 @JsonSerializable()
 class DocumentCaptureModuleSettings {
-  /// Indicates whether the input image is already cropped and perspective-corrected.
+  /// Controls how the input image is treated with respect to document localization
+  /// and perspective correction.
   ///
-  /// Requires the input image to consist solely of the cropped document image with perspective correction applied.
-  /// This only applies to images from the DirectAPI method of scanning — with images from the default scanning, the setting will be ignored.
-  final bool inputImageCropped;
+  /// [InputImageCropType.cropped] and [InputImageCropType.unknown] are only applicable
+  /// to DirectAPI (`Photo`) input sources and will cause a validation error if used
+  /// with the default (`Video`) scanning.
+  ///
+  /// See [InputImageCropType] for the available options.
+  final InputImageCropType cropType;
 
   /// Enables the scanning and processing of unsupported document types.
   ///
@@ -198,9 +210,10 @@ class DocumentCaptureModuleSettings {
   /// This setting is implemented to comply with regulations in certain countries that mandate documents
   /// to be stored with adequate margins in the image.
   ///
-  /// Default value is `0.02`.
-  /// The setting is applicable only when using images from `Video` source.
-  /// The setting is ignored if `inputImageCropped == true`.
+  /// The recommended value for `Video` mode is `0.02`. The setting is applicable only when using
+  /// images from a `Video` source, and is ignored if [cropType] is [InputImageCropType.cropped].
+  ///
+  /// A value of `null` lets the SDK resolve the value based on other settings. Defaults to `null`.
   ///
   /// Allowed minimal value is `0.0` and maximum value is `1.0`.
   final double? inputImageMargin;
@@ -232,7 +245,9 @@ class DocumentCaptureModuleSettings {
   /// If `true`, images with detected blur will be excluded from further processing.
   ///
   /// If `false`, images will still be processed and blur status will be reported in the result.
-  final bool imageWithBlurRejected;
+  ///
+  /// A value of `null` lets the SDK resolve the value based on other settings. Defaults to `null`.
+  final bool? imageWithBlurRejected;
 
   /// The sensitivity of glare detection in the document image.
   ///
@@ -246,7 +261,9 @@ class DocumentCaptureModuleSettings {
   /// If `true`, images with detected glare will be excluded from further processing.
   ///
   /// If `false`, images will still be processed and glare status will be reported in the result.
-  final bool imageWithGlareRejected;
+  ///
+  /// A value of `null` lets the SDK resolve the value based on other settings. Defaults to `null`.
+  final bool? imageWithGlareRejected;
 
   /// The sensitivity of allowed detected tilt of the document in the image.
   ///
@@ -266,11 +283,23 @@ class DocumentCaptureModuleSettings {
   ///
   /// If `true`, occluded images will be excluded from further processing.
   ///
-  /// This setting is applicable only if `inputImageCropped == false`.
-  final bool imageWithHandOcclusionRejected;
+  /// This setting is applicable only if [cropType] is not [InputImageCropType.cropped].
+  ///
+  /// A value of `null` lets the SDK resolve the value based on other settings. Defaults to `null`.
+  final bool? imageWithHandOcclusionRejected;
+
+  /// The strategy used to select the best input image from a pool of stable input images.
+  ///
+  /// Before selecting the best quality image, a sequence of stable input images must be
+  /// available. From this pool, the one with the highest quality is selected. A larger pool
+  /// size increases the likelihood of capturing a high-quality image but may introduce a
+  /// slight delay, as more stable input images need to be collected.
+  ///
+  /// See [InputImageSelectionStrategy] for more information.
+  final InputImageSelectionStrategy inputImageSelectionStrategy;
 
   const DocumentCaptureModuleSettings({
-    this.inputImageCropped = false,
+    this.cropType = InputImageCropType.notCropped,
     this.unsupportedDocumentsAllowed = false,
     this.secondSideWithNoExtractableDataSkipped = true,
     this.passportDataPageScanOnly = true,
@@ -278,24 +307,26 @@ class DocumentCaptureModuleSettings {
     this.faceImagePresenceMandatory = false,
     this.inputImageReturnEnabled = false,
     this.documentImageReturnEnabled = false,
-    this.inputImageMargin = 0.02,
+    this.inputImageMargin,
     this.dotsPerInch = 250,
     this.extensionFactor = 0.0,
     this.blurSensitivityLevel = SensitivityLevel.mid,
-    this.imageWithBlurRejected = true,
+    this.imageWithBlurRejected,
     this.glareSensitivityLevel = SensitivityLevel.mid,
-    this.imageWithGlareRejected = true,
+    this.imageWithGlareRejected,
     this.tiltSensitivityLevel = SensitivityLevel.mid,
     this.imageWithPoorLightingRejected = true,
-    this.imageWithHandOcclusionRejected = true,
+    this.imageWithHandOcclusionRejected,
+    this.inputImageSelectionStrategy = InputImageSelectionStrategy.balanced,
   });
 
   /// Returns a copy with the given fields replaced.
   ///
-  /// [inputImageMargin] can only be replaced with a non-null value here —
-  /// construct a new instance directly if you need to clear it back to null.
+  /// [inputImageMargin], [imageWithBlurRejected], [imageWithGlareRejected] and
+  /// [imageWithHandOcclusionRejected] can only be replaced with a non-null value here —
+  /// construct a new instance directly if you need to clear one back to null.
   DocumentCaptureModuleSettings copyWith({
-    bool? inputImageCropped,
+    InputImageCropType? cropType,
     bool? unsupportedDocumentsAllowed,
     bool? secondSideWithNoExtractableDataSkipped,
     bool? passportDataPageScanOnly,
@@ -313,8 +344,9 @@ class DocumentCaptureModuleSettings {
     SensitivityLevel? tiltSensitivityLevel,
     bool? imageWithPoorLightingRejected,
     bool? imageWithHandOcclusionRejected,
+    InputImageSelectionStrategy? inputImageSelectionStrategy,
   }) => DocumentCaptureModuleSettings(
-    inputImageCropped: inputImageCropped ?? this.inputImageCropped,
+    cropType: cropType ?? this.cropType,
     unsupportedDocumentsAllowed: unsupportedDocumentsAllowed ?? this.unsupportedDocumentsAllowed,
     secondSideWithNoExtractableDataSkipped:
         secondSideWithNoExtractableDataSkipped ?? this.secondSideWithNoExtractableDataSkipped,
@@ -333,6 +365,7 @@ class DocumentCaptureModuleSettings {
     tiltSensitivityLevel: tiltSensitivityLevel ?? this.tiltSensitivityLevel,
     imageWithPoorLightingRejected: imageWithPoorLightingRejected ?? this.imageWithPoorLightingRejected,
     imageWithHandOcclusionRejected: imageWithHandOcclusionRejected ?? this.imageWithHandOcclusionRejected,
+    inputImageSelectionStrategy: inputImageSelectionStrategy ?? this.inputImageSelectionStrategy,
   );
 
   factory DocumentCaptureModuleSettings.fromJson(Map<String, dynamic> json) =>
@@ -414,13 +447,15 @@ class VizModuleSettings {
   /// of being sourced from a single image.
   ///
   /// This only applies to images from `Video` input image source - for images from `Photo` source, setting will be ignored.
-  final bool resultAggregationEnabled;
+  ///
+  /// A value of `null` lets the SDK resolve the value based on other settings. Defaults to `null`.
+  final bool? resultAggregationEnabled;
 
   const VizModuleSettings({
     this.presenceMandatory = false,
     this.signatureImageExtractionEnabled = false,
     this.characterValidationEnabled = true,
-    this.resultAggregationEnabled = true,
+    this.resultAggregationEnabled,
   });
 
   /// Returns a copy with the given fields replaced.
@@ -459,8 +494,8 @@ class ClassFilter {
   ///  ```
   ///   final classFilter = ClassFilter();
   ///    classFilter.includeDocuments = [
-  ///      DocumentFilter.country(Country.usa),
-  ///      DocumentFilter.countryType(Country.croatia, DocumentType.id),
+  ///      DocumentFilter.country(CountryId.usa),
+  ///      DocumentFilter.countryType(CountryId.croatia, DocumentTypeId.id),
   ///    ];
   ///
   ///    await blinkIdPlugin.performScan(sdkSettings, sessionSettings classFilter)
@@ -485,8 +520,8 @@ class ClassFilter {
   ///  ```
   ///   final classFilter = ClassFilter();
   ///    classFilter.excludeDocuments = [
-  ///      DocumentFilter.country(Country.usa),
-  ///      DocumentFilter.countryType(Country.croatia, DocumentType.id),
+  ///      DocumentFilter.country(CountryId.usa),
+  ///      DocumentFilter.countryType(CountryId.croatia, DocumentTypeId.id),
   ///    ];
   ///
   ///    await blinkIdPlugin.performScan(sdkSettings, sessionSettings classFilter)
@@ -615,15 +650,15 @@ class DetailedFieldType {
 class DocumentFilter {
   /// If set, only specified country will pass the filter criteria.
   /// Otherwise, issuing country will not be taken into account.
-  Country? country;
+  CountryId? country;
 
   /// If set, only specified country will pass the filter criteria.
   /// Otherwise, issuing region will not be taken into account.
-  Region? region;
+  RegionId? region;
 
   /// If set, only specified type will pass the filter criteria. Otherwise, issuing type will not be taken into
   /// account.
-  DocumentType? documentType;
+  DocumentTypeId? documentType;
 
   /// Represents the document filter.
   /// Used with other classes like the [ClassFilter], [DocumentRules] and the [DocumentAnonymizationSettings].
@@ -631,11 +666,11 @@ class DocumentFilter {
   /// All parameters are optional, and do not need to be added.
   /// The filter can be set to be more generic (for example, to only accept document from USA):
   /// ```
-  /// DocumentFilter(Country.usa);
+  /// DocumentFilter(CountryId.usa);
   /// ```
   /// or, it can be set to be more specific (for example, to specifically accept USA drivers licenses from California):
   /// ```
-  /// DocumentFilter(Country.usa, Region.california, DocumentType.dl);
+  /// DocumentFilter(CountryId.usa, RegionId.california, DocumentTypeId.dl);
   /// ```
   DocumentFilter({this.country, this.region, this.documentType});
   factory DocumentFilter.fromJson(Map<String, dynamic> json) => _$DocumentFilterFromJson(json);
@@ -747,8 +782,252 @@ enum AlphabetType {
   greek,
 }
 
+/// Specifies whether the input image is cropped, likely cropped, or not cropped.
+///
+/// Declaration order matches the native SDKs — native bridges may send an
+/// ordinal, and [enumFromValue] falls back to index lookup.
+enum InputImageCropType {
+  /// The image is considered raw, and thus subject to the full detection and
+  /// perspective-correction pipeline. Default value.
+  @JsonValue("notCropped")
+  notCropped,
+
+  /// The image may be cropped, but there is no guarantee that it is cropped.
+  ///
+  /// A first attempt is made treating the image as cropped; if extraction fails,
+  /// the normal detection-and-cropping pipeline runs as a fallback.
+  @JsonValue("unknown")
+  unknown,
+
+  /// The input image is already cropped and perspective-corrected.
+  @JsonValue("cropped")
+  cropped,
+}
+
+/// Describes the conclusion drawn about whether the input image was already
+/// cropped and perspective-corrected prior to being submitted for recognition.
+///
+/// This analysis is only performed when [InputImageCropType.unknown] is used
+/// with a `Photo` input source. In all other cases the value is [notAvailable].
+///
+/// Declaration order matches the native SDKs — native bridges may send an
+/// ordinal, and [enumFromValue] falls back to index lookup.
+enum InputImageCropAnalysis {
+  /// The first attempt (treating the image as pre-cropped) did not succeed, so the
+  /// standard detection-and-perspective-correction pipeline ran as a fallback and
+  /// succeeded. The input image was likely not pre-cropped.
+  @JsonValue("notCropped")
+  notCropped,
+
+  /// The first attempt (treating the image as pre-cropped) succeeded without running
+  /// the document detector. The input image was likely already cropped and
+  /// perspective-corrected.
+  @JsonValue("cropped")
+  cropped,
+
+  /// Default value. The two-attempt analysis was not performed because [InputImageCropType]
+  /// was [InputImageCropType.cropped] or [InputImageCropType.notCropped], or the input
+  /// source was `Video`.
+  @JsonValue("notAvailable")
+  notAvailable,
+
+  /// The analysis does not allow for a conclusion to be drawn because a valid stage
+  /// could not be reached considering the image as either cropped or not cropped.
+  @JsonValue("undetermined")
+  undetermined,
+}
+
+/// Represents the strategy used to select the best input image from a pool of
+/// stable input images.
+///
+/// Before selecting the best quality image, a sequence of stable input images must be
+/// available. From this pool, the one with the highest quality is selected. A larger
+/// pool size increases the likelihood of capturing a high-quality image but may
+/// introduce a slight delay, as more stable input images need to be collected.
+///
+/// Declaration order matches the native SDKs — native bridges may send an
+/// ordinal, and [enumFromValue] falls back to index lookup.
+enum InputImageSelectionStrategy {
+  /// Selects the first acceptable stable input image.
+  @JsonValue("singleImage")
+  singleImage,
+
+  /// Processing is faster, but it is possible to select an input image with lower
+  /// quality because a smaller pool of stable input images is considered.
+  @JsonValue("optimizeForSpeed")
+  optimizeForSpeed,
+
+  /// Trade-off between quality and speed. Default value.
+  @JsonValue("balanced")
+  balanced,
+
+  /// Processing is slower in order to select a high quality input image, because a
+  /// larger pool of stable input images is considered.
+  @JsonValue("optimizeForQuality")
+  optimizeForQuality,
+}
+
+/// Describes whether VIZ (Visual Inspection Zone) extraction was available for the
+/// processed input image and which extraction option was selected.
+///
+/// Declaration order matches the native SDKs — native bridges may send an
+/// ordinal, and [enumFromValue] falls back to index lookup.
+enum VizExtractionType {
+  /// VIZ extraction was not available — no document has been scanned yet.
+  @JsonValue("notAvailable")
+  notAvailable,
+
+  /// VIZ extraction was performed using segmentation.
+  @JsonValue("segmentation")
+  segmentation,
+
+  /// VIZ extraction was performed using templating.
+  @JsonValue("templating")
+  templating,
+
+  /// VIZ extraction is not supported for this document.
+  @JsonValue("unsupported")
+  unsupported,
+}
+
+/// Represents the status of the document processing for a single input image.
+///
+/// Declaration order matches the native SDKs — native bridges may send an
+/// ordinal, and [enumFromValue] falls back to index lookup.
+enum ProcessingStatus {
+  /// The document was fully scanned and data was extracted as expected.
+  @JsonValue("success")
+  success,
+
+  /// The document was not found on the image.
+  @JsonValue("detectionFailed")
+  detectionFailed,
+
+  /// Preprocessing of the input image has failed.
+  @JsonValue("imagePreprocessingFailed")
+  imagePreprocessingFailed,
+
+  /// Stability is achieved when the same document is provided on consecutive frames,
+  /// resulting in a consistent recognition between frames prior to data extraction.
+  /// Valid only for a video feed.
+  @JsonValue("stabilityTestFailed")
+  stabilityTestFailed,
+
+  /// The wrong side of the document is scanned.
+  @JsonValue("scanningWrongSide")
+  scanningWrongSide,
+
+  /// Unexpected fields are present on the document and removed from the final result.
+  @JsonValue("fieldIdentificationFailed")
+  fieldIdentificationFailed,
+
+  /// Fields expected to appear on the scanned document have not been found.
+  @JsonValue("mandatoryFieldMissing")
+  mandatoryFieldMissing,
+
+  /// One of the extracted fields contains a character which does not satisfy the
+  /// rule defined for that field. Only occurs if character validation is enabled.
+  @JsonValue("invalidCharactersFound")
+  invalidCharactersFound,
+
+  /// Failed to return a requested image.
+  @JsonValue("imageReturnFailed")
+  imageReturnFailed,
+
+  /// Reading or parsing of the barcode has failed.
+  @JsonValue("barcodeRecognitionFailed")
+  barcodeRecognitionFailed,
+
+  /// Parsing of the MRZ has failed.
+  @JsonValue("mrzParsingFailed")
+  mrzParsingFailed,
+
+  /// Document currently not supported.
+  @JsonValue("unsupportedDocument")
+  unsupportedDocument,
+
+  /// Front side recognition has completed successfully. The other side should be scanned.
+  @JsonValue("awaitingOtherSide")
+  awaitingOtherSide,
+
+  /// Front side recognition has not completed successfully, so the back side is not scanned.
+  @JsonValue("notScanned")
+  notScanned,
+
+  /// The barcode was not found on the image. Only occurs if the document has a
+  /// mandatory barcode.
+  @JsonValue("barcodeDetectionFailed")
+  barcodeDetectionFailed,
+
+  /// The MRZ was not found on the image. Only occurs if the document has a
+  /// mandatory MRZ.
+  @JsonValue("mrzDetectionFailed")
+  mrzDetectionFailed,
+
+  /// Input image is not focused. Platform specific.
+  @JsonValue("inputImageNotFocused")
+  inputImageNotFocused,
+
+  /// More stable input images are required to proceed to data and image extraction.
+  @JsonValue("awaitingMoreStableInputImages")
+  awaitingMoreStableInputImages,
+}
+
+/// Represents the status of document detection within an input image.
+///
+/// Declaration order matches the native SDKs — native bridges may send an
+/// ordinal, and [enumFromValue] falls back to index lookup.
+enum DetectionStatus {
+  /// Document detection failed.
+  @JsonValue("failed")
+  failed,
+
+  /// Document detection succeeded.
+  @JsonValue("success")
+  success,
+
+  /// The camera is too far from the document.
+  @JsonValue("cameraTooFar")
+  cameraTooFar,
+
+  /// The camera is too close to the document.
+  @JsonValue("cameraTooClose")
+  cameraTooClose,
+
+  /// The camera angle relative to the document is too steep.
+  @JsonValue("cameraAngleTooSteep")
+  cameraAngleTooSteep,
+
+  /// The document is too close to the edge of the camera frame.
+  @JsonValue("documentTooCloseToCameraEdge")
+  documentTooCloseToCameraEdge,
+
+  /// The document is only partially visible within the camera frame.
+  @JsonValue("documentPartiallyVisible")
+  documentPartiallyVisible,
+}
+
+/// Represents a binary detection outcome for a specific image-quality check
+/// (blur, glare, moiré, hand occlusion, face, MRZ, barcode, Real ID).
+///
+/// Declaration order matches the native SDKs — native bridges may send an
+/// ordinal, and [enumFromValue] falls back to index lookup.
+enum ImageAnalysisDetectionStatus {
+  /// Detection is not available for this input image.
+  @JsonValue("notAvailable")
+  notAvailable,
+
+  /// The condition was checked for and not detected.
+  @JsonValue("notDetected")
+  notDetected,
+
+  /// The condition was checked for and detected.
+  @JsonValue("detected")
+  detected,
+}
+
 /// Document country.
-enum Country {
+enum CountryId {
   @JsonValue("none")
   none,
   @JsonValue("albania")
@@ -775,8 +1054,8 @@ enum Country {
   brunei,
   @JsonValue("bulgaria")
   bulgaria,
-  @JsonValue("bambodia")
-  bambodia,
+  @JsonValue("cambodia")
+  cambodia,
   @JsonValue("canada")
   canada,
   @JsonValue("chile")
@@ -907,10 +1186,10 @@ enum Country {
   turkey,
   @JsonValue("uae")
   uae,
-  @JsonValue("gganda")
-  gganda,
-  @JsonValue("uK")
-  uK,
+  @JsonValue("uganda")
+  uganda,
+  @JsonValue("uk")
+  uk,
   @JsonValue("ukraine")
   ukraine,
   @JsonValue("usa")
@@ -1081,8 +1360,8 @@ enum Country {
   guineaBissau,
   @JsonValue("guyana")
   guyana,
-  @JsonValue("heardIslandAndMcdonaldIslands")
-  heardIslandAndMcdonaldIslands,
+  @JsonValue("heardIslandAndMcDonaldIslands")
+  heardIslandAndMcDonaldIslands,
   @JsonValue("iran")
   iran,
   @JsonValue("iraq")
@@ -1265,8 +1544,12 @@ enum Country {
   saintThomasAndPrince,
 }
 
+/// Renamed to [CountryId] in v8001 to match the native SDKs.
+@Deprecated('Renamed to CountryId in v8001 to match the native SDKs')
+typedef Country = CountryId;
+
 /// Document region.
-enum Region {
+enum RegionId {
   @JsonValue("none")
   none,
   @JsonValue("alabama")
@@ -1509,8 +1792,8 @@ enum Region {
   rioDeJaneiro,
   @JsonValue("rioGrandeDoSul")
   rioGrandeDoSul,
-  @JsonValue("northWestTerritories")
-  northWestTerritories,
+  @JsonValue("northwestTerritories")
+  northwestTerritories,
   @JsonValue("nunavut")
   nunavut,
   @JsonValue("princeEdwardIsland")
@@ -1543,8 +1826,8 @@ enum Region {
   haryana,
   @JsonValue("sergipe")
   sergipe,
-  @JsonValue("alagos")
-  alagos,
+  @JsonValue("alagoas")
+  alagoas,
   @JsonValue("bangsamoro")
   bangsamoro,
   @JsonValue("telangana")
@@ -1569,8 +1852,12 @@ enum Region {
   uttarakhand,
 }
 
+/// Renamed to [RegionId] in v8001 to match the native SDKs.
+@Deprecated('Renamed to RegionId in v8001 to match the native SDKs')
+typedef Region = RegionId;
+
 /// Document type.
-enum DocumentType {
+enum DocumentTypeId {
   @JsonValue("none")
   none,
   @JsonValue("consularId")
@@ -1591,8 +1878,8 @@ enum DocumentType {
   myKad,
   @JsonValue("myKid")
   myKid,
-  @JsonValue("myPR")
-  myPR,
+  @JsonValue("myPr")
+  myPr,
   @JsonValue("myTentera")
   myTentera,
   @JsonValue("panCard")
@@ -1617,8 +1904,6 @@ enum DocumentType {
   militaryId,
   @JsonValue("myKas")
   myKas,
-  @JsonValue("docialSecurityCard")
-  docialSecurityCard,
   @JsonValue("healthInsuranceCard")
   healthInsuranceCard,
   @JsonValue("passport")
@@ -1651,8 +1936,8 @@ enum DocumentType {
   driverCard,
   @JsonValue("globalEntryCard")
   globalEntryCard,
-  @JsonValue("mypolis")
-  mypolis,
+  @JsonValue("myPolis")
+  myPolis,
   @JsonValue("nexusCard")
   nexusCard,
   @JsonValue("passportCard")
@@ -1675,8 +1960,8 @@ enum DocumentType {
   minorsPassport,
   @JsonValue("minorsPublicServicesCard")
   minorsPublicServicesCard,
-  @JsonValue("drivingPriviligeCard")
-  drivingPriviligeCard,
+  @JsonValue("drivingPrivilegeCard")
+  drivingPrivilegeCard,
   @JsonValue("asylumRequest")
   asylumRequest,
   @JsonValue("driverQualificationCard")
@@ -1707,8 +1992,8 @@ enum DocumentType {
   temporaryProtectionPermit,
   @JsonValue("afghanCitizenCard")
   afghanCitizenCard,
-  @JsonValue("eId")
-  eId,
+  @JsonValue("eid")
+  eid,
   @JsonValue("pass")
   pass,
   @JsonValue("sisId")
@@ -1747,8 +2032,8 @@ enum DocumentType {
   adrCertificate,
   @JsonValue("ninCard")
   ninCard,
-  @JsonValue("mysssCard")
-  mysssCard,
+  @JsonValue("mySSSCard")
+  mySSSCard,
   @JsonValue("gendarmerieId")
   gendarmerieId,
   @JsonValue("policeId")
@@ -1756,6 +2041,10 @@ enum DocumentType {
   @JsonValue("originCard")
   originCard,
 }
+
+/// Renamed to [DocumentTypeId] in v8001 to match the native SDKs.
+@Deprecated('Renamed to DocumentTypeId in v8001 to match the native SDKs')
+typedef DocumentType = DocumentTypeId;
 
 /// Represents all possible field types that can be extracted from the document.
 enum FieldType {
@@ -1903,6 +2192,10 @@ enum FieldType {
   husbandName,
   @JsonValue("cardAccessNumber")
   cardAccessNumber,
+  @JsonValue("parentFullName")
+  parentFullName,
+  @JsonValue("ethnicity")
+  ethnicity,
 }
 
 /// An enum indicating preffered camera position for document capturing.
@@ -1918,22 +2211,66 @@ enum PreferredCamera {
   front,
 }
 
+/// Document country classification, with a strongly-typed [id] (when known at
+/// SDK build time) and the raw string value delivered by the native SDK.
+///
+/// For OTA-delivered (over-the-air) documents, [id] may be `null` while
+/// [rawValue] is still populated — match on [rawValue] for classes the
+/// compiled [CountryId] enum doesn't know about yet.
+class DocumentClassCountry {
+  /// The strongly-typed country id, or `null` for an OTA-only class.
+  final CountryId? id;
+
+  /// The raw classification string reported by the native SDK. Always populated.
+  final String rawValue;
+
+  DocumentClassCountry(Map<String, dynamic> native)
+    : id = enumFromValue(CountryId.values.toList(), native['id']),
+      rawValue = native['rawValue'] as String? ?? '';
+}
+
+/// Document region classification. See [DocumentClassCountry] for the id/rawValue contract.
+class DocumentClassRegion {
+  /// The strongly-typed region id, or `null` for an OTA-only class.
+  final RegionId? id;
+
+  /// The raw classification string reported by the native SDK. Always populated.
+  final String rawValue;
+
+  DocumentClassRegion(Map<String, dynamic> native)
+    : id = enumFromValue(RegionId.values.toList(), native['id']),
+      rawValue = native['rawValue'] as String? ?? '';
+}
+
+/// Document type classification. See [DocumentClassCountry] for the id/rawValue contract.
+class DocumentClassDocumentType {
+  /// The strongly-typed document type id, or `null` for an OTA-only class.
+  final DocumentTypeId? id;
+
+  /// The raw classification string reported by the native SDK. Always populated.
+  final String rawValue;
+
+  DocumentClassDocumentType(Map<String, dynamic> native)
+    : id = enumFromValue(DocumentTypeId.values.toList(), native['id']),
+      rawValue = native['rawValue'] as String? ?? '';
+}
+
 /// Represents the document class information.
 class DocumentClassInfo {
-  /// The document country.
+  /// The document country classification.
   ///
-  /// See [Country] for more information.
-  Country? country;
+  /// See [DocumentClassCountry] for more information.
+  DocumentClassCountry? country;
 
-  /// The document region.
+  /// The document region classification.
   ///
-  /// See [Region] for more information.
-  Region? region;
+  /// See [DocumentClassRegion] for more information.
+  DocumentClassRegion? region;
 
-  /// The type of the scanned document.
+  /// The type classification of the scanned document.
   ///
-  /// See [DocumentType] for more information.
-  DocumentType? documentType;
+  /// See [DocumentClassDocumentType] for more information.
+  DocumentClassDocumentType? documentType;
 
   /// Flag that indicates if the document class information is empty
   ///
@@ -1953,15 +2290,108 @@ class DocumentClassInfo {
 
   /// Represents the document class information.
   DocumentClassInfo(Map<String, dynamic> nativeClassInfo) {
-    country = enumFromValue(Country.values.toList(), nativeClassInfo['country']);
-    region = enumFromValue(Region.values.toList(), nativeClassInfo['region']);
-    documentType = enumFromValue(DocumentType.values.toList(), nativeClassInfo['documentType']);
+    final countryMap = nativeClassInfo['country'];
+    country = countryMap is Map ? DocumentClassCountry(countryMap.cast<String, dynamic>()) : null;
+    final regionMap = nativeClassInfo['region'];
+    region = regionMap is Map ? DocumentClassRegion(regionMap.cast<String, dynamic>()) : null;
+    final documentTypeMap = nativeClassInfo['documentType'];
+    documentType = documentTypeMap is Map
+        ? DocumentClassDocumentType(documentTypeMap.cast<String, dynamic>())
+        : null;
     empty = nativeClassInfo['empty'];
     countryName = nativeClassInfo['countryName'];
     isoNumericCountryCode = nativeClassInfo['isoNumericCountryCode'];
     isoAlpha2CountryCode = nativeClassInfo['isoAlpha2CountryCode'];
     isoAlpha3CountryCode = nativeClassInfo['isoAlpha3CountryCode'];
   }
+}
+
+/// Represents the result of processing and analyzing a single input image (frame).
+///
+/// This is the per-frame counterpart to [BlinkIdScanningResult] — it reports the
+/// status of processing a single image, along with detection and image-quality
+/// results, rather than the final aggregated scanning result. Currently only
+/// populated by [BlinkidFlutter.performDirectApiScanWithAnalysis].
+class InputImageAnalysisResult {
+  /// The status of processing this input image.
+  ProcessingStatus? processingStatus;
+
+  /// Describes whether this input image was already cropped and perspective-corrected
+  /// prior to being submitted for recognition.
+  ///
+  /// Only meaningful when [DocumentCaptureModuleSettings.cropType] was
+  /// [InputImageCropType.unknown] — otherwise [InputImageCropAnalysis.notAvailable].
+  InputImageCropAnalysis? inputImageCropAnalysis;
+
+  /// Describes whether VIZ extraction was available for this input image and which
+  /// extraction option was selected.
+  VizExtractionType? vizExtractionType;
+
+  /// The document class information detected on this input image, if available.
+  DocumentClassInfo? documentClassInfo;
+
+  /// The status of document detection on this input image.
+  DetectionStatus? documentDetectionStatus;
+
+  /// The status of blur detection on this input image.
+  ImageAnalysisDetectionStatus? blurDetectionStatus;
+
+  /// The status of glare detection on this input image.
+  ImageAnalysisDetectionStatus? glareDetectionStatus;
+
+  /// Which side of the document this input image was processed as.
+  ScanningSide? scanningSide;
+
+  /// Fields that were expected on the document but were missing.
+  List<FieldType> missingMandatoryFields;
+
+  /// Fields that were extracted from the document.
+  List<FieldType> extractedFields;
+
+  /// Fields that contained characters which were not expected in that field.
+  List<FieldType> invalidCharacterFields;
+
+  /// Fields that weren't expected on the document but were present.
+  List<FieldType> extraPresentFields;
+
+  /// Represents the result of processing and analyzing a single input image (frame).
+  InputImageAnalysisResult(Map<String, dynamic> nativeAnalysisResult)
+    : processingStatus = enumFromValue(ProcessingStatus.values.toList(), nativeAnalysisResult['processingStatus']),
+      inputImageCropAnalysis = enumFromValue(
+        InputImageCropAnalysis.values.toList(),
+        nativeAnalysisResult['inputImageCropAnalysis'],
+      ),
+      vizExtractionType = enumFromValue(VizExtractionType.values.toList(), nativeAnalysisResult['vizExtractionType']),
+      documentClassInfo = nativeAnalysisResult['documentClassInfo'] is Map
+          ? DocumentClassInfo(Map<String, dynamic>.from(nativeAnalysisResult['documentClassInfo']))
+          : null,
+      documentDetectionStatus = enumFromValue(
+        DetectionStatus.values.toList(),
+        nativeAnalysisResult['documentDetectionStatus'],
+      ),
+      blurDetectionStatus = enumFromValue(
+        ImageAnalysisDetectionStatus.values.toList(),
+        nativeAnalysisResult['blurDetectionStatus'],
+      ),
+      glareDetectionStatus = enumFromValue(
+        ImageAnalysisDetectionStatus.values.toList(),
+        nativeAnalysisResult['glareDetectionStatus'],
+      ),
+      scanningSide = enumFromValue(ScanningSide.values.toList(), nativeAnalysisResult['scanningSide']),
+      missingMandatoryFields = _fieldTypeList(nativeAnalysisResult['missingMandatoryFields']),
+      extractedFields = _fieldTypeList(nativeAnalysisResult['extractedFields']),
+      invalidCharacterFields = _fieldTypeList(nativeAnalysisResult['invalidCharacterFields']),
+      extraPresentFields = _fieldTypeList(nativeAnalysisResult['extraPresentFields']);
+}
+
+/// Parses a native list of raw field-type strings into [FieldType] values,
+/// silently dropping any entries the compiled enum doesn't recognize.
+List<FieldType> _fieldTypeList(dynamic nativeList) {
+  if (nativeList is! List) return const [];
+  return nativeList
+      .map((value) => enumFromValue(FieldType.values.toList(), value))
+      .whereType<FieldType>()
+      .toList();
 }
 
 /// Represents the result of the data match.
@@ -2575,6 +3005,9 @@ class VizResult {
   /// The work restriction of the document owner.
   StringResult? workRestriction;
 
+  /// The ethnicity of the document owner.
+  StringResult? ethnicity;
+
   /// Represents the result of the Visual Inspection Zone of a document.
   VizResult(Map<String, dynamic> nativeVizResult) {
     firstName = createStringResult(nativeVizResult, 'firstName');
@@ -2660,6 +3093,7 @@ class VizResult {
     legalStatus = createStringResult(nativeVizResult, 'legalStatus');
     socialSecurityStatus = createStringResult(nativeVizResult, 'socialSecurityStatus');
     workRestriction = createStringResult(nativeVizResult, 'workRestriction');
+    ethnicity = createStringResult(nativeVizResult, 'ethnicity');
   }
 }
 
@@ -3849,9 +4283,13 @@ class ParentInfo {
   /// The last name of one of the document owner's parents.
   StringResult? lastName;
 
+  /// The full name of one of the document owner's parents.
+  StringResult? fullName;
+
   ParentInfo(Map<String, dynamic> nativeParentInfo) {
     firstName = createStringResult(nativeParentInfo, 'firstName');
     lastName = createStringResult(nativeParentInfo, 'lastName');
+    fullName = createStringResult(nativeParentInfo, 'fullName');
   }
 }
 
