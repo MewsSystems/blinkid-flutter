@@ -143,6 +143,13 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
       abortPendingCameraResult("Camera retry superseded")
       pendingCameraResult = result
       cameraSetupFailed = false
+      // Only reachable today right after a permission denial, where no
+      // session exists yet — but performCameraSetup() unconditionally builds
+      // a new session/preview sublayer without detaching a prior one (unlike
+      // Android's performCameraSetup, which self-protects via unbindAll()).
+      // Stop first so this stays correct if retryCamera is ever reachable
+      // with a running session.
+      stopCaptureSession()
       setupCamera()
     case "switchCamera":
       _startScanTask?.cancel()
@@ -384,11 +391,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
       isScanning = false
       blinkIdSession = nil
     }
-    let session = captureSession
-    captureSession = nil
-    previewLayer?.removeFromSuperlayer()
-    // See stopCaptureSession()'s comment — same reasoning applies here.
-    sessionQueue.async { session?.stopRunning() }
+    stopCaptureSession()
     methodChannel.setMethodCallHandler(nil)
     // Null the sink immediately so no events are emitted after teardown.
     // The StreamHandler is unregistered in the "dispose" method-channel
