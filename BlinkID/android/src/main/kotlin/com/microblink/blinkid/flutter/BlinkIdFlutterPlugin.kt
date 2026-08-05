@@ -27,7 +27,7 @@ import kotlinx.coroutines.*
 import org.json.JSONObject
 import java.io.File
 
-/** BlinkidFlutterPlugin */
+/** BlinkIdFlutterPlugin */
 class BlinkIdFlutterPlugin :
     FlutterPlugin,
     MethodCallHandler,
