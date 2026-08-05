@@ -31,7 +31,7 @@ class BlinkIdSdkSettings {
   String? bundleIdentifier;
 
   /// Timeout settings for resource downloads.
-  int? resourceRequestTimeout;  // TODO bug, should be set to RequestTimeout not int
+  int? resourceRequestTimeout; // TODO bug, should be set to RequestTimeout not int
 
   /// Set a custom HTTPS URL to be used as a proxy for Ping and license checks.
   /// The proxy URL will be applied only if the license has the appropriate rights.
@@ -54,8 +54,7 @@ class BlinkIdSdkSettings {
     this.microblinkProxyUrl,
   });
 
-  factory BlinkIdSdkSettings.fromJson(Map<String, dynamic> json) =>
-      _$BlinkIdSdkSettingsFromJson(json);
+  factory BlinkIdSdkSettings.fromJson(Map<String, dynamic> json) => _$BlinkIdSdkSettingsFromJson(json);
   Map<String, dynamic> toJson() => _$BlinkIdSdkSettingsToJson(this);
 }
 
@@ -100,17 +99,31 @@ class BlinkIdSessionSettings {
     this.inactivityTimeoutDuration = 10000,
   }) : scanningSettings = scanningSettings ?? BlinkIdScanningSettings();
 
-  factory BlinkIdSessionSettings.fromJson(Map<String, dynamic> json) =>
-      _$BlinkIdSessionSettingsFromJson(json);
+  factory BlinkIdSessionSettings.fromJson(Map<String, dynamic> json) => _$BlinkIdSessionSettingsFromJson(json);
   Map<String, dynamic> toJson() => _$BlinkIdSessionSettingsToJson(this);
 }
+
+// Distinguishes "parameter omitted" from "parameter explicitly passed as
+// null" in [BlinkIdScanningSettings]'s constructor — a plain nullable
+// parameter can't tell the two apart, since both read as `null` inside the
+// constructor body. Omitted -> SDK default (module enabled, matching the
+// pre-8000.0.0 behavior where these fields were non-nullable). Explicit
+// `null` -> module disabled, serialized as a JSON `null` so native can act on
+// it (see BlinkIdDeserializationUtils on both platforms).
+const Object _unsetModule = Object();
 
 /// Represents the configurable settings for scanning a document.
 ///
 /// This class defines various parameters and policies related to the scanning
 /// process, including image quality handling, data extraction and redaction,
 /// along with options for frame processing and image extraction.
-@JsonSerializable()
+// createFactory: false — fromJson is hand-written below. The generated
+// factory can't reproduce the tri-state contract (see _unsetModule above):
+// it always calls this constructor with an explicit value for every module
+// parameter, so "key absent from JSON" and "key present with null" would
+// collapse to the same non-sentinel `null` argument and both disable the
+// module, rather than "absent" falling through to the SDK-default instance.
+@JsonSerializable(createFactory: false)
 class BlinkIdScanningSettings {
   /// Settings for the document capture module.
   ///
@@ -118,7 +131,9 @@ class BlinkIdScanningSettings {
   /// (such as face and document images), and image quality validation (blur, glare,
   /// and lighting checks).
   /// See [DocumentCaptureModuleSettings] for more information.
-  @JsonKey(includeIfNull: false)
+  ///
+  /// Leave unset for the SDK default (enabled). Pass `documentCaptureModule: null`
+  /// explicitly to disable the module.
   DocumentCaptureModuleSettings? documentCaptureModule;
 
   /// Settings for the MRZ (Machine Readable Zone) extraction module.
@@ -127,7 +142,9 @@ class BlinkIdScanningSettings {
   /// zone typically found on passports, visas, and identity cards.
   ///
   /// See [MrzModuleSettings] for more information.
-  @JsonKey(includeIfNull: false)
+  ///
+  /// Leave unset for the SDK default (enabled). Pass `mrzModule: null`
+  /// explicitly to disable the module.
   MrzModuleSettings? mrzModule;
 
   /// Settings for the barcode extraction module.
@@ -138,7 +155,9 @@ class BlinkIdScanningSettings {
   /// It can operate as a standalone module or in combination with document capture.
   ///
   /// See [BarcodeModuleSettings] for more information.
-  @JsonKey(includeIfNull: false)
+  ///
+  /// Leave unset for the SDK default (enabled). Pass `barcodeModule: null`
+  /// explicitly to disable the module.
   BarcodeModuleSettings? barcodeModule;
 
   /// Settings for the VIZ (Visual Inspection Zone) extraction module.
@@ -150,7 +169,9 @@ class BlinkIdScanningSettings {
   /// signature image extraction, and data aggregation across multiple video frames.
   ///
   /// See [VizModuleSettings] for more information.
-  @JsonKey(includeIfNull: false)
+  ///
+  /// Leave unset for the SDK default (enabled). Pass `vizModule: null`
+  /// explicitly to disable the module.
   VizModuleSettings? vizModule;
 
   /// The maximum allowed mismatches per field during data matching.
@@ -161,15 +182,48 @@ class BlinkIdScanningSettings {
   int maxAllowedMismatchesPerField;
 
   BlinkIdScanningSettings({
-    this.documentCaptureModule,
-    this.mrzModule,
-    this.barcodeModule,
-    this.vizModule,
+    Object? documentCaptureModule = _unsetModule,
+    Object? mrzModule = _unsetModule,
+    Object? barcodeModule = _unsetModule,
+    Object? vizModule = _unsetModule,
     this.maxAllowedMismatchesPerField = 0,
-  });
+  }) : documentCaptureModule = identical(documentCaptureModule, _unsetModule)
+           ? DocumentCaptureModuleSettings()
+           : documentCaptureModule as DocumentCaptureModuleSettings?,
+       mrzModule = identical(mrzModule, _unsetModule) ? MrzModuleSettings() : mrzModule as MrzModuleSettings?,
+       barcodeModule = identical(barcodeModule, _unsetModule)
+           ? BarcodeModuleSettings()
+           : barcodeModule as BarcodeModuleSettings?,
+       vizModule = identical(vizModule, _unsetModule) ? VizModuleSettings() : vizModule as VizModuleSettings?;
 
-  factory BlinkIdScanningSettings.fromJson(Map<String, dynamic> json) =>
-      _$BlinkIdScanningSettingsFromJson(json);
+  // Hand-written to preserve the tri-state contract on the way back in:
+  // key absent -> leave the constructor's SDK-default instance in place; key
+  // present and null -> disabled; key present with a map -> deserialize.
+  factory BlinkIdScanningSettings.fromJson(Map<String, dynamic> json) {
+    final settings = BlinkIdScanningSettings(
+      maxAllowedMismatchesPerField: (json['maxAllowedMismatchesPerField'] as num?)?.toInt() ?? 0,
+    );
+    if (json.containsKey('documentCaptureModule')) {
+      final value = json['documentCaptureModule'];
+      settings.documentCaptureModule = value == null
+          ? null
+          : DocumentCaptureModuleSettings.fromJson(value as Map<String, dynamic>);
+    }
+    if (json.containsKey('mrzModule')) {
+      final value = json['mrzModule'];
+      settings.mrzModule = value == null ? null : MrzModuleSettings.fromJson(value as Map<String, dynamic>);
+    }
+    if (json.containsKey('barcodeModule')) {
+      final value = json['barcodeModule'];
+      settings.barcodeModule = value == null ? null : BarcodeModuleSettings.fromJson(value as Map<String, dynamic>);
+    }
+    if (json.containsKey('vizModule')) {
+      final value = json['vizModule'];
+      settings.vizModule = value == null ? null : VizModuleSettings.fromJson(value as Map<String, dynamic>);
+    }
+    return settings;
+  }
+
   Map<String, dynamic> toJson() => _$BlinkIdScanningSettingsToJson(this);
 }
 
@@ -213,7 +267,6 @@ class BlinkIdScanningUxSettings {
     this.preferredCamera = PreferredCamera.back,
   });
 
-  factory BlinkIdScanningUxSettings.fromJson(Map<String, dynamic> json) =>
-      _$BlinkIdScanningUxSettingsFromJson(json);
+  factory BlinkIdScanningUxSettings.fromJson(Map<String, dynamic> json) => _$BlinkIdScanningUxSettingsFromJson(json);
   Map<String, dynamic> toJson() => _$BlinkIdScanningUxSettingsToJson(this);
 }

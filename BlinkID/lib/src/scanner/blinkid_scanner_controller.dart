@@ -90,11 +90,20 @@ class BlinkIdScannerController extends ChangeNotifier {
   BlinkIdCameraPermissionException? get lastPermissionException => _lastPermissionException;
 
   final _guidanceController = StreamController<BlinkIdGuidance>.broadcast();
+  BlinkIdGuidance? _lastEmittedGuidance;
 
   /// Guidance events emitted during scanning. Events are suppressed while
   /// [phase] is [BlinkIdScanPhase.flip]; use [phase] to drive flip UI instead.
   /// [BlinkIdGuidanceFlipDocument] is never emitted here — it drives the
   /// phase transition internally.
+  ///
+  /// Native emits one guidance value per analyzed frame (~30/s); only exact
+  /// consecutive duplicates are collapsed here. Real detection is noisy
+  /// frame-to-frame — e.g. `wrongSide` and `searching` alternating near a
+  /// boundary — so consecutive *different* values are delivered as-is. Bind
+  /// this directly to UI and it will flicker; debounce and impose a minimum
+  /// hold time on the display side first (see `_GuidanceOverlay` /
+  /// `_onGuidance` in `custom_scanner_screen.dart` for a working example).
   Stream<BlinkIdGuidance> get guidanceStream => _guidanceController.stream;
 
   MethodChannel? _methodChannel;
@@ -102,6 +111,15 @@ class BlinkIdScannerController extends ChangeNotifier {
   Completer<BlinkIdScanningResult>? _scanCompleter;
   final List<Completer<void>> _pendingReady = [];
   bool _debugLoggingEnabled = false;
+  bool _disposed = false;
+
+  PreferredCamera? _activeCamera;
+
+  /// The camera lens actually bound natively, once known. May differ from the
+  /// last-requested [PreferredCamera] — e.g. a `front` request silently
+  /// resolves to `back` on a device with no front lens. `null` until the
+  /// platform view's first camera bind completes.
+  PreferredCamera? get activeCamera => _activeCamera;
 
   // True between onFlipComplete() and the first guidance event after resume.
   bool _awaitingBackSide = false;
@@ -167,6 +185,9 @@ class BlinkIdScannerController extends ChangeNotifier {
   }
 
   void _onGuidanceEvent(dynamic event) {
+    // Same rationale as _handleMethodCall's guard: a guidance frame can still
+    // be in flight when dispose() closes _guidanceController.
+    if (_disposed) return;
     if (event is! String) return;
     final guidance = BlinkIdGuidance.fromString(event);
 
@@ -187,10 +208,17 @@ class BlinkIdScannerController extends ChangeNotifier {
       _awaitingBackSide = false;
       _phase = BlinkIdScanPhase.back;
       notifyListeners();
+      // The same guidance value can mean something different on the new side
+      // (e.g. "searching" on front vs. back) — force it through even if it's
+      // identical to the last front-side value.
+      _lastEmittedGuidance = null;
     }
 
     if (_phase == BlinkIdScanPhase.flip) return;
 
+    // Collapse consecutive duplicates — see guidanceStream's doc comment.
+    if (guidance == _lastEmittedGuidance) return;
+    _lastEmittedGuidance = guidance;
     _guidanceController.add(guidance);
   }
 
@@ -309,16 +337,21 @@ class BlinkIdScannerController extends ChangeNotifier {
   ///
   /// Cancels any in-flight scan and transitions to
   /// [BlinkIdScannerStatus.initializing] while the native camera rebinds, then
-  /// back to [BlinkIdScannerStatus.ready]. Call [scan] again after this returns
-  /// to start scanning with the new camera.
+  /// back to [BlinkIdScannerStatus.ready] — which is only reached once the
+  /// camera has actually bound (or definitively failed), not merely dispatched.
+  /// Call [scan] again after this returns to start scanning with the new camera.
+  ///
+  /// Returns the lens actually bound, which **may differ from [camera]** — a
+  /// `front` request silently resolves to `back` on a device with no front
+  /// lens. Also available afterwards via [activeCamera].
   ///
   /// Any [Future] from an in-progress [scan] completes with
-  /// [BlinkIdScanCancelException].
+  /// [BlinkIdScanCameraSwitchException].
   ///
   /// Throws [StateError] if the platform view is not yet attached or if the
   /// controller is in a state that does not support camera switching (e.g.
   /// [BlinkIdScannerStatus.uninitialized], [BlinkIdScannerStatus.error]).
-  Future<void> switchCamera(PreferredCamera camera) async {
+  Future<PreferredCamera> switchCamera(PreferredCamera camera) async {
     if (_methodChannel == null) throw StateError('Platform view not ready; cannot switch camera');
     switch (_status) {
       case BlinkIdScannerStatus.ready ||
@@ -338,15 +371,26 @@ class BlinkIdScannerController extends ChangeNotifier {
     _creationParams = {..._creationParams, 'preferredCamera': camera.name};
     _setStatus(BlinkIdScannerStatus.initializing);
 
+    String? resolvedLens;
     try {
-      await _methodChannel!.invokeMethod<void>('switchCamera', camera.name);
+      resolvedLens = await _methodChannel!.invokeMethod<String>('switchCamera', camera.name);
     } on PlatformException catch (e) {
       _failScan(e.message ?? 'Camera switch failed');
       rethrow;
     }
 
+    final resolved = _cameraFromLensString(resolvedLens) ?? camera;
+    _activeCamera = resolved;
+    _creationParams = {..._creationParams, 'preferredCamera': resolved.name};
     _setStatus(BlinkIdScannerStatus.ready);
+    return resolved;
   }
+
+  PreferredCamera? _cameraFromLensString(String? value) => switch (value) {
+    'front' => PreferredCamera.front,
+    'back' => PreferredCamera.back,
+    _ => null,
+  };
 
   /// Cancels any in-flight scan and returns the controller to
   /// [BlinkIdScannerStatus.ready], ready for a new [scan] call. Use this to
@@ -378,6 +422,10 @@ class BlinkIdScannerController extends ChangeNotifier {
   }
 
   Future<dynamic> _handleMethodCall(MethodCall call) async {
+    // A native callback can still be in flight when dispose() runs (e.g. a
+    // frame processed just before teardown). Without this guard it would
+    // reach _setStatus/notifyListeners on an already-disposed ChangeNotifier.
+    if (_disposed) return;
     try {
       switch (call.method) {
         case 'onDebugLog':
@@ -411,7 +459,12 @@ class BlinkIdScannerController extends ChangeNotifier {
 
   void _resumeAfterFlip() => _methodChannel?.invokeMethod<void>('resumeAfterFlip').ignore();
 
-  void _retryCamera() => _methodChannel?.invokeMethod<void>('retryCamera').ignore();
+  void _retryCamera() {
+    _methodChannel?.invokeMethod<String>('retryCamera').then((lens) {
+      final resolved = _cameraFromLensString(lens);
+      if (resolved != null) _activeCamera = resolved;
+    }).ignore();
+  }
 
   void _setDebugLogging(bool enabled) => _methodChannel?.invokeMethod<void>('setDebugLogging', enabled).ignore();
 
@@ -484,14 +537,24 @@ class BlinkIdScannerController extends ChangeNotifier {
 
   void _setStatus(BlinkIdScannerStatus s) {
     _status = s;
-    notifyListeners();
+    // Guards against notifyListeners() on an already-disposed ChangeNotifier
+    // when a native callback races dispose() — see _handleMethodCall's guard.
+    if (!_disposed) notifyListeners();
   }
 
   @override
   void dispose() {
+    // Set first: every guard above (_handleMethodCall, _onGuidanceEvent,
+    // _setStatus) checks this before touching notifyListeners or the
+    // (about to be closed) guidance controller.
+    _disposed = true;
     _guidanceSub?.cancel().ignore();
-    _guidanceController.close();
+    // Stop dispatching to _handleMethodCall before the underlying platform
+    // view is asked to tear down, so no late native callback reaches a
+    // disposed ChangeNotifier via the method channel.
+    _methodChannel?.setMethodCallHandler(null);
     _methodChannel?.invokeMethod<void>('dispose').ignore();
+    _guidanceController.close();
     // Drain in-flight scan without corrupting status — widget tree tearing down.
     final completer = _scanCompleter;
     _scanCompleter = null;

@@ -33,9 +33,11 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.platform.PlatformView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -77,6 +79,8 @@ class BlinkIdScannerView(
     @Volatile private var isScanning = false
     private val analysisExecutor = Executors.newSingleThreadExecutor()
     private var pendingStartResult: MethodChannel.Result? = null
+    private var startJob: Job? = null
+    private var pendingCameraResult: MethodChannel.Result? = null
     @Volatile private var preferredCameraOverride: String? = null
 
     override val lifecycle: Lifecycle get() = lifecycleRegistry
@@ -116,6 +120,7 @@ class BlinkIdScannerView(
             }
 
             "cancelScan" -> {
+                abortPendingStart()
                 isScanning = false
                 scanningSession = null
                 result.success(null)
@@ -128,17 +133,21 @@ class BlinkIdScannerView(
             }
 
             "retryCamera" -> {
+                abortPendingCameraResult("Camera retry superseded")
+                pendingCameraResult = result
                 scope.launch {
                     withContext(analysisExecutor.asCoroutineDispatcher()) {}
                     setupCamera()
                 }
-                result.success(null)
             }
 
             "switchCamera" -> {
+                abortPendingStart()
+                abortPendingCameraResult("Camera switch superseded")
                 isScanning = false
                 scanningSession = null
                 preferredCameraOverride = call.arguments as? String
+                pendingCameraResult = result
                 scope.launch {
                     // Drain any in-flight analyzer frame, then let BlinkID's
                     // ProcessingQueue settle before unbindAll().
@@ -146,7 +155,6 @@ class BlinkIdScannerView(
                     delay(500L)
                     setupCamera()
                 }
-                result.success(null)
             }
 
             "setDebugLogging" -> {
@@ -182,7 +190,7 @@ class BlinkIdScannerView(
             return
         }
         pendingStartResult = result
-        scope.launch {
+        startJob = scope.launch {
             val sessionSettingsMap = creationParams["sessionSettings"] as? Map<*, *>
 
             @Suppress("UNCHECKED_CAST")
@@ -193,8 +201,12 @@ class BlinkIdScannerView(
                         false,
                     ),
                 )
+            // Cancelled by abortPendingStart() (cancelScan/switchCamera/dispose) while the
+            // above suspended — discard the just-created session instead of installing it.
+            ensureActive()
             val pending = pendingStartResult ?: return@launch
             pendingStartResult = null
+            startJob = null
             if (sessionResult.isFailure) {
                 pending.error("blinkid_error", sessionResult.exceptionOrNull()?.message, null)
                 return@launch
@@ -202,6 +214,35 @@ class BlinkIdScannerView(
             scanningSession = sessionResult.getOrThrow()
             isScanning = true
             pending.success(null)
+        }
+    }
+
+    // Cancels an in-flight startScan (if any) so a session created after a
+    // cancel/switch can never be installed. See startScan()'s ensureActive() check.
+    private fun abortPendingStart() {
+        startJob?.cancel()
+        startJob = null
+        pendingStartResult?.error("blinkid_error", "Scan cancelled", null)
+        pendingStartResult = null
+    }
+
+    private fun abortPendingCameraResult(message: String) {
+        pendingCameraResult?.error("blinkid_error", message, null)
+        pendingCameraResult = null
+    }
+
+    // Completes the deferred switchCamera/retryCamera result once the camera has
+    // actually bound (or definitively failed) — never on the calling turn.
+    private fun completeCameraResult(
+        resolvedLens: String?,
+        error: String?,
+    ) {
+        val pending = pendingCameraResult ?: return
+        pendingCameraResult = null
+        if (error != null) {
+            pending.error("blinkid_error", error, null)
+        } else {
+            pending.success(resolvedLens)
         }
     }
 
@@ -248,6 +289,12 @@ class BlinkIdScannerView(
     }
 
     private fun invokePermissionRequired(permanentlyDenied: Boolean) {
+        // No camera bind will happen on this pass — fail any deferred
+        // switchCamera/retryCamera result rather than leaving it pending forever.
+        completeCameraResult(
+            resolvedLens = null,
+            error = if (permanentlyDenied) "Camera permission permanently denied" else "Camera permission required",
+        )
         scope.launch {
             methodChannel.invokeMethod(
                 "onPermissionRequired",
@@ -263,6 +310,7 @@ class BlinkIdScannerView(
                 try {
                     cameraProviderFuture.get()
                 } catch (e: Exception) {
+                    completeCameraResult(resolvedLens = null, error = "Camera unavailable: ${e.message}")
                     scope.launch {
                         methodChannel.invokeMethod("onScanError", "Camera unavailable: ${e.message}")
                     }
@@ -371,30 +419,38 @@ class BlinkIdScannerView(
 
             try {
                 val preferred = preferredCameraOverride ?: creationParams["preferredCamera"] as? String
-                val cameraSelector = resolveCameraSelector(preferred, cameraProvider)
+                val resolvedLens = resolveCameraLens(preferred, cameraProvider)
+                preferredCameraOverride = resolvedLens
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalysis)
+                cameraProvider.bindToLifecycle(this, cameraSelectorFor(resolvedLens), preview, imageAnalysis)
+                completeCameraResult(resolvedLens, error = null)
             } catch (e: Exception) {
+                completeCameraResult(resolvedLens = null, error = "Camera bind failed: ${e.message}")
                 scope.launch { methodChannel.invokeMethod("onScanError", "Camera bind failed: ${e.message}") }
             }
         }, ContextCompat.getMainExecutor(context))
     }
 
-    private fun resolveCameraSelector(
+    // Returns the lens that will actually be bound: "front" only if requested
+    // and available, "back" otherwise (including any unrecognized request).
+    private fun resolveCameraLens(
         preferred: String?,
         provider: ProcessCameraProvider?,
-    ): CameraSelector {
+    ): String =
         if (preferred == "front" && provider?.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) == true) {
-            return CameraSelector.DEFAULT_FRONT_CAMERA
+            "front"
+        } else {
+            "back"
         }
-        return CameraSelector.DEFAULT_BACK_CAMERA
-    }
+
+    private fun cameraSelectorFor(lens: String): CameraSelector =
+        if (lens == "front") CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
 
     override fun getView(): View = previewView
 
     override fun dispose() {
-        pendingStartResult?.error("blinkid_error", "Scanner disposed", null)
-        pendingStartResult = null
+        abortPendingStart()
+        abortPendingCameraResult("Scanner disposed")
         isScanning = false
         scanningSession = null
         // Drain any in-flight analyzer frame before CameraX unbinds.

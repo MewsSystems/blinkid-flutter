@@ -26,7 +26,22 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
   bool _isPopping = false;
   bool _isSwitchingCamera = false;
 
+  // Derived from the single guidanceStream subscription below (with
+  // debounce/sticky/reset smoothing applied — see _onGuidance) and passed
+  // down to _GuidanceOverlay as plain text; the overlay owns no controller
+  // reference and needs none.
+  late String _guidanceText;
+  int _guidanceKey = 0;
+  String? _pendingGuidanceText;
+  Timer? _guidanceDebounce;
+  Timer? _guidanceResetTimer;
+  Timer? _guidanceStickyTimer;
+  bool _guidanceSticky = false;
+
   static const _timeoutSeconds = 10;
+  static const _guidanceDebounceDelay = Duration(milliseconds: 600);
+  static const _guidanceStickyDuration = Duration(milliseconds: 1500);
+  static const _guidanceResetDelay = Duration(seconds: 3);
 
   void _safePop([BlinkIdScanningResult? result]) {
     if (_isPopping || !mounted) return;
@@ -41,7 +56,11 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
     _controller = BlinkIdScannerController()
       ..setDebugLogging(true)
       ..addListener(_onScanStateChanged);
-    _guidanceSub = _controller.guidanceStream.listen(_onGuidanceForTimer);
+    _guidanceText = guidanceText(null, _controller.phase);
+    // Single subscription drives both the scan-timeout timer and the
+    // guidance overlay's text — previously two separate listeners on the
+    // same stream, one of them duplicated inside _GuidanceOverlay itself.
+    _guidanceSub = _controller.guidanceStream.listen(_onGuidance);
     unawaited(_startScanning());
   }
 
@@ -61,15 +80,65 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
           _scanTimer?.cancel();
         case .back:
           _startScanTimer();
+          // Same guidance value can mean something different on the new
+          // side; refresh the displayed text immediately rather than waiting
+          // for the next guidance event, and drop any smoothing state left
+          // over from the front side.
+          _guidanceDebounce?.cancel();
+          _guidanceStickyTimer?.cancel();
+          _guidanceResetTimer?.cancel();
+          _guidanceSticky = false;
+          _pendingGuidanceText = null;
+          setState(() {
+            _guidanceText = guidanceText(null, phase);
+            _guidanceKey++;
+          });
         case .front:
           break;
       }
     }
   }
 
-  void _onGuidanceForTimer(BlinkIdGuidance guidance) {
-    if (guidance is BlinkIdGuidanceSearching || guidance is BlinkIdGuidanceWrongSide) return;
-    if (_controller.status == .scanning) _startScanTimer();
+  void _onGuidance(BlinkIdGuidance guidance) {
+    if (guidance is! BlinkIdGuidanceSearching && guidance is! BlinkIdGuidanceWrongSide) {
+      if (_controller.status == .scanning) _startScanTimer();
+    }
+
+    _guidanceResetTimer?.cancel();
+    _guidanceResetTimer = Timer(_guidanceResetDelay, _resetGuidanceToDefault);
+
+    final next = guidanceText(guidance, _controller.phase);
+    if (next == _guidanceText || next == _pendingGuidanceText) return;
+
+    _pendingGuidanceText = next;
+    _guidanceDebounce?.cancel();
+    final delay = _guidanceSticky ? _guidanceStickyDuration : _guidanceDebounceDelay;
+    _guidanceDebounce = Timer(delay, _commitPendingGuidance);
+  }
+
+  void _commitPendingGuidance() {
+    if (!mounted || _pendingGuidanceText == null) return;
+    setState(() {
+      _guidanceText = _pendingGuidanceText!;
+      _pendingGuidanceText = null;
+      _guidanceKey++;
+    });
+    _guidanceSticky = true;
+    _guidanceStickyTimer?.cancel();
+    _guidanceStickyTimer = Timer(_guidanceStickyDuration, () => _guidanceSticky = false);
+  }
+
+  void _resetGuidanceToDefault() {
+    _guidanceDebounce?.cancel();
+    _guidanceStickyTimer?.cancel();
+    _guidanceSticky = false;
+    _pendingGuidanceText = null;
+    final defaultText = guidanceText(null, _controller.phase);
+    if (!mounted || _guidanceText == defaultText) return;
+    setState(() {
+      _guidanceText = defaultText;
+      _guidanceKey++;
+    });
   }
 
   void _startScanTimer() {
@@ -144,6 +213,10 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
         final result = await _controller.scan();
         _scanTimer?.cancel();
         await Future.delayed(const Duration(milliseconds: 700));
+        // _safePop() re-checks mounted internally, but the route may have
+        // been popped by other means during the delay above — check
+        // explicitly here too so that intent is obvious at the call site.
+        if (!mounted) return;
         _safePop(result);
         return;
       } on BlinkIdScanCameraSwitchException {
@@ -183,6 +256,9 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
   @override
   void dispose() {
     _scanTimer?.cancel();
+    _guidanceDebounce?.cancel();
+    _guidanceResetTimer?.cancel();
+    _guidanceStickyTimer?.cancel();
     _guidanceSub?.cancel();
     _controller.removeListener(_onScanStateChanged);
     _controller.dispose();
@@ -237,7 +313,7 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
         final permException = _controller.lastPermissionException;
         final permanentlyDenied = permException?.permanentlyDenied ?? false;
 
-        final canInteract = !permRequired && status != .processing && status != .done;
+        final canInteract = !permRequired && status != .processing && status != .done && status != .initializing;
 
         return Stack(
           fit: StackFit.expand,
@@ -279,8 +355,8 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
               ),
             if (canInteract)
               switch (_controller.phase) {
-                BlinkIdScanPhase.flip => _FlipOverlay(controller: _controller),
-                _ => _GuidanceOverlay(controller: _controller),
+                BlinkIdScanPhase.flip => _FlipOverlay(onFlipComplete: _controller.onFlipComplete),
+                _ => _GuidanceOverlay(text: _guidanceText, switcherKey: _guidanceKey),
               },
             if (status == BlinkIdScannerStatus.done) const _ScanSuccessOverlay(message: 'Document scanned!'),
             // Close button — top-left
@@ -322,8 +398,14 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
 }
 
 class _FlipOverlay extends StatefulWidget {
-  const _FlipOverlay({required this.controller});
-  final BlinkIdScannerController controller;
+  const _FlipOverlay({required this.onFlipComplete});
+
+  /// Called exactly once, when the flip animation finishes — or immediately
+  /// on early disposal if it hasn't finished yet (see [_FlipOverlayState.dispose]).
+  /// Callers pass [BlinkIdScannerController.onFlipComplete] directly; this
+  /// widget holds no other reference to the controller, so it can't reach
+  /// into state that isn't its concern.
+  final VoidCallback onFlipComplete;
 
   @override
   State<_FlipOverlay> createState() => _FlipOverlayState();
@@ -334,6 +416,7 @@ enum _FlipStage { success, animating, persistent }
 class _FlipOverlayState extends State<_FlipOverlay> with SingleTickerProviderStateMixin {
   late final AnimationController _anim;
   _FlipStage _stage = _FlipStage.success;
+  bool _completedFlip = false;
 
   @override
   void initState() {
@@ -344,14 +427,25 @@ class _FlipOverlayState extends State<_FlipOverlay> with SingleTickerProviderSta
       setState(() => _stage = _FlipStage.animating);
       _anim.forward().then((_) {
         if (!mounted) return;
-        widget.controller.onFlipComplete();
+        _completeFlip();
         setState(() => _stage = _FlipStage.persistent);
       });
     });
   }
 
+  void _completeFlip() {
+    if (_completedFlip) return;
+    _completedFlip = true;
+    widget.onFlipComplete();
+  }
+
   @override
   void dispose() {
+    // Guarantee native scanning resumes even if this overlay is torn down
+    // before the flip animation finishes (e.g. canInteract flips false, or
+    // the route is popped) — otherwise the scanner is left paused forever,
+    // since nothing else calls onFlipComplete for this flip.
+    _completeFlip();
     _anim.dispose();
     super.dispose();
   }
@@ -408,80 +502,18 @@ class _ScanSuccessOverlay extends StatelessWidget {
   );
 }
 
-class _GuidanceOverlay extends StatefulWidget {
-  const _GuidanceOverlay({required this.controller});
-  final BlinkIdScannerController controller;
-
-  @override
-  State<_GuidanceOverlay> createState() => _GuidanceOverlayState();
-}
-
-class _GuidanceOverlayState extends State<_GuidanceOverlay> {
-  int _switcherKey = 0;
-  String _displayText = '';
-  String? _pendingText;
-  Timer? _debounce;
-  Timer? _resetTimer;
-  Timer? _stickyTimer;
-  bool _sticky = false;
-  StreamSubscription<BlinkIdGuidance>? _sub;
-
-  static const _debounceDelay = Duration(milliseconds: 600);
-  static const _stickyDuration = Duration(milliseconds: 1500);
-  static const _resetDelay = Duration(seconds: 3);
-
-  @override
-  void initState() {
-    super.initState();
-    _displayText = guidanceText(null, widget.controller.phase);
-    _sub = widget.controller.guidanceStream.listen(_onGuidance);
-  }
-
-  void _onGuidance(BlinkIdGuidance g) {
-    _resetTimer?.cancel();
-    _resetTimer = Timer(_resetDelay, _resetToDefault);
-
-    final next = guidanceText(g, widget.controller.phase);
-    if (next == _displayText || next == _pendingText) return;
-
-    _pendingText = next;
-    _debounce?.cancel();
-
-    final delay = _sticky ? _stickyDuration : _debounceDelay;
-    _debounce = Timer(delay, () {
-      if (!mounted) return;
-      setState(() {
-        _displayText = _pendingText!;
-        _pendingText = null;
-        _switcherKey++;
-      });
-      _sticky = true;
-      _stickyTimer?.cancel();
-      _stickyTimer = Timer(_stickyDuration, () => _sticky = false);
-    });
-  }
-
-  void _resetToDefault() {
-    _debounce?.cancel();
-    _stickyTimer?.cancel();
-    _sticky = false;
-    _pendingText = null;
-    final defaultText = guidanceText(null, widget.controller.phase);
-    if (!mounted || _displayText == defaultText) return;
-    setState(() {
-      _displayText = defaultText;
-      _switcherKey++;
-    });
-  }
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _resetTimer?.cancel();
-    _stickyTimer?.cancel();
-    _sub?.cancel();
-    super.dispose();
-  }
+// Purely presentational — the parent owns the single guidanceStream
+// subscription and derives [text]/[switcherKey] from it (see
+// _CustomScannerScreenState._onGuidance) — including the debounce/sticky/
+// reset smoothing, since native emits per-frame (~30/s) and consecutive
+// *different* noisy values still need it, not just exact duplicates.
+// [switcherKey] must be a monotonically increasing counter, not the text
+// itself: a quick A->B->A oscillation would otherwise leave two children
+// keyed identically mid-transition and crash AnimatedSwitcher's Stack.
+class _GuidanceOverlay extends StatelessWidget {
+  const _GuidanceOverlay({required this.text, required this.switcherKey});
+  final String text;
+  final int switcherKey;
 
   @override
   Widget build(BuildContext context) => Align(
@@ -491,11 +523,11 @@ class _GuidanceOverlayState extends State<_GuidanceOverlay> {
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 200),
         child: Container(
-          key: ValueKey(_switcherKey),
+          key: ValueKey(switcherKey),
           padding: const .symmetric(horizontal: 24, vertical: 12),
           decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(12)),
           child: Text(
-            _displayText,
+            text,
             style: const TextStyle(color: Colors.white, fontSize: 16),
             textAlign: .center,
           ),

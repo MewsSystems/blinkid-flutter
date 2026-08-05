@@ -90,7 +90,6 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
       blinkIdSdk = nil
       throw error
     }
-    return nil
   }
 
   private func setupBlinkIdSettings(_ call: FlutterMethodCall) async throws -> BlinkIDSdkSettings? {
@@ -126,7 +125,9 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
       else {
         throw BlinkIdFlutterError.incorrectArgument("BlinkID session settings")
       }
+      #if DEBUG
       print("[BlinkIdFlutter] performScan received blinkIdSessionSettings=\(sessionSettings)")
+      #endif
 
       let uxSettings = BlinkIdDeserializationUtils.deserializeBlinkIdUxScanningSettings(
         cleanArguments["blinkIdScanningUxSettings"] as? [String: Any])
@@ -135,9 +136,11 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
       redactionSettingsResolverDict = BlinkIdDeserializationUtils.toStringKeyedMap(
         cleanArguments["blinkIdRedactionSettingsResolver"]
       )
+      #if DEBUG
       print(
         "[BlinkIdFlutter] performScan received blinkIdRedactionSettingsResolver=\(String(describing: redactionSettingsResolverDict))"
       )
+      #endif
       let analyzer = try await BlinkIDAnalyzer(
         sdk: blinkIdSdk,
         blinkIdSessionSettings: BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
@@ -184,8 +187,11 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
   }
 
   private func presentScanningUI(_ model: BlinkIDUXModel) {
-    guard let rootVC = UIApplication.shared.windows.first(where: \.isKeyWindow)?.rootViewController
-    else {
+    let keyWindow = UIApplication.shared.connectedScenes
+      .compactMap { $0 as? UIWindowScene }
+      .flatMap { $0.windows }
+      .first(where: \.isKeyWindow)
+    guard let rootVC = keyWindow?.rootViewController else {
       return
     }
 

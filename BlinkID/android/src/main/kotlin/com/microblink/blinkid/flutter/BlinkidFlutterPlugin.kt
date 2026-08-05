@@ -170,17 +170,21 @@ class BlinkIdFlutterPlugin :
         try {
             val blinkIdSdkSettings = call.argument<Map<String, Any>>("blinkIdSdkSettings")
             val blinkIdSessionSettings = call.argument<Map<String, Any>>("blinkIdSessionSettings")
-            android.util.Log.i(
-                "BlinkIdFlutter",
-                "performScan received blinkIdSessionSettings=$blinkIdSessionSettings",
-            )
+            if (android.util.Log.isLoggable("BlinkIdFlutter", android.util.Log.DEBUG)) {
+                android.util.Log.d(
+                    "BlinkIdFlutter",
+                    "performScan received blinkIdSessionSettings=$blinkIdSessionSettings",
+                )
+            }
             val blinkIdScanningUxSettings = call.argument<Map<String, Any>>("blinkIdScanningUxSettings")
             val classFilterMap = call.argument<Map<String, Any>>("blinkIdClassFilter")
             val redactionSettingsResolverMap = call.argument<Map<String, Any>>("blinkIdRedactionSettingsResolver")
-            android.util.Log.i(
-                "BlinkIdFlutter",
-                "performScan received blinkIdRedactionSettingsResolver=$redactionSettingsResolverMap",
-            )
+            if (android.util.Log.isLoggable("BlinkIdFlutter", android.util.Log.DEBUG)) {
+                android.util.Log.d(
+                    "BlinkIdFlutter",
+                    "performScan received blinkIdRedactionSettingsResolver=$redactionSettingsResolverMap",
+                )
+            }
             val sdkSettings =
                 BlinkIdDeserializationUtils
                     .deserializeBlinkIdSdkSettings(blinkIdSdkSettings)
