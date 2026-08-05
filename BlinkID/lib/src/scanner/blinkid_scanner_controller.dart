@@ -238,6 +238,7 @@ class BlinkIdScannerController extends ChangeNotifier {
 
     final channel = _methodChannel;
     if (channel == null) throw StateError('Platform view not yet created');
+    if (_scanCompleter != null) throw StateError('A scan is already in progress');
 
     _phase = BlinkIdScanPhase.front;
     _setStatus(BlinkIdScannerStatus.scanning);
@@ -326,7 +327,7 @@ class BlinkIdScannerController extends ChangeNotifier {
     _cancelScan();
     final completer = _scanCompleter;
     _scanCompleter = null;
-    completer?.completeError(const BlinkIdScanCancelException());
+    completer?.completeError(const BlinkIdScanCameraSwitchException());
 
     _creationParams = {..._creationParams, 'preferredCamera': camera.name};
     _setStatus(BlinkIdScannerStatus.initializing);
@@ -395,7 +396,7 @@ class BlinkIdScannerController extends ChangeNotifier {
           completer?.completeError(permissionException);
       }
     } catch (e, st) {
-      debugPrint('BlinkID _handleMethodCall error (${call.method}): $e\n$st');
+      if (_debugLoggingEnabled) debugPrint('BlinkID _handleMethodCall error (${call.method}): $e\n$st');
       _failScan('Handler error: $e');
     }
   }
@@ -500,6 +501,15 @@ class BlinkIdScanCancelException implements Exception {
   const BlinkIdScanCancelException();
   @override
   String toString() => 'Scan canceled';
+}
+
+/// Thrown when [BlinkIdScannerController.switchCamera] interrupts an in-flight
+/// scan. Distinct from [BlinkIdScanCancelException] so callers can continue
+/// the scan loop rather than treating it as a user-initiated cancel.
+class BlinkIdScanCameraSwitchException implements Exception {
+  const BlinkIdScanCameraSwitchException();
+  @override
+  String toString() => 'Scan interrupted by camera switch';
 }
 
 /// Thrown when [BlinkIdScannerController.reset] is called while a scan is in

@@ -32,7 +32,9 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.platform.PlatformView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -69,12 +71,12 @@ class BlinkIdScannerView(
         )
 
     private var guidanceEventSink: EventChannel.EventSink? = null
-    private var debugLoggingEnabled = false
-    private var scanningSession: BlinkIdScanningSession? = null
-    private var isScanning = false
+    @Volatile private var debugLoggingEnabled = false
+    @Volatile private var scanningSession: BlinkIdScanningSession? = null
+    @Volatile private var isScanning = false
     private val analysisExecutor = Executors.newSingleThreadExecutor()
     private var pendingStartResult: MethodChannel.Result? = null
-    private var preferredCameraOverride: String? = null
+    @Volatile private var preferredCameraOverride: String? = null
 
     override val lifecycle: Lifecycle get() = lifecycleRegistry
 
@@ -125,7 +127,10 @@ class BlinkIdScannerView(
             }
 
             "retryCamera" -> {
-                setupCamera()
+                scope.launch {
+                    withContext(analysisExecutor.asCoroutineDispatcher()) {}
+                    setupCamera()
+                }
                 result.success(null)
             }
 
@@ -133,7 +138,13 @@ class BlinkIdScannerView(
                 isScanning = false
                 scanningSession = null
                 preferredCameraOverride = call.arguments as? String
-                setupCamera()
+                scope.launch {
+                    // Drain any in-flight analyzer frame, then let BlinkID's
+                    // ProcessingQueue settle before unbindAll().
+                    withContext(analysisExecutor.asCoroutineDispatcher()) {}
+                    delay(500L)
+                    setupCamera()
+                }
                 result.success(null)
             }
 
@@ -157,6 +168,10 @@ class BlinkIdScannerView(
         val sdk = sdkProvider()
         if (sdk == null) {
             result.error("blinkid_error", "SDK not initialized", null)
+            return
+        }
+        if (pendingStartResult != null) {
+            result.error("blinkid_error", "Scan already starting", null)
             return
         }
         pendingStartResult = result
@@ -340,6 +355,10 @@ class BlinkIdScannerView(
                             }
                         }
                     }
+                } catch (e: Exception) {
+                    scope.launch {
+                        if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", "Analyzer error: ${e.message}")
+                    }
                 } finally {
                     imageProxy.close()
                 }
@@ -371,9 +390,11 @@ class BlinkIdScannerView(
     override fun dispose() {
         pendingStartResult?.error("blinkid_error", "Scanner disposed", null)
         pendingStartResult = null
-        lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         isScanning = false
         scanningSession = null
+        // Drain any in-flight analyzer frame before CameraX unbinds.
+        try { analysisExecutor.submit {}.get(500L, java.util.concurrent.TimeUnit.MILLISECONDS) } catch (_: Exception) {}
+        lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         analysisExecutor.shutdown()
         scope.cancel()
         methodChannel.setMethodCallHandler(null)

@@ -229,6 +229,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
       let input = try? AVCaptureDeviceInput(device: device)
     else {
       cameraSetupFailed = true
+      methodChannel.invokeMethod("onScanError", arguments: "Camera device unavailable")
       return
     }
 
@@ -241,6 +242,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
 
     guard session.canAddInput(input), session.canAddOutput(output) else {
       cameraSetupFailed = true
+      methodChannel.invokeMethod("onScanError", arguments: "Camera setup failed")
       return
     }
     session.addInput(input)
