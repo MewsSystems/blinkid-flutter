@@ -132,6 +132,10 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
       await _controller.initialize(widget.sdkSettings, widget.sessionSettings, preferredCamera: _camera);
     } on BlinkIdSdkInitException catch (e, st) {
       debugPrint('BlinkID init error: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('SDK error: $e')));
+      }
+      _safePop();
       return;
     }
 

@@ -497,7 +497,7 @@ await _controller.initialize(
 );
 ```
 
-To switch cameras at runtime call `switchCamera()`. It cancels any in-progress scan (the current `scan()` future completes with `BlinkIdScanCancelException`), rebinds the native camera, and returns once the controller is back in `ready` state. Call `scan()` again to resume:
+To switch cameras at runtime call `switchCamera()`. It cancels any in-progress scan (the current `scan()` future completes with `BlinkIdScanCameraSwitchException`), rebinds the native camera, and returns once the controller is back in `ready` state. Call `scan()` again to resume:
 
 ```dart
 await _controller.switchCamera(PreferredCamera.front);
