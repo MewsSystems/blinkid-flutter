@@ -103,26 +103,17 @@ class BlinkIdSessionSettings {
   Map<String, dynamic> toJson() => _$BlinkIdSessionSettingsToJson(this);
 }
 
-// Distinguishes "parameter omitted" from "parameter explicitly passed as
-// null" in [BlinkIdScanningSettings]'s constructor — a plain nullable
-// parameter can't tell the two apart, since both read as `null` inside the
-// constructor body. Omitted -> SDK default (module enabled, matching the
-// pre-8000.0.0 behavior where these fields were non-nullable). Explicit
-// `null` -> module disabled, serialized as a JSON `null` so native can act on
-// it (see BlinkIdDeserializationUtils on both platforms).
-const Object _unsetModule = Object();
-
 /// Represents the configurable settings for scanning a document.
 ///
 /// This class defines various parameters and policies related to the scanning
 /// process, including image quality handling, data extraction and redaction,
 /// along with options for frame processing and image extraction.
 // createFactory: false — fromJson is hand-written below. The generated
-// factory can't reproduce the tri-state contract (see _unsetModule above):
-// it always calls this constructor with an explicit value for every module
-// parameter, so "key absent from JSON" and "key present with null" would
-// collapse to the same non-sentinel `null` argument and both disable the
-// module, rather than "absent" falling through to the SDK-default instance.
+// factory would always pass an explicit value for every module parameter
+// (computed from the JSON, which is `null` for both "key absent" and "key
+// present and null"), so it can't tell "leave the constructor's SDK-default
+// in place" apart from "explicitly disabled" the way the constructor itself
+// can (see the module fields' doc comments and the constructor below).
 @JsonSerializable(createFactory: false)
 class BlinkIdScanningSettings {
   /// Settings for the document capture module.
@@ -182,19 +173,12 @@ class BlinkIdScanningSettings {
   int maxAllowedMismatchesPerField;
 
   BlinkIdScanningSettings({
-    Object? documentCaptureModule = _unsetModule,
-    Object? mrzModule = _unsetModule,
-    Object? barcodeModule = _unsetModule,
-    Object? vizModule = _unsetModule,
+    this.documentCaptureModule = const DocumentCaptureModuleSettings(),
+    this.mrzModule = const MrzModuleSettings(),
+    this.barcodeModule = const BarcodeModuleSettings(),
+    this.vizModule = const VizModuleSettings(),
     this.maxAllowedMismatchesPerField = 0,
-  }) : documentCaptureModule = identical(documentCaptureModule, _unsetModule)
-           ? DocumentCaptureModuleSettings()
-           : documentCaptureModule as DocumentCaptureModuleSettings?,
-       mrzModule = identical(mrzModule, _unsetModule) ? MrzModuleSettings() : mrzModule as MrzModuleSettings?,
-       barcodeModule = identical(barcodeModule, _unsetModule)
-           ? BarcodeModuleSettings()
-           : barcodeModule as BarcodeModuleSettings?,
-       vizModule = identical(vizModule, _unsetModule) ? VizModuleSettings() : vizModule as VizModuleSettings?;
+  });
 
   // Hand-written to preserve the tri-state contract on the way back in:
   // key absent -> leave the constructor's SDK-default instance in place; key
