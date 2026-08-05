@@ -106,7 +106,7 @@ object BlinkIdDeserializationUtils {
         // NSNull explicitly disables a module. Passing null to ScanningSettings disables extraction.
         return ScanningSettings(
             documentCaptureModule = documentCaptureModule ?: DocumentCaptureModuleSettings(),
-            barcodeModule = barcodeModule,
+            barcodeModule = barcodeModule ?: BarcodeModuleSettings(),
             mrzModule = mrzModule ?: MrzModuleSettings(),
             vizModule = vizModule ?: VizModuleSettings(),
             maxAllowedMismatchesPerField =
