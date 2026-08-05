@@ -391,6 +391,8 @@ For `ScanningMode.automatic`, `firstImage` should be the front side and `secondI
 ##### Quick-start
 
 ```dart
+import 'dart:async';
+
 import 'package:blinkid_flutter/blinkid_flutter.dart';
 
 class ScanScreen extends StatefulWidget { ... }
@@ -421,6 +423,9 @@ class _ScanScreenState extends State<ScanScreen> {
         return;
       } on BlinkIdScanResetException {
         // controller.reset() was called — loop restarts scan()
+      } on BlinkIdScanCameraSwitchException {
+        // Camera switch interrupted the scan — loop restarts scan()
+        // once the new camera is ready.
       }
     }
   }
