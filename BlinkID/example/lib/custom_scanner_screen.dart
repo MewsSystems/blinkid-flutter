@@ -142,11 +142,13 @@ class _CustomScannerScreenState extends State<CustomScannerScreen> {
         await Future.delayed(const Duration(milliseconds: 700));
         _safePop(result);
         return;
+      } on BlinkIdScanCameraSwitchException {
+        _scanTimer?.cancel();
+        // Camera switch interrupted the scan — loop continues so scan()
+        // waits for the new camera to become ready.
+        continue;
       } on BlinkIdScanCancelException {
         _scanTimer?.cancel();
-        // switchCamera internally cancels the scan and moves to initializing;
-        // let the loop continue so scan() awaits the new camera being ready.
-        if (_controller.status == .initializing) continue;
         _safePop();
         return;
       } on BlinkIdScanResetException {

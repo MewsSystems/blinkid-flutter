@@ -33,7 +33,7 @@ sealed class BlinkIdGuidance {
   // --- Wrong side (emitted to stream; no phase change) ---
   const factory BlinkIdGuidance.wrongSide() = BlinkIdGuidanceWrongSide;
 
-  // --- iOS only (unconfirmed; pending iOS SDK verification) ---
+  // --- Reserved (not emitted by either platform SDK; kept for forward-compat) ---
   const factory BlinkIdGuidance.holdStill() = BlinkIdGuidanceHoldStill;
   const factory BlinkIdGuidance.blur() = BlinkIdGuidanceBlur;
   const factory BlinkIdGuidance.glare() = BlinkIdGuidanceGlare;
