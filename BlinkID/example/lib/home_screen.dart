@@ -21,6 +21,12 @@ class _HomeScreenState extends State<HomeScreen> {
   BlinkIdScanningResult? _result;
   String? _error;
   bool _scanning = false;
+  bool _deletingCache = false;
+
+  // v8001: OTA lets the SDK fetch newer document-model resources without an app update, and
+  // allowScanSound controls the scan-success beep independently of haptics.
+  bool _otaCheckForUpdates = true;
+  bool _allowScanSound = true;
 
   BlinkIdSdkSettings get _sdkSettings => BlinkIdSdkSettings(
     licenseKey: switch (Theme.of(context).platform) {
@@ -28,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
       .android => _licenseKeyAndroid,
       .fuchsia || .linux || .macOS || .windows => throw UnsupportedError('BlinkID not supported on this platform'),
     },
+    otaResourcesConfig: OtaResourcesConfig(checkForUpdates: _otaCheckForUpdates),
   );
 
   BlinkIdSessionSettings get _sessionSettings => .new(
@@ -39,6 +46,8 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   );
 
+  BlinkIdScanningUxSettings get _uxSettings => BlinkIdScanningUxSettings(allowScanSound: _allowScanSound);
+
   Future<void> _performScan() async {
     setState(() {
       _scanning = true;
@@ -49,6 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final result = await _blinkId.performScan(
         blinkIdSdkSettings: _sdkSettings,
         blinkIdSessionSettings: _sessionSettings,
+        blinkidScanningUxSettings: _uxSettings,
       );
       setState(() => _result = result);
     } catch (e, st) {
@@ -56,6 +66,23 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() => _error = 'Error: $e');
     } finally {
       setState(() => _scanning = false);
+    }
+  }
+
+  // Deliberately does NOT call loadBlinkIdSdk() first — deleteCachedResources() is a standalone
+  // API that works whether or not the SDK has ever been initialized this session, e.g. for a
+  // logout or storage-cleanup flow.
+  Future<void> _deleteCachedResources() async {
+    setState(() => _deletingCache = true);
+    try {
+      await _blinkId.deleteCachedResources();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Cached SDK resources deleted')));
+      }
+    } finally {
+      if (mounted) setState(() => _deletingCache = false);
     }
   }
 
@@ -81,6 +108,33 @@ class _HomeScreenState extends State<HomeScreen> {
           FilledButton(onPressed: _scanning ? null : _performScan, child: const Text('Scan (Native UI)')),
           const SizedBox(height: 12),
           FilledButton.tonal(onPressed: _scanning ? null : _openCustomScanner, child: const Text('Scan (Custom UI)')),
+          const SizedBox(height: 12),
+          Card(
+            child: Column(
+              children: [
+                SwitchListTile(
+                  title: const Text('OTA: check for updates'),
+                  subtitle: const Text('Download newer document-model resources on SDK init'),
+                  value: _otaCheckForUpdates,
+                  onChanged: (v) => setState(() => _otaCheckForUpdates = v),
+                ),
+                SwitchListTile(
+                  title: const Text('Allow scan sound'),
+                  subtitle: const Text('Beep on scan-success events'),
+                  value: _allowScanSound,
+                  onChanged: (v) => setState(() => _allowScanSound = v),
+                ),
+                ListTile(
+                  title: const Text('Delete cached SDK resources'),
+                  subtitle: const Text('Works without initializing the SDK first'),
+                  trailing: _deletingCache
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.delete_outline),
+                  onTap: _deletingCache ? null : _deleteCachedResources,
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 24),
           if (_scanning) const Center(child: CircularProgressIndicator()),
           if (_error != null)
@@ -131,7 +185,7 @@ class _ResultCard extends StatelessWidget {
           title: 'Document',
           rows: [
             _row('Country', docInfo?.countryName),
-            _row('Type', docInfo?.documentType?.name),
+            _row('Type', docInfo?.documentType?.id?.name ?? docInfo?.documentType?.rawValue),
             _row('Document no.', result.documentNumber?.value),
             _row('Personal ID', result.personalIdNumber?.value),
             _row('Date of issue', _formatDate(result.dateOfIssue?.date)),

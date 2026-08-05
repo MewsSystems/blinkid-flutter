@@ -40,8 +40,10 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
     switch method {
     case .performScan: Task { await performScan(call) }
     case .directApi: Task { await performDirectApiScan(call) }
+    case .directApiWithAnalysis: Task { await performDirectApiScanWithAnalysis(call) }
     case .loadSdk: Task { await loadSdk(call) }
     case .unloadSdk: Task { await unloadSdk(call) }
+    case .deleteCachedResources: deleteCachedResources(call)
     }
   }
 
@@ -203,6 +205,17 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
   }
 
   func performDirectApiScan(_ call: FlutterMethodCall) async {
+    await runDirectApiScan(call, includeAnalysis: false)
+  }
+
+  /// Behaves like `performDirectApiScan`, but the success payload is
+  /// `{"result": <scanning result JSON>, "analysis": <analysis JSON>}` instead of the bare
+  /// scanning-result JSON.
+  func performDirectApiScanWithAnalysis(_ call: FlutterMethodCall) async {
+    await runDirectApiScan(call, includeAnalysis: true)
+  }
+
+  private func runDirectApiScan(_ call: FlutterMethodCall, includeAnalysis: Bool) async {
     guard let arguments = call.arguments as? [String: Any],
       let argumentsClean = BlinkIdDeserializationUtils.sanitizeDictionary(arguments)
     else { return }
@@ -233,12 +246,12 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
         throw BlinkIdFlutterError.frontImageError
       }
 
-      try await session.process(inputImage: InputImage(uiImage: frontUIImage))
+      var lastFrameResult = try await session.process(inputImage: InputImage(uiImage: frontUIImage))
 
       if let backUIImage = BlinkIdDeserializationUtils.deserializeBase64Image(
         argumentsClean["secondImage"] as? String)
       {
-        try await session.process(inputImage: InputImage(uiImage: backUIImage))
+        lastFrameResult = try await session.process(inputImage: InputImage(uiImage: backUIImage))
       }
 
       var redactionSettings: RedactionSettings?
@@ -249,9 +262,19 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
       }
 
       let scannedResults = await session.getResult(redactionSettings: redactionSettings)
-      DispatchQueue.main.async {
-        self.result?(BlinkIdSerializationUtils.serializeBlinkIdScanningResult(scannedResults))
 
+      if includeAnalysis {
+        var payload: [String: Any] = [:]
+        payload["result"] = BlinkIdSerializationUtils.serializeBlinkIdScanningResultDict(scannedResults)
+        payload["analysis"] = BlinkIdSerializationUtils.serializeInputImageAnalysisResult(
+          lastFrameResult.processResult?.inputImageAnalysisResult)
+        DispatchQueue.main.async {
+          self.result?(BlinkIdSerializationUtils.encodeToJson(payload))
+        }
+      } else {
+        DispatchQueue.main.async {
+          self.result?(BlinkIdSerializationUtils.serializeBlinkIdScanningResult(scannedResults))
+        }
       }
     } catch {
       if let error = error as? InvalidLicenseKeyError {
@@ -260,6 +283,19 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
         throwFlutterError(with: error.localizedDescription)
       }
     }
+  }
+
+  // Deletes cached SDK resources from disk without requiring the SDK to be initialized — a plain
+  // static utility on BlinkIDSdk (unlike unloadSdk, it never touches the live `blinkIdSdk`
+  // instance), safe to call at any time, e.g. on logout or storage cleanup.
+  private func deleteCachedResources(_ call: FlutterMethodCall) {
+    let arguments = call.arguments as? [String: Any]
+    let resourcesLocalFolder = (arguments?["resourcesLocalFolder"] as? String) ?? "MLModels"
+    let otaResourcesLocalFolder = (arguments?["otaResourcesLocalFolder"] as? String) ?? "OTAMLModels"
+    BlinkIDSdk.deleteCachedResources(
+      resourcesLocalFolder: resourcesLocalFolder,
+      otaResourcesLocalFolder: otaResourcesLocalFolder)
+    result?(true)
   }
 
   private func addFlutterPinglet(with sessionNumber: Int) async {
@@ -298,8 +334,10 @@ extension BlinkIdFlutterPlugin: RedactionSettingsResolver {
 enum BlinkIdFlutterMethodChannelArguments: String {
   case performScan = "performScan"
   case directApi = "performDirectApiScan"
+  case directApiWithAnalysis = "performDirectApiScanWithAnalysis"
   case loadSdk = "loadBlinkIdSdk"
   case unloadSdk = "unloadBlinkIdSdk"
+  case deleteCachedResources = "deleteCachedResources"
 }
 
 enum BlinkIdFlutterError: LocalizedError {

@@ -65,4 +65,96 @@ void main() {
       expect(roundTripped.barcodeModule, isNotNull);
     });
   });
+
+  group('DocumentCaptureModuleSettings v8001 nullable rejection flags', () {
+    test('imageWith*Rejected default to null (SDK-resolved), not true', () {
+      final json = DocumentCaptureModuleSettings().toJson();
+
+      expect(json['imageWithBlurRejected'], isNull);
+      expect(json['imageWithGlareRejected'], isNull);
+      expect(json['imageWithHandOcclusionRejected'], isNull);
+      // This one genuinely defaults to true on both native SDKs — not part of the tri-state group.
+      expect(json['imageWithPoorLightingRejected'], isTrue);
+    });
+
+    test('inputImageMargin defaults to null (SDK-resolved), not the old hardcoded 0.02', () {
+      expect(DocumentCaptureModuleSettings().toJson()['inputImageMargin'], isNull);
+    });
+
+    test('cropType defaults to notCropped and serializes as a string', () {
+      expect(DocumentCaptureModuleSettings().toJson()['cropType'], 'notCropped');
+    });
+
+    test('inputImageSelectionStrategy defaults to balanced', () {
+      expect(DocumentCaptureModuleSettings().toJson()['inputImageSelectionStrategy'], 'balanced');
+    });
+  });
+
+  group('VizModuleSettings v8001 nullable resultAggregationEnabled', () {
+    test('defaults to null (SDK-resolved), not the old hardcoded true', () {
+      expect(VizModuleSettings().toJson()['resultAggregationEnabled'], isNull);
+    });
+  });
+
+  group('BarcodeModuleSettings v8001 aztecScanningEnabled', () {
+    test('defaults to false and is present in the serialized settings', () {
+      expect(BarcodeModuleSettings().toJson()['aztecScanningEnabled'], isFalse);
+    });
+  });
+
+  group('BlinkIdScanningUxSettings v8001 allowScanSound', () {
+    test('defaults to true and is present in the serialized settings', () {
+      expect(BlinkIdScanningUxSettings().toJson()['allowScanSound'], isTrue);
+    });
+  });
+
+  group('BlinkIdSdkSettings v8001 resource config restructure', () {
+    test('nests resourcesConfig / otaResourcesConfig with the documented defaults', () {
+      final json = BlinkIdSdkSettings(licenseKey: 'x').toJson();
+
+      final resourcesConfig = json['resourcesConfig'] as Map;
+      expect(resourcesConfig['download'], isTrue);
+      expect(resourcesConfig['serviceUrl'], 'https://models.cdn.microblink.com/resources');
+      expect(resourcesConfig['localFolder'], 'MLModels');
+      final requestTimeout = resourcesConfig['requestTimeout'] as Map;
+      expect(requestTimeout['connectionTimeoutMilliseconds'], 30000);
+      expect(requestTimeout['readTimeoutMilliseconds'], 30000);
+      expect(requestTimeout['writeTimeoutMilliseconds'], 30000);
+
+      final otaResourcesConfig = json['otaResourcesConfig'] as Map;
+      expect(otaResourcesConfig['checkForUpdates'], isTrue);
+      expect(otaResourcesConfig['strict'], isFalse);
+      expect(otaResourcesConfig['serviceUrl'], 'https://blinkid-ota.microblink.com');
+      expect(otaResourcesConfig['localFolder'], 'OTAMLModels');
+    });
+
+    test('deprecated flat constructor params fold into resourcesConfig, not serialized separately', () {
+      final settings = BlinkIdSdkSettings(
+        licenseKey: 'x',
+        // ignore: deprecated_member_use_from_same_package
+        downloadResources: false,
+        // ignore: deprecated_member_use_from_same_package
+        resourceDownloadUrl: 'https://custom.example.com',
+        // ignore: deprecated_member_use_from_same_package
+        resourceLocalFolder: 'CustomFolder',
+        // ignore: deprecated_member_use_from_same_package
+        resourceRequestTimeout: 5000,
+      );
+      final json = settings.toJson();
+
+      expect(json.containsKey('downloadResources'), isFalse);
+      expect(json.containsKey('resourceDownloadUrl'), isFalse);
+      expect(json.containsKey('resourceLocalFolder'), isFalse);
+      expect(json.containsKey('resourceRequestTimeout'), isFalse);
+
+      final resourcesConfig = json['resourcesConfig'] as Map;
+      expect(resourcesConfig['download'], isFalse);
+      expect(resourcesConfig['serviceUrl'], 'https://custom.example.com');
+      expect(resourcesConfig['localFolder'], 'CustomFolder');
+      final requestTimeout = resourcesConfig['requestTimeout'] as Map;
+      expect(requestTimeout['connectionTimeoutMilliseconds'], 5000);
+      expect(requestTimeout['readTimeoutMilliseconds'], 5000);
+      expect(requestTimeout['writeTimeoutMilliseconds'], 5000);
+    });
+  });
 }

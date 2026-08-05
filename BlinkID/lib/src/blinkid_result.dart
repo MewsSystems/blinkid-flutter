@@ -245,6 +245,9 @@ class BlinkIdScanningResult {
   /// The work restriction of the document owner.
   StringResult? workRestriction;
 
+  /// The ethnicity of the document owner.
+  StringResult? ethnicity;
+
   /// Represents the results of scanning a document.
   ///
   /// This class contains the results of scanning a document, including the extracted data
@@ -524,5 +527,31 @@ class BlinkIdScanningResult {
       nativeBlinkIdScanningResult,
       'workRestriction',
     );
+    ethnicity = createStringResult(
+      nativeBlinkIdScanningResult,
+      'ethnicity',
+    );
   }
+}
+
+/// Result of [BlinkidFlutter.performDirectApiScanWithAnalysis].
+///
+/// Pairs the final [result] with the per-frame [analysis] the SDK produced
+/// while processing the submitted image(s) — e.g. to inspect
+/// [InputImageAnalysisResult.inputImageCropAnalysis] when
+/// [DocumentCaptureModuleSettings.cropType] was [InputImageCropType.unknown].
+class BlinkIdDirectApiResult {
+  /// The final scanning result, or `null` if scanning did not complete successfully.
+  BlinkIdScanningResult? result;
+
+  /// The per-frame analysis result for the last processed image, or `null` if
+  /// not reported by the native SDK.
+  InputImageAnalysisResult? analysis;
+
+  /// Result of [BlinkidFlutter.performDirectApiScanWithAnalysis].
+  BlinkIdDirectApiResult(Map<String, dynamic> native)
+    : result = native['result'] is Map ? BlinkIdScanningResult(Map<String, dynamic>.from(native['result'])) : null,
+      analysis = native['analysis'] is Map
+          ? InputImageAnalysisResult(Map<String, dynamic>.from(native['analysis']))
+          : null;
 }

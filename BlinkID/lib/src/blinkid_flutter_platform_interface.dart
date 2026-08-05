@@ -62,6 +62,24 @@ abstract class BlinkIdFlutterPlatform extends PlatformInterface {
     );
   }
 
+  /// Returns the `performDirectApiScanWithAnalysis` method from the [MethodChannelBlinkIdFlutter].
+  /// See [MethodChannelBlinkIdFlutter] for more detailed information.
+  Future<BlinkIdDirectApiResult> performDirectApiScanWithAnalysis({
+    required BlinkIdSdkSettings blinkIdSdkSettings,
+    required BlinkIdSessionSettings blinkIdSessionSettings,
+    RedactionSettings? redactionSettings,
+    required String firstImage,
+    String? secondImage,
+  }) async {
+    return MethodChannelBlinkIdFlutter().performDirectApiScanWithAnalysis(
+      blinkIdSdkSettings: blinkIdSdkSettings,
+      blinkIdSessionSettings: blinkIdSessionSettings,
+      redactionSettings: redactionSettings,
+      firstImage: firstImage,
+      secondImage: secondImage,
+    );
+  }
+
   /// Returns the `loadBlinkIdSdk` method from the [MethodChannelBlinkIdFlutter].
   /// It takes the following parameter: [BlinkIdSdkSettings]
   /// See [MethodChannelBlinkIdFlutter] for more detailed information.
@@ -75,6 +93,18 @@ abstract class BlinkIdFlutterPlatform extends PlatformInterface {
   Future<void> unloadBlinkIdSdk({bool deleteCachedResources = false}) async {
     return MethodChannelBlinkIdFlutter().unloadBlinkIdSdk(
       deleteCachedResources: deleteCachedResources,
+    );
+  }
+
+  /// Returns the `deleteCachedResources` method from the [MethodChannelBlinkIdFlutter].
+  /// See [MethodChannelBlinkIdFlutter] for more detailed information.
+  Future<void> deleteCachedResources({
+    String resourcesLocalFolder = 'MLModels',
+    String otaResourcesLocalFolder = 'OTAMLModels',
+  }) async {
+    return MethodChannelBlinkIdFlutter().deleteCachedResources(
+      resourcesLocalFolder: resourcesLocalFolder,
+      otaResourcesLocalFolder: otaResourcesLocalFolder,
     );
   }
 }

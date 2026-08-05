@@ -6,20 +6,24 @@ import android.os.Parcelable
 import android.util.Base64
 import android.util.Log
 import com.microblink.blinkid.core.BlinkIdSdkSettings
+import com.microblink.blinkid.core.image.InputImageCropType
+import com.microblink.blinkid.core.image.InputImageSelectionStrategy
 import com.microblink.blinkid.core.network.RequestTimeout
 import com.microblink.blinkid.core.result.FieldType
-import com.microblink.blinkid.core.result.classinfo.Country
+import com.microblink.blinkid.core.result.classinfo.CountryId
 import com.microblink.blinkid.core.result.classinfo.DocumentClassInfo
-import com.microblink.blinkid.core.result.classinfo.Region
-import com.microblink.blinkid.core.result.classinfo.Type
+import com.microblink.blinkid.core.result.classinfo.DocumentTypeId
+import com.microblink.blinkid.core.result.classinfo.RegionId
 import com.microblink.blinkid.core.session.BlinkIdSessionSettings
 import com.microblink.blinkid.core.session.InputImageSource
 import com.microblink.blinkid.core.session.ScanningMode
 import com.microblink.blinkid.core.settings.DocumentFilter
 import com.microblink.blinkid.core.settings.DocumentNumberRedactionSettings
+import com.microblink.blinkid.core.settings.OtaResourcesConfig
 import com.microblink.blinkid.core.settings.RedactionMode
 import com.microblink.blinkid.core.settings.RedactionSettings
 import com.microblink.blinkid.core.settings.RedactionSettingsResolver
+import com.microblink.blinkid.core.settings.ResourcesConfig
 import com.microblink.blinkid.core.settings.ScanningSettings
 import com.microblink.blinkid.core.settings.SensitivityLevel
 import com.microblink.blinkid.core.settings.scanning.BarcodeModuleSettings
@@ -38,30 +42,67 @@ object BlinkIdDeserializationUtils {
     internal const val TAG = "BlinkIdFlutter"
     private const val DEFAULT_RESOURCE_DOWNLOAD_URL = "https://models.cdn.microblink.com/resources"
     private const val DEFAULT_RESOURCES_LOCAL_FOLDER = "MLModels"
+    private const val DEFAULT_OTA_DOWNLOAD_URL = "https://blinkid-ota.microblink.com"
+    private const val DEFAULT_OTA_RESOURCES_LOCAL_FOLDER = "OTAMLModels"
 
     fun deserializeBlinkIdSdkSettings(blinkIdSdkSettingsMap: Map<String, Any>?): BlinkIdSdkSettings? {
         val licenseKey = blinkIdSdkSettingsMap?.get("licenseKey") as? String ?: return null
 
-        val sdkSettings =
-            BlinkIdSdkSettings(
-                licenseKey = licenseKey,
-                licensee = blinkIdSdkSettingsMap["licensee"] as? String,
-                downloadResources = blinkIdSdkSettingsMap["downloadResources"] as? Boolean ?: true,
-                resourceDownloadUrl =
-                    blinkIdSdkSettingsMap["resourceDownloadUrl"] as? String
-                        ?: DEFAULT_RESOURCE_DOWNLOAD_URL,
-                resourceLocalFolder =
-                    blinkIdSdkSettingsMap["resourceLocalFolder"] as? String
-                        ?: DEFAULT_RESOURCES_LOCAL_FOLDER,
-                resourceRequestTimeout =
-                    deserializeResourceRequestTimeout(
-                        blinkIdSdkSettingsMap["resourceRequestTimeout"] as? Map<String, Any>,
-                    ),
-                microblinkProxyUrl = blinkIdSdkSettingsMap["microblinkProxyUrl"] as? String,
-            )
-
-        return sdkSettings
+        return BlinkIdSdkSettings(
+            licenseKey = licenseKey,
+            licensee = blinkIdSdkSettingsMap["licensee"] as? String,
+            resourcesConfig = deserializeResourcesConfig(blinkIdSdkSettingsMap),
+            otaResourcesConfig = deserializeOtaResourcesConfig(blinkIdSdkSettingsMap),
+            microblinkProxyUrl = blinkIdSdkSettingsMap["microblinkProxyUrl"] as? String,
+        )
     }
+
+    // v8001 nests base-resource configuration under "resourcesConfig". The pre-v8001 flat keys
+    // (downloadResources, resourceDownloadUrl, resourceLocalFolder, resourceRequestTimeout) are
+    // read as a fallback so payloads from a not-yet-upgraded Dart client keep working.
+    private fun deserializeResourcesConfig(map: Map<String, Any>): ResourcesConfig {
+        val nested = map["resourcesConfig"] as? Map<String, Any>
+        return ResourcesConfig(
+            download = nested?.get("download") as? Boolean
+                ?: map["downloadResources"] as? Boolean
+                ?: true,
+            serviceUrl = nested?.get("serviceUrl") as? String
+                ?: map["resourceDownloadUrl"] as? String
+                ?: DEFAULT_RESOURCE_DOWNLOAD_URL,
+            localFolder = nested?.get("localFolder") as? String
+                ?: map["resourceLocalFolder"] as? String
+                ?: DEFAULT_RESOURCES_LOCAL_FOLDER,
+            requestTimeout = deserializeResourceRequestTimeout(
+                (nested?.get("requestTimeout") as? Map<String, Any>)
+                    ?: legacyIntTimeoutAsMap(map["resourceRequestTimeout"]),
+            ),
+        )
+    }
+
+    // v8001 introduces OTA (over-the-air) resource configuration, nested under "otaResourcesConfig".
+    // There is no pre-v8001 equivalent to fall back to.
+    private fun deserializeOtaResourcesConfig(map: Map<String, Any>): OtaResourcesConfig {
+        val nested = map["otaResourcesConfig"] as? Map<String, Any>
+        return OtaResourcesConfig(
+            checkForUpdates = nested?.get("checkForUpdates") as? Boolean ?: true,
+            strict = nested?.get("strict") as? Boolean ?: false,
+            serviceUrl = nested?.get("serviceUrl") as? String ?: DEFAULT_OTA_DOWNLOAD_URL,
+            localFolder = nested?.get("localFolder") as? String ?: DEFAULT_OTA_RESOURCES_LOCAL_FOLDER,
+            requestTimeout = deserializeResourceRequestTimeout(nested?.get("requestTimeout") as? Map<String, Any>),
+        )
+    }
+
+    // Legacy `resourceRequestTimeout` was a single flat Int (applied inconsistently — see the
+    // historical "TODO bug" in the Dart/iOS bridges). Normalize it to the new per-phase shape so
+    // deserializeResourceRequestTimeout can handle both old and new payloads uniformly.
+    private fun legacyIntTimeoutAsMap(value: Any?): Map<String, Any>? =
+        (value as? Int)?.let {
+            mapOf(
+                "connectionTimeoutMilliseconds" to it,
+                "readTimeoutMilliseconds" to it,
+                "writeTimeoutMilliseconds" to it,
+            )
+        }
 
     fun deserializeBlinkIdSessionSettings(
         blinkIdSdkSessionSettingsMap: Map<String, Any>?,
@@ -145,7 +186,7 @@ object BlinkIdDeserializationUtils {
 
     private fun deserializeDocumentCaptureModuleSettings(map: Map<String, Any>): DocumentCaptureModuleSettings =
         DocumentCaptureModuleSettings(
-            inputImageCropped = map["inputImageCropped"] as? Boolean ?: false,
+            cropType = deserializeCropType(map["cropType"] as? String),
             unsupportedDocumentsAllowed = map["unsupportedDocumentsAllowed"] as? Boolean ?: false,
             secondSideWithNoExtractableDataSkipped = map["secondSideWithNoExtractableDataSkipped"] as? Boolean ?: true,
             passportDataPageScanOnly = map["passportDataPageScanOnly"] as? Boolean ?: true,
@@ -157,12 +198,14 @@ object BlinkIdDeserializationUtils {
             dotsPerInch = map["dotsPerInch"] as? Int ?: 250,
             extensionFactor = (map["extensionFactor"] as? Number)?.toFloat() ?: 0.0f,
             blurSensitivityLevel = deserializeSensitivityLevel(map["blurSensitivityLevel"] as? String),
-            imageWithBlurRejected = map["imageWithBlurRejected"] as? Boolean ?: true,
+            imageWithBlurRejected = map["imageWithBlurRejected"] as? Boolean,
             glareSensitivityLevel = deserializeSensitivityLevel(map["glareSensitivityLevel"] as? String),
-            imageWithGlareRejected = map["imageWithGlareRejected"] as? Boolean ?: true,
+            imageWithGlareRejected = map["imageWithGlareRejected"] as? Boolean,
             tiltSensitivityLevel = deserializeSensitivityLevel(map["tiltSensitivityLevel"] as? String),
             imageWithPoorLightingRejected = map["imageWithPoorLightingRejected"] as? Boolean ?: true,
-            imageWithHandOcclusionRejected = map["imageWithHandOcclusionRejected"] as? Boolean ?: true,
+            imageWithHandOcclusionRejected = map["imageWithHandOcclusionRejected"] as? Boolean,
+            inputImageSelectionStrategy =
+                deserializeInputImageSelectionStrategy(map["inputImageSelectionStrategy"] as? String),
         )
 
     private fun deserializeSensitivityLevel(value: String?): SensitivityLevel =
@@ -172,6 +215,23 @@ object BlinkIdDeserializationUtils {
             "mid" -> SensitivityLevel.Mid
             "high" -> SensitivityLevel.High
             else -> SensitivityLevel.Mid
+        }
+
+    private fun deserializeCropType(value: String?): InputImageCropType =
+        when (value?.lowercase()) {
+            "notcropped" -> InputImageCropType.NotCropped
+            "unknown" -> InputImageCropType.Unknown
+            "cropped" -> InputImageCropType.Cropped
+            else -> InputImageCropType.NotCropped
+        }
+
+    private fun deserializeInputImageSelectionStrategy(value: String?): InputImageSelectionStrategy =
+        when (value?.lowercase()) {
+            "singleimage" -> InputImageSelectionStrategy.SingleImage
+            "optimizeforspeed" -> InputImageSelectionStrategy.OptimizeForSpeed
+            "balanced" -> InputImageSelectionStrategy.Balanced
+            "optimizeforquality" -> InputImageSelectionStrategy.OptimizeForQuality
+            else -> InputImageSelectionStrategy.Balanced
         }
 
     private fun deserializeBarcodeModuleSettings(map: Map<String, Any>): BarcodeModuleSettings =
@@ -188,6 +248,7 @@ object BlinkIdDeserializationUtils {
             ean13ScanningEnabled = map["ean13ScanningEnabled"] as? Boolean ?: false,
             itfScanningEnabled = map["itfScanningEnabled"] as? Boolean ?: false,
             dataMatrixScanningEnabled = map["dataMatrixScanningEnabled"] as? Boolean ?: false,
+            aztecScanningEnabled = map["aztecScanningEnabled"] as? Boolean ?: false,
         )
 
     private fun deserializeMrzModuleSettings(map: Map<String, Any>): MrzModuleSettings =
@@ -200,15 +261,15 @@ object BlinkIdDeserializationUtils {
             presenceMandatory = map["presenceMandatory"] as? Boolean ?: false,
             signatureImageExtractionEnabled = map["signatureImageExtractionEnabled"] as? Boolean ?: false,
             characterValidationEnabled = map["characterValidationEnabled"] as? Boolean ?: true,
-            resultAggregationEnabled = map["resultAggregationEnabled"] as? Boolean ?: true,
+            resultAggregationEnabled = map["resultAggregationEnabled"] as? Boolean,
         )
 
     private fun deserializeResourceRequestTimeout(resourceRequestTimeoutMap: Map<String, Any>?): RequestTimeout {
         if (resourceRequestTimeoutMap == null) return RequestTimeout.DEFAULT
         return RequestTimeout(
-            connectionTimeout = (resourceRequestTimeoutMap["connectionTimeoutMilliseconds"] as? Int ?: 10000).milliseconds,
-            writeTimeout = (resourceRequestTimeoutMap["writeTimeoutMilliseconds"] as? Int ?: 10000).milliseconds,
-            readTimeout = (resourceRequestTimeoutMap["readTimeoutMilliseconds"] as? Int ?: 10000).milliseconds,
+            connectionTimeout = (resourceRequestTimeoutMap["connectionTimeoutMilliseconds"] as? Int ?: 30000).milliseconds,
+            writeTimeout = (resourceRequestTimeoutMap["writeTimeoutMilliseconds"] as? Int ?: 30000).milliseconds,
+            readTimeout = (resourceRequestTimeoutMap["readTimeoutMilliseconds"] as? Int ?: 30000).milliseconds,
         )
     }
 
@@ -217,13 +278,13 @@ object BlinkIdDeserializationUtils {
             val filter = DocumentFilter()
 
             (documentFilterMap["country"] as? String)?.let {
-                filter.country = enumValueOf<Country>(it.replaceFirstChar { char -> char.uppercase() })
+                filter.country = enumValueOf<CountryId>(it.replaceFirstChar { char -> char.uppercase() })
             }
             (documentFilterMap["region"] as? String)?.let {
-                filter.region = enumValueOf<Region>(it.replaceFirstChar { char -> char.uppercase() })
+                filter.region = enumValueOf<RegionId>(it.replaceFirstChar { char -> char.uppercase() })
             }
             (documentFilterMap["documentType"] as? String)?.let {
-                filter.type = enumValueOf<Type>(it.replaceFirstChar { char -> char.uppercase() })
+                filter.type = enumValueOf<DocumentTypeId>(it.replaceFirstChar { char -> char.uppercase() })
             }
             filter
         } else {
@@ -340,14 +401,16 @@ object BlinkIdDeserializationUtils {
         documentFilter: DocumentFilter,
         classInfo: DocumentClassInfo,
     ): Boolean =
-        matchesFilterField(documentFilter.country, Country.None, classInfo.country) &&
-            matchesFilterField(documentFilter.region, Region.None, classInfo.region) &&
-            matchesFilterField(documentFilter.type, Type.None, classInfo.type)
+        matchesFilterField(documentFilter.country, CountryId.None, classInfo.country?.id) &&
+            matchesFilterField(documentFilter.region, RegionId.None, classInfo.region?.id) &&
+            matchesFilterField(documentFilter.type, DocumentTypeId.None, classInfo.documentType?.id)
 
+    // classInfoValue is nullable — a null id means the document's class was delivered via OTA and
+    // isn't known to this compiled enum, in which case an id-based filter can't match it.
     private fun <T> matchesFilterField(
         filterValue: T?,
         noneValue: T,
-        classInfoValue: T,
+        classInfoValue: T?,
     ): Boolean = filterValue == null || filterValue == noneValue || filterValue == classInfoValue
 
     fun deserializeBlinkIdUxSettings(
@@ -372,6 +435,7 @@ object BlinkIdDeserializationUtils {
             stepTimeoutDuration = stepTimeoutMs.milliseconds,
             inactivityTimeoutDuration = inactivityTimeoutMs.milliseconds,
             allowHapticFeedback = (uxMap["allowHapticFeedback"] as? Boolean) ?: true,
+            allowScanSound = (uxMap["allowScanSound"] as? Boolean) ?: true,
             classFilter = CustomClassFilter(classFilterMap),
             redactionSettingsResolver = deserializeRedactionSettingsResolver(redactionSettingsResolverMap),
         )
@@ -434,9 +498,9 @@ object BlinkIdDeserializationUtils {
         val region = filteredClass["region"] as? String
         val documentType = filteredClass["documentType"] as? String
 
-        return (country == null || enumValueOf<Country>(country.replaceFirstChar { char -> char.uppercase() }) == classInfo.country) &&
-            (region == null || enumValueOf<Region>(region.replaceFirstChar { char -> char.uppercase() }) == classInfo.region) &&
-            (documentType == null || enumValueOf<Type>(documentType.replaceFirstChar { char -> char.uppercase() }) == classInfo.type)
+        return (country == null || enumValueOf<CountryId>(country.replaceFirstChar { char -> char.uppercase() }) == classInfo.country?.id) &&
+            (region == null || enumValueOf<RegionId>(region.replaceFirstChar { char -> char.uppercase() }) == classInfo.region?.id) &&
+            (documentType == null || enumValueOf<DocumentTypeId>(documentType.replaceFirstChar { char -> char.uppercase() }) == classInfo.documentType?.id)
     }
 
     fun base64ToBitmap(base64Str: String?): Bitmap? =
@@ -522,9 +586,9 @@ private class CustomRedactionSettingsResolver(
                 if (debugLoggable) {
                     Log.d(
                         BlinkIdDeserializationUtils.TAG,
-                        "resolveRedactionSettings matched class=${classInfo.country}/" +
-                            "${classInfo.region}/${classInfo.type}, mode=${entry.settings.redactionMode}, " +
-                            "fields=${entry.settings.fields.size}",
+                        "resolveRedactionSettings matched class=${classInfo.country?.rawValue}/" +
+                            "${classInfo.region?.rawValue}/${classInfo.documentType?.rawValue}, " +
+                            "mode=${entry.settings.redactionMode}, fields=${entry.settings.fields.size}",
                     )
                 }
                 return entry.settings
@@ -533,8 +597,8 @@ private class CustomRedactionSettingsResolver(
         if (debugLoggable) {
             Log.d(
                 BlinkIdDeserializationUtils.TAG,
-                "resolveRedactionSettings no matching entry for class=${classInfo.country}/" +
-                    "${classInfo.region}/${classInfo.type}, " +
+                "resolveRedactionSettings no matching entry for class=${classInfo.country?.rawValue}/" +
+                    "${classInfo.region?.rawValue}/${classInfo.documentType?.rawValue}, " +
                     "filters=${entries.map { entry ->
                         entry.documentFilters.map { filter ->
                             "${filter.country}/${filter.region}/${filter.documentType}"

@@ -435,6 +435,11 @@ extension BlinkIdScannerView: AVCaptureVideoDataOutputSampleBufferDelegate {
             guard self.blinkIdSession === session else { return }
             self.guidanceEventSink?("wrongSide")
           }
+        } else if processingStatus == .awaitingMoreStableInputImages {
+          await MainActor.run {
+            guard self.blinkIdSession === session else { return }
+            self.guidanceEventSink?("holdStill")
+          }
         } else if let ia = frameResult.processResult?.inputImageAnalysisResult {
           let guidance: String
           if ia.blurDetectionStatus == .detected {

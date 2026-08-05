@@ -85,6 +85,34 @@ class BlinkIdFlutter {
     );
   }
 
+  /// The `performDirectApiScanWithAnalysis` method behaves like [performDirectApiScan],
+  /// but additionally returns the per-frame [InputImageAnalysisResult] the SDK produced
+  /// while processing the submitted image(s) as part of a [BlinkIdDirectApiResult].
+  ///
+  /// Use this when you need [InputImageAnalysisResult.inputImageCropAnalysis] or
+  /// [InputImageAnalysisResult.vizExtractionType] — for example, when
+  /// [DocumentCaptureModuleSettings.cropType] is [InputImageCropType.unknown] and you
+  /// need to know whether the submitted image was actually cropped.
+  ///
+  /// Takes the same parameters as [performDirectApiScan].
+  ///
+  /// Returns the `performDirectApiScanWithAnalysis` method from the [BlinkidFlutterPlatform].
+  Future<BlinkIdDirectApiResult> performDirectApiScanWithAnalysis({
+    required BlinkIdSdkSettings blinkIdSdkSettings,
+    required BlinkIdSessionSettings blinkIdSessionSettings,
+    RedactionSettings? redactionSettings,
+    required String firstImage,
+    String? secondImage,
+  }) {
+    return BlinkIdFlutterPlatform.instance.performDirectApiScanWithAnalysis(
+      blinkIdSdkSettings: blinkIdSdkSettings,
+      blinkIdSessionSettings: blinkIdSessionSettings,
+      redactionSettings: redactionSettings,
+      firstImage: firstImage,
+      secondImage: secondImage,
+    );
+  }
+
   /// The `loadBlinkIdSdk` method creates or retrieves the instance of the BlinkID SDK.
   ///
   /// Initializes and loads the BlinkID SDK if it is not already loaded.
@@ -129,6 +157,28 @@ class BlinkIdFlutter {
   Future<void> unloadBlinkIdSdk({bool deleteCachedResources = false}) async {
     return BlinkIdFlutterPlatform.instance.unloadBlinkIdSdk(
       deleteCachedResources: deleteCachedResources,
+    );
+  }
+
+  /// Deletes cached SDK resources from disk, without requiring the SDK to be
+  /// initialized — unlike [unloadBlinkIdSdk], this is safe to call at any time,
+  /// e.g. on logout, on uninstall-style cleanup flows, or to force a fresh
+  /// download of resources on the next init.
+  ///
+  /// Errors are swallowed (best-effort) rather than thrown, matching the
+  /// native SDK's own `deleteCachedResources` contract.
+  ///
+  /// [resourcesLocalFolder] and [otaResourcesLocalFolder] must match the
+  /// folder names configured on [ResourcesConfig.localFolder] /
+  /// [OtaResourcesConfig.localFolder] if they were customized — otherwise the
+  /// wrong folders won't be removed. Defaults match the SDKs' own defaults.
+  Future<void> deleteCachedResources({
+    String resourcesLocalFolder = 'MLModels',
+    String otaResourcesLocalFolder = 'OTAMLModels',
+  }) {
+    return BlinkIdFlutterPlatform.instance.deleteCachedResources(
+      resourcesLocalFolder: resourcesLocalFolder,
+      otaResourcesLocalFolder: otaResourcesLocalFolder,
     );
   }
 }

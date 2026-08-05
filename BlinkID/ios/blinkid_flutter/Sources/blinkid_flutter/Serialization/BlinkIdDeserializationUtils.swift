@@ -14,44 +14,84 @@ struct BlinkIdDeserializationUtils {
   static func deserializeBlinkIdSdkSettings(_ sdkSettingsDict: [String: Any]?)
     -> BlinkIDSdkSettings?
   {
-    var blinkidSdkSettings: BlinkIDSdkSettings?
+    guard let licenseKey = sdkSettingsDict?["licenseKey"] as? String else { return nil }
 
-    if let licenseKey = sdkSettingsDict?["licenseKey"] as? String {
-      blinkidSdkSettings = BlinkIDSdkSettings(licenseKey: licenseKey)
-    }
+    var blinkidSdkSettings = BlinkIDSdkSettings(
+      licenseKey: licenseKey,
+      resourcesConfiguration: deserializeResourcesConfig(sdkSettingsDict),
+      otaResourcesConfiguration: deserializeOtaResourcesConfig(sdkSettingsDict)
+    )
 
     if let licensee = sdkSettingsDict?["licensee"] as? String {
-      blinkidSdkSettings?.licensee = licensee
-    }
-
-    if let downloadResources = sdkSettingsDict?["downloadResources"] as? Bool {
-      blinkidSdkSettings?.downloadResources = downloadResources
-    }
-
-    if let resourceDownloadUrl = sdkSettingsDict?["resourceDownloadUrl"] as? String {
-      blinkidSdkSettings?.resourceDownloadUrl = resourceDownloadUrl
-    }
-
-    if let resourceLocalFolder = sdkSettingsDict?["resourceLocalFolder"] as? String {
-      blinkidSdkSettings?.resourceLocalFolder = resourceLocalFolder
-    }
-
-    if let bundleURL = sdkSettingsDict?["bundleIdentifier"] as? String,
-      let bundle: Bundle = Bundle.init(identifier: bundleURL)
-    {
-      blinkidSdkSettings?.bundleURL = bundle.bundleURL
-    }
-
-    if let resourceRequestTimeout = sdkSettingsDict?["resourceRequestTimeout"] as? Int {
-      // TODO Bug in iOS native SDK
-      blinkidSdkSettings?.resourceRequestTimeout = BlinkID.RequestTimeout.default
+      blinkidSdkSettings.licensee = licensee
     }
 
     if let microblinkProxyUrl = sdkSettingsDict?["microblinkProxyUrl"] as? String {
-      blinkidSdkSettings?.microblinkProxyURL = microblinkProxyUrl
+      blinkidSdkSettings.microblinkProxyURL = microblinkProxyUrl
     }
 
     return blinkidSdkSettings
+  }
+
+  // v8001 nests base-resource configuration under "resourcesConfig". `ResourcesConfig` only
+  // exposes a memberwise initializer (no public setters), so it's built in one shot here rather
+  // than mutated field-by-field. The pre-v8001 flat keys (downloadResources, resourceDownloadUrl,
+  // resourceLocalFolder, bundleIdentifier, resourceRequestTimeout) are read as a fallback so
+  // payloads from a not-yet-upgraded Dart client keep working.
+  private static func deserializeResourcesConfig(_ sdkSettingsDict: [String: Any]?) -> ResourcesConfig {
+    let nested = sdkSettingsDict?["resourcesConfig"] as? [String: Any]
+    let bundleIdentifier =
+      (nested?["bundleIdentifier"] as? String) ?? (sdkSettingsDict?["bundleIdentifier"] as? String)
+    let bundleUrl = bundleIdentifier.flatMap { Bundle(identifier: $0)?.bundleURL }
+    return ResourcesConfig(
+      download: (nested?["download"] as? Bool) ?? (sdkSettingsDict?["downloadResources"] as? Bool) ?? true,
+      serviceUrl: (nested?["serviceUrl"] as? String) ?? (sdkSettingsDict?["resourceDownloadUrl"] as? String)
+        ?? "https://models.cdn.microblink.com/resources",
+      localFolder: (nested?["localFolder"] as? String) ?? (sdkSettingsDict?["resourceLocalFolder"] as? String)
+        ?? "MLModels",
+      requestTimeout: deserializeRequestTimeout(
+        (nested?["requestTimeout"] as? [String: Any])
+          ?? legacyIntTimeoutAsDict(sdkSettingsDict?["resourceRequestTimeout"])
+      ),
+      bundleUrl: bundleUrl
+    )
+  }
+
+  // v8001 introduces OTA (over-the-air) resource configuration, nested under "otaResourcesConfig".
+  // There is no pre-v8001 equivalent to fall back to.
+  private static func deserializeOtaResourcesConfig(_ sdkSettingsDict: [String: Any]?) -> OTAResourcesConfig {
+    let nested = sdkSettingsDict?["otaResourcesConfig"] as? [String: Any]
+    let bundleUrl = (nested?["bundleIdentifier"] as? String).flatMap { Bundle(identifier: $0)?.bundleURL }
+    return OTAResourcesConfig(
+      checkForUpdates: (nested?["checkForUpdates"] as? Bool) ?? true,
+      strict: (nested?["strict"] as? Bool) ?? false,
+      serviceUrl: (nested?["serviceUrl"] as? String) ?? BlinkID.OtaServiceURL.default,
+      localFolder: (nested?["localFolder"] as? String) ?? "OTAMLModels",
+      requestTimeout: deserializeRequestTimeout(nested?["requestTimeout"] as? [String: Any]),
+      bundleUrl: bundleUrl
+    )
+  }
+
+  // Dart's RequestTimeout is expressed in milliseconds (matching Android's Duration-based API);
+  // the iOS SDK's RequestTimeout uses TimeInterval (seconds), so values are converted here.
+  private static func deserializeRequestTimeout(_ requestTimeoutDict: [String: Any]?) -> BlinkID.RequestTimeout {
+    guard let requestTimeoutDict else { return .default }
+    let connection = (requestTimeoutDict["connectionTimeoutMilliseconds"] as? Int).map { Double($0) / 1000.0 } ?? 30.0
+    let read = (requestTimeoutDict["readTimeoutMilliseconds"] as? Int).map { Double($0) / 1000.0 } ?? 30.0
+    let write = (requestTimeoutDict["writeTimeoutMilliseconds"] as? Int).map { Double($0) / 1000.0 } ?? 30.0
+    return BlinkID.RequestTimeout(connectionTimeout: connection, readTimeout: read, writeTimeout: write)
+  }
+
+  // Legacy `resourceRequestTimeout` was a single flat Int (ms) applied inconsistently — this
+  // replaces the historical "TODO Bug in iOS native SDK" that ignored the value entirely.
+  // Normalized here to the new per-phase shape so deserializeRequestTimeout handles both uniformly.
+  private static func legacyIntTimeoutAsDict(_ value: Any?) -> [String: Any]? {
+    guard let ms = value as? Int else { return nil }
+    return [
+      "connectionTimeoutMilliseconds": ms,
+      "readTimeoutMilliseconds": ms,
+      "writeTimeoutMilliseconds": ms,
+    ]
   }
 
   static func deserializeBlinkIdSessionSettings(
@@ -220,6 +260,10 @@ struct BlinkIdDeserializationUtils {
       barodeModuleSettings.upceScanningEnabled = upceScanningEnabled
     }
 
+    if let aztecScanningEnabled = barcodeModuleDict["aztecScanningEnabled"] as? Bool {
+      barodeModuleSettings.aztecScanningEnabled = aztecScanningEnabled
+    }
+
     return barodeModuleSettings
   }
 
@@ -289,8 +333,15 @@ struct BlinkIdDeserializationUtils {
       documentCaptureSettings.imageWithPoorLightingRejected = imageWithPoorLightingRejected
     }
 
-    if let inputImageCropped = documentCaptureModuleDict["inputImageCropped"] as? Bool {
-      documentCaptureSettings.inputImageCropped = inputImageCropped
+    if let cropTypeRaw = documentCaptureModuleDict["cropType"] as? String {
+      documentCaptureSettings.cropType = deserializeCropType(cropTypeRaw)
+    }
+
+    if let inputImageSelectionStrategyRaw = documentCaptureModuleDict["inputImageSelectionStrategy"]
+      as? String
+    {
+      documentCaptureSettings.inputImageSelectionStrategy = deserializeInputImageSelectionStrategy(
+        inputImageSelectionStrategyRaw)
     }
 
     if let inputImageReturnEnabled = documentCaptureModuleDict["inputImageReturnEnabled"] as? Bool {
@@ -333,6 +384,25 @@ struct BlinkIdDeserializationUtils {
     case "mid": return .mid
     case "high": return .high
     default: return .mid
+    }
+  }
+
+  static func deserializeCropType(_ value: String) -> InputImageCropType {
+    switch value {
+    case "notCropped": return .notCropped
+    case "unknown": return .unknown
+    case "cropped": return .cropped
+    default: return .notCropped
+    }
+  }
+
+  static func deserializeInputImageSelectionStrategy(_ value: String) -> InputImageSelectionStrategy {
+    switch value {
+    case "singleImage": return .singleImage
+    case "optimizeForSpeed": return .optimizeForSpeed
+    case "balanced": return .balanced
+    case "optimizeForQuality": return .optimizeForQuality
+    default: return .balanced
     }
   }
 
@@ -432,22 +502,26 @@ struct BlinkIdDeserializationUtils {
     return documentNumberRedactionSettings
   }
 
+  // Reads each key independently — a single missing key (e.g. a client on an older Dart plugin
+  // version without `allowScanSound`) used to fall through to all-defaults for every setting;
+  // now every other supplied key is still honored.
   static func deserializeBlinkIdUxScanningSettings(_ scanningUxSettingsDict: [String: Any]?)
     -> ScanningUXSettings
   {
-    if let scanningUxSettingsDict = scanningUxSettingsDict,
-      let allowHapticFeedback = scanningUxSettingsDict["allowHapticFeedback"] as? Bool,
-      let preferredCameraPosition = scanningUxSettingsDict["preferredCamera"] as? String,
-      let showHelpButton = scanningUxSettingsDict["showHelpButton"] as? Bool,
-      let showIntroductionAlert = scanningUxSettingsDict["showOnboardingDialog"] as? Bool
-    {
-      return ScanningUXSettings(
-        showIntroductionAlert: showIntroductionAlert,
-        showHelpButton: showHelpButton,
-        preferredCameraPosition: deserializePreferredCameraPosition(preferredCameraPosition),
-        allowHapticFeedback: allowHapticFeedback)
-    }
-    return ScanningUXSettings()
+    let showIntroductionAlert = scanningUxSettingsDict?["showOnboardingDialog"] as? Bool ?? true
+    let showHelpButton = scanningUxSettingsDict?["showHelpButton"] as? Bool ?? true
+    let preferredCameraPosition =
+      (scanningUxSettingsDict?["preferredCamera"] as? String)
+      .map(deserializePreferredCameraPosition) ?? .back
+    let allowHapticFeedback = scanningUxSettingsDict?["allowHapticFeedback"] as? Bool ?? true
+    let allowScanSound = scanningUxSettingsDict?["allowScanSound"] as? Bool ?? true
+
+    return ScanningUXSettings(
+      showIntroductionAlert: showIntroductionAlert,
+      showHelpButton: showHelpButton,
+      preferredCameraPosition: preferredCameraPosition,
+      allowHapticFeedback: allowHapticFeedback,
+      allowScanSound: allowScanSound)
   }
 
   static func deserializePreferredCameraPosition(_ value: String) -> Camera.CameraPosition {
@@ -562,11 +636,46 @@ struct BlinkIdDeserializationUtils {
     let type = filteredClass["documentType"] as? String
     let region = filteredClass["region"] as? String
 
-    let countryMatches = country == nil || classInfo.country == Country(rawValue: country!)
-    let typeMatches = type == nil || classInfo.documentType == DocumentType(rawValue: type!)
-    let regionMatches = region == nil || classInfo.region == Region(rawValue: region!)
+    let countryMatches =
+      country == nil || classInfo.country?.countryId == country.flatMap(countryIdFromWireValue)
+    let typeMatches =
+      type == nil || classInfo.documentType?.documentTypeId == type.flatMap(documentTypeIdFromWireValue)
+    let regionMatches =
+      region == nil || classInfo.region?.regionId == region.flatMap { RegionID(rawValue: $0) }
 
     return countryMatches && typeMatches && regionMatches
+  }
+
+  // The native SDKs disagree with each other (and, for a couple of cases, with their own Swift
+  // naming conventions) on the exact casing of a handful of classification identifiers — e.g.
+  // CountryID's Swift case is literally `schengen_area`, while Android's Kotlin enum (whose
+  // lower-camel `.name` is the Dart @JsonValue wire format) uses `schengenArea`. These tables
+  // translate between the wire format (Android/Dart casing) and each iOS enum's actual case in
+  // both directions; every case not listed here already matches by identity.
+  private static let countryIdWireOverrides: [String: String] = [
+    "schengenArea": "schengen_area",
+    "heardIslandAndMcDonaldIslands": "heardIslandAndMcdonaldIslands",
+  ]
+  private static let documentTypeIdWireOverrides: [String: String] = [
+    "myPolis": "mypolis",
+    "myPr": "myPR",
+    "mySSSCard": "mysssCard",
+  ]
+
+  static func countryIdToWireValue(_ id: CountryID) -> String {
+    countryIdWireOverrides.first(where: { $0.value == id.rawValue })?.key ?? id.rawValue
+  }
+
+  static func countryIdFromWireValue(_ value: String) -> CountryID? {
+    CountryID(rawValue: countryIdWireOverrides[value] ?? value)
+  }
+
+  static func documentTypeIdToWireValue(_ id: DocumentTypeID) -> String {
+    documentTypeIdWireOverrides.first(where: { $0.value == id.rawValue })?.key ?? id.rawValue
+  }
+
+  static func documentTypeIdFromWireValue(_ value: String) -> DocumentTypeID? {
+    DocumentTypeID(rawValue: documentTypeIdWireOverrides[value] ?? value)
   }
 
   static func toStringKeyedMap(_ value: Any?) -> [String: Any]? {

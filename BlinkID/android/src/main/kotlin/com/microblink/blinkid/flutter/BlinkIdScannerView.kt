@@ -397,6 +397,7 @@ class BlinkIdScannerView(
                                 val ia = frameResult.inputImageAnalysisResult
                                 val guidance = when {
                                     ia.processingStatus == ProcessingStatus.ScanningWrongSide -> "wrongSide"
+                                    ia.processingStatus == ProcessingStatus.AwaitingMoreStableInputImages -> "holdStill"
                                     ia.blurDetectionStatus == ImageAnalysisDetectionStatus.Detected -> "blur"
                                     ia.glareDetectionStatus == ImageAnalysisDetectionStatus.Detected -> "glare"
                                     else -> detectionStatus.toGuidanceString()

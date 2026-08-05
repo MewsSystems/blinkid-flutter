@@ -21,9 +21,19 @@ class MethodChannelBlinkIdFlutter extends BlinkIdFlutterPlatform {
   final methodChannel = const MethodChannel('blinkid_flutter');
   static const String ARG_SCAN_METHOD = 'performScan';
   static const String ARG_SCAN_DIRECT_API_METHOD = 'performDirectApiScan';
+  static const String ARG_SCAN_DIRECT_API_WITH_ANALYSIS_METHOD =
+      'performDirectApiScanWithAnalysis';
   static const String ARG_LOAD_BLINKID_SDK = 'loadBlinkIdSdk';
   static const String ARG_UNLOAD_BLINKID_SDK = 'unloadBlinkIdSdk';
   static const String ARG_DELETE_CACHED_RESOURCES = 'deleteCachedResources';
+  // Standalone deleteCachedResources() is a distinct method-channel call — not
+  // to be confused with ARG_DELETE_CACHED_RESOURCES, which is an argument key
+  // on the unloadBlinkIdSdk call. Both happen to share the string value.
+  static const String ARG_DELETE_CACHED_RESOURCES_METHOD =
+      'deleteCachedResources';
+  static const String ARG_RESOURCES_LOCAL_FOLDER = 'resourcesLocalFolder';
+  static const String ARG_OTA_RESOURCES_LOCAL_FOLDER =
+      'otaResourcesLocalFolder';
   static const String ARG_BLINKID_SDK_SETTINGS = 'blinkIdSdkSettings';
   static const String ARG_SESSION_SETTINGS = 'blinkIdSessionSettings';
   static const String ARG_UX_SETTINGS = 'blinkIdScanningUxSettings';
@@ -123,6 +133,35 @@ class MethodChannelBlinkIdFlutter extends BlinkIdFlutterPlatform {
     return BlinkIdScanningResult(decodedMap);
   }
 
+  /// The `performDirectApiScanWithAnalysis` platform channel method behaves like
+  /// [performDirectApiScan], but additionally returns the per-frame
+  /// [InputImageAnalysisResult] the SDK produced while processing the submitted
+  /// image(s) — e.g. to inspect [InputImageAnalysisResult.inputImageCropAnalysis]
+  /// when [DocumentCaptureModuleSettings.cropType] was [InputImageCropType.unknown].
+  @override
+  Future<BlinkIdDirectApiResult> performDirectApiScanWithAnalysis({
+    required BlinkIdSdkSettings blinkIdSdkSettings,
+    required BlinkIdSessionSettings blinkIdSessionSettings,
+    RedactionSettings? redactionSettings,
+    required String firstImage,
+    String? secondImage,
+  }) async {
+    final sessionPayload = jsonDecode(jsonEncode(blinkIdSessionSettings));
+    final jsonBlinkIdDirectApiResult = await methodChannel
+        .invokeMethod(ARG_SCAN_DIRECT_API_WITH_ANALYSIS_METHOD, {
+          ARG_BLINKID_SDK_SETTINGS: jsonDecode(jsonEncode(blinkIdSdkSettings)),
+          ARG_SESSION_SETTINGS: sessionPayload,
+          ARG_REDACTION_SETTINGS: jsonDecode(jsonEncode(redactionSettings)),
+          ARG_FIRST_IMAGE: jsonDecode(jsonEncode(firstImage)),
+          ARG_SECOND_IMAGE: jsonDecode(jsonEncode(secondImage)),
+        });
+
+    final decodedMap = Map<String, dynamic>.from(
+      jsonDecode(jsonBlinkIdDirectApiResult),
+    );
+    return BlinkIdDirectApiResult(decodedMap);
+  }
+
   /// The `loadBlinkIdSdk` platform channel method creates or retrieves the instance of the BlinkID SDK.
   ///
   /// Initializes and loads the BlinkID SDK if it is not already loaded.
@@ -171,6 +210,28 @@ class MethodChannelBlinkIdFlutter extends BlinkIdFlutterPlatform {
       ARG_DELETE_CACHED_RESOURCES: jsonDecode(
         jsonEncode(deleteCachedResources),
       ),
+    });
+  }
+
+  /// The `deleteCachedResources` platform channel method deletes cached SDK
+  /// resources from disk **without** requiring the SDK to be initialized —
+  /// unlike [unloadBlinkIdSdk], this never touches a live SDK instance and is
+  /// safe to call at any time, e.g. on logout or storage cleanup.
+  ///
+  /// Errors are swallowed natively (best-effort), matching the native SDK's
+  /// own `deleteCachedResources` contract.
+  ///
+  /// Pass the same folder names configured on [ResourcesConfig.localFolder] /
+  /// [OtaResourcesConfig.localFolder] if they were customized, or the wrong
+  /// folders won't be removed.
+  @override
+  Future<void> deleteCachedResources({
+    String resourcesLocalFolder = 'MLModels',
+    String otaResourcesLocalFolder = 'OTAMLModels',
+  }) async {
+    await methodChannel.invokeMethod(ARG_DELETE_CACHED_RESOURCES_METHOD, {
+      ARG_RESOURCES_LOCAL_FOLDER: resourcesLocalFolder,
+      ARG_OTA_RESOURCES_LOCAL_FOLDER: otaResourcesLocalFolder,
     });
   }
 }

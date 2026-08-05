@@ -22,6 +22,7 @@ import com.microblink.blinkid.core.result.barcode.BarcodeData
 import com.microblink.blinkid.core.result.barcode.BarcodeElement
 import com.microblink.blinkid.core.result.barcode.BarcodeResult
 import com.microblink.blinkid.core.result.barcode.BarcodeType
+import com.microblink.blinkid.core.result.InputImageAnalysisResult
 import com.microblink.blinkid.core.result.classinfo.DocumentClassInfo
 import com.microblink.blinkid.core.result.mrz.MrzResult
 import com.microblink.blinkid.core.result.viz.VizResult
@@ -230,6 +231,9 @@ object BlinkIdSerializationUtils {
         scanningResult?.workRestriction?.let {
             scanningResultDict["workRestriction"] = serializeStringResult(it)
         }
+        scanningResult?.ethnicity?.let {
+            scanningResultDict["ethnicity"] = serializeStringResult(it)
+        }
         scanningResult?.inputImage(ScanningSide.First)?.let {
             scanningResultDict["firstInputImage"] = encodeBase64Image(it.bitmap)
         }
@@ -278,19 +282,39 @@ object BlinkIdSerializationUtils {
         return simpleDateResultDict
     }
 
+    // Each classification (country/region/documentType) is serialized as {"id": ..., "rawValue": ...}.
+    // `id` is null when the class was delivered via OTA and isn't known to this compiled enum;
+    // `rawValue` is always populated. `empty` is derived — v8001's DocumentClassInfo has no
+    // isEmpty()/empty member of its own — as "no classification was detected at all".
     private fun serializeDocumentClassInfo(documentClassInfo: DocumentClassInfo): Map<String, Any?> {
         val documentClassInfoDict: MutableMap<String, Any?> = mutableMapOf()
-        documentClassInfo.country?.name?.let {
-            documentClassInfoDict["country"] = it.replaceFirstChar { char -> char.lowercase() }
+        documentClassInfo.country?.let {
+            documentClassInfoDict["country"] = mapOf(
+                "id" to it.id?.let { id -> serializeEnumName(id.name) },
+                "rawValue" to it.rawValue,
+            )
         }
-        documentClassInfo.region?.name?.let {
-            documentClassInfoDict["region"] = it.replaceFirstChar { char -> char.lowercase() }
+        documentClassInfo.region?.let {
+            documentClassInfoDict["region"] = mapOf(
+                "id" to it.id?.let { id -> serializeEnumName(id.name) },
+                "rawValue" to it.rawValue,
+            )
         }
-        documentClassInfo.type?.name?.let {
-            documentClassInfoDict["documentType"] = it.replaceFirstChar { char -> char.lowercase() }
+        documentClassInfo.documentType?.let {
+            documentClassInfoDict["documentType"] = mapOf(
+                "id" to it.id?.let { id -> serializeEnumName(id.name) },
+                "rawValue" to it.rawValue,
+            )
         }
+        documentClassInfoDict["empty"] =
+            documentClassInfo.country == null &&
+            documentClassInfo.region == null &&
+            documentClassInfo.documentType == null
         documentClassInfo.countryName?.let {
             documentClassInfoDict["countryName"] = it
+        }
+        documentClassInfo.isoNumericCountryCode?.let {
+            documentClassInfoDict["isoNumericCountryCode"] = it
         }
         documentClassInfo.isoAlpha2CountryCode?.let {
             documentClassInfoDict["isoAlpha2CountryCode"] = it
@@ -299,6 +323,32 @@ object BlinkIdSerializationUtils {
             documentClassInfoDict["isoAlpha3CountryCode"] = it
         }
         return documentClassInfoDict
+    }
+
+    // Converts a Kotlin PascalCase enum constant name (e.g. "AwaitingMoreStableInputImages") to the
+    // lowerCamel wire format the Dart @JsonValue annotations expect (e.g. "awaitingMoreStableInputImages").
+    private fun serializeEnumName(name: String): String = name.replaceFirstChar { char -> char.lowercase() }
+
+    // Serializes the per-frame analysis result reported alongside a DirectAPI scan, for the
+    // performDirectApiScanWithAnalysis method channel.
+    fun serializeInputImageAnalysisResult(analysisResult: InputImageAnalysisResult?): Map<String, Any?> {
+        if (analysisResult == null) return emptyMap()
+        val dict: MutableMap<String, Any?> = mutableMapOf()
+        dict["processingStatus"] = serializeEnumName(analysisResult.processingStatus.name)
+        dict["inputImageCropAnalysis"] = serializeEnumName(analysisResult.inputImageCropAnalysis.name)
+        dict["vizExtractionType"] = serializeEnumName(analysisResult.vizExtractionType.name)
+        dict["documentDetectionStatus"] = serializeEnumName(analysisResult.documentDetectionStatus.name)
+        dict["blurDetectionStatus"] = serializeEnumName(analysisResult.blurDetectionStatus.name)
+        dict["glareDetectionStatus"] = serializeEnumName(analysisResult.glareDetectionStatus.name)
+        dict["scanningSide"] = serializeEnumName(analysisResult.scanningSide.name)
+        analysisResult.documentClassInfo?.let {
+            dict["documentClassInfo"] = serializeDocumentClassInfo(it)
+        }
+        dict["missingMandatoryFields"] = analysisResult.missingMandatoryFields.map { serializeEnumName(it.name) }
+        dict["extractedFields"] = analysisResult.extractedFields.map { serializeEnumName(it.name) }
+        dict["invalidCharacterFields"] = analysisResult.invalidCharacterFields.map { serializeEnumName(it.name) }
+        dict["extraPresentFields"] = analysisResult.extraPresentFields.map { serializeEnumName(it.name) }
+        return dict
     }
 
     private fun serializeDataMatchResult(dataMatchResult: DataMatchResult): Map<String, Any?> =
@@ -711,6 +761,9 @@ object BlinkIdSerializationUtils {
         vizResult?.workRestriction?.let {
             vizResultDict["workRestriction"] = serializeStringResult(it)
         }
+        vizResult?.ethnicity?.let {
+            vizResultDict["ethnicity"] = serializeStringResult(it)
+        }
         return vizResultDict
     }
 
@@ -748,6 +801,9 @@ object BlinkIdSerializationUtils {
         }
         parentInfo.lastName?.let {
             parentInfoDict["lastName"] = serializeStringResult(it)
+        }
+        parentInfo.fullName?.let {
+            parentInfoDict["fullName"] = serializeStringResult(it)
         }
         return parentInfoDict
     }
