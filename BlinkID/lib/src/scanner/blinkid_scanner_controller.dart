@@ -278,6 +278,12 @@ class BlinkIdScannerController extends ChangeNotifier {
     switch (_status) {
       case BlinkIdScannerStatus.scanning || BlinkIdScannerStatus.processing:
         _abortWithCancel();
+      case BlinkIdScannerStatus.initializing:
+        final pending = List<Completer<void>>.from(_pendingReady);
+        _pendingReady.clear();
+        for (final c in pending) {
+          if (!c.isCompleted) c.completeError(const BlinkIdScanCancelException());
+        }
       default:
         break;
     }
@@ -410,9 +416,12 @@ class BlinkIdScannerController extends ChangeNotifier {
   void _setDebugLogging(bool enabled) => _methodChannel?.invokeMethod<void>('setDebugLogging', enabled).ignore();
 
   BlinkIdScanningResult _parseResult(dynamic rawArgs) {
+    // Native sends a JSON string. jsonDecode produces Map<String, dynamic> at
+    // every nesting level, avoiding the Map<Object?, Object?> that
+    // StandardMessageCodec would produce for a method-channel map argument.
     final Map<String, dynamic> json = switch (rawArgs) {
-      final Map m => Map<String, dynamic>.from(m),
-      final String s => Map<String, dynamic>.from(jsonDecode(s) as Map),
+      final String s => jsonDecode(s) as Map<String, dynamic>,
+      final Map m => Map<String, dynamic>.fromEntries(m.entries.map((e) => MapEntry(e.key as String, e.value))),
       _ => throw ArgumentError('Unexpected scan result type: ${rawArgs?.runtimeType}'),
     };
     return BlinkIdScanningResult(json);

@@ -2,20 +2,23 @@ import 'package:flutter/foundation.dart';
 
 /// Guidance states emitted by [BlinkIdScannerController.guidanceStream].
 ///
-/// Android-verified DetectionStatus mapping (from compiled SDK):
-///   CameraTooFar              → tooFar
-///   CameraTooClose            → tooClose
-///   DocumentTooCloseToCameraEdge → tooCloseToEdge
-///   CameraAngleTooSteep       → tilted
-///   DocumentPartiallyVisible  → notFullyVisible
-///   Success / Failed          → searching
+/// Both platforms emit a guidance string per frame.  Mapping:
+///
+///   wrongSide          — ProcessingStatus.ScanningWrongSide
+///   blur               — blurDetectionStatus == Detected
+///   glare              — glareDetectionStatus == Detected
+///   tooFar             — DetectionStatus.CameraTooFar
+///   tooClose           — DetectionStatus.CameraTooClose
+///   tooCloseToEdge     — DetectionStatus.DocumentTooCloseToCameraEdge
+///   tilted             — DetectionStatus.CameraAngleTooSteep
+///   notFullyVisible    — DetectionStatus.DocumentPartiallyVisible
+///   searching          — DetectionStatus.Success / Failed (fallback)
 ///
 /// [flipDocument] is NOT a DetectionStatus — it is emitted by the controller
 /// when ScanningStatus.SideScanned fires (front side complete). The guidance
 /// stream goes silent during the flip phase; use [BlinkIdScanPhase] instead.
 ///
-/// blur / glare / holdStill / lowLight / tooMuchLight are reserved for iOS;
-/// Android's DetectionStatus does not include these cases.
+/// holdStill / lowLight / tooMuchLight are reserved for forward-compat.
 sealed class BlinkIdGuidance {
   const BlinkIdGuidance._();
 
@@ -33,10 +36,12 @@ sealed class BlinkIdGuidance {
   // --- Wrong side (emitted to stream; no phase change) ---
   const factory BlinkIdGuidance.wrongSide() = BlinkIdGuidanceWrongSide;
 
-  // --- Reserved (not emitted by either platform SDK; kept for forward-compat) ---
-  const factory BlinkIdGuidance.holdStill() = BlinkIdGuidanceHoldStill;
+  // --- Quality hints (emitted by both platforms when detected) ---
   const factory BlinkIdGuidance.blur() = BlinkIdGuidanceBlur;
   const factory BlinkIdGuidance.glare() = BlinkIdGuidanceGlare;
+
+  // --- Reserved (not emitted by either platform SDK; kept for forward-compat) ---
+  const factory BlinkIdGuidance.holdStill() = BlinkIdGuidanceHoldStill;
   const factory BlinkIdGuidance.lowLight() = BlinkIdGuidanceLowLight;
   const factory BlinkIdGuidance.tooMuchLight() = BlinkIdGuidanceTooMuchLight;
 

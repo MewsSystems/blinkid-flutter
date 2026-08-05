@@ -21,6 +21,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import com.microblink.blinkid.core.BlinkIdSdk
 import com.microblink.blinkid.core.image.InputImage
+import com.microblink.blinkid.core.result.ImageAnalysisDetectionStatus
 import com.microblink.blinkid.core.result.ProcessingStatus
 import com.microblink.blinkid.core.result.ScanningStatus
 import com.microblink.blinkid.core.session.BlinkIdScanningSession
@@ -155,6 +156,12 @@ class BlinkIdScannerView(
 
             "dispose" -> {
                 dispose()
+                // Dart sends 'cancel' before 'dispose' on the same binary-messenger
+                // queue, so by the time we reach here the EventChannel 'onCancel'
+                // has already fired and guidanceEventSink is null.  Clearing the
+                // handler now releases the StreamHandler→this strong reference
+                // without any risk of a MissingPluginException.
+                eventChannel.setStreamHandler(null)
                 result.success(null)
             }
 
@@ -312,15 +319,13 @@ class BlinkIdScannerView(
                                     val scanResult = withContext(Dispatchers.Default) { session.getResult(null) }
                                     if (scanningSession !== session) return@launch
                                     if (scanResult.isSuccess) {
-                                        val resultMap =
+                                        val jsonString =
                                             withContext(Dispatchers.Default) {
-                                                val jsonString =
-                                                    BlinkIdSerializationUtils.serializeBlinkIdScanningResult(
-                                                        scanResult.getOrNull(),
-                                                    )
-                                                jsonString?.let { org.json.JSONObject(it).toNestedMap() }
+                                                BlinkIdSerializationUtils.serializeBlinkIdScanningResult(
+                                                    scanResult.getOrNull(),
+                                                )
                                             }
-                                        methodChannel.invokeMethod("onScanResult", resultMap)
+                                        methodChannel.invokeMethod("onScanResult", jsonString)
                                     } else {
                                         val err = scanResult.exceptionOrNull()?.message ?: "Scan failed"
                                         if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", "getResult() failed: $err")
@@ -341,13 +346,13 @@ class BlinkIdScannerView(
                             }
 
                             else -> {
-                                val processingStatus = frameResult.inputImageAnalysisResult.processingStatus
-                                val guidance =
-                                    if (processingStatus == ProcessingStatus.ScanningWrongSide) {
-                                        "wrongSide"
-                                    } else {
-                                        detectionStatus.toGuidanceString()
-                                    }
+                                val ia = frameResult.inputImageAnalysisResult
+                                val guidance = when {
+                                    ia.processingStatus == ProcessingStatus.ScanningWrongSide -> "wrongSide"
+                                    ia.blurDetectionStatus == ImageAnalysisDetectionStatus.Detected -> "blur"
+                                    ia.glareDetectionStatus == ImageAnalysisDetectionStatus.Detected -> "glare"
+                                    else -> detectionStatus.toGuidanceString()
+                                }
                                 scope.launch {
                                     if (scanningSession !== session) return@launch
                                     guidanceEventSink?.success(guidance)
@@ -398,33 +403,13 @@ class BlinkIdScannerView(
         analysisExecutor.shutdown()
         scope.cancel()
         methodChannel.setMethodCallHandler(null)
-        eventChannel.setStreamHandler(null)
+        // Null the sink immediately so no guidance events are emitted after
+        // disposal (covers the engine-direct PlatformView.dispose() path).
+        // The StreamHandler itself is unregistered in the "dispose" method-
+        // channel handler, which runs after Dart's 'cancel' has already arrived.
+        guidanceEventSink = null
     }
 }
-
-private fun org.json.JSONObject.toNestedMap(): Map<String, Any?> {
-    val map = mutableMapOf<String, Any?>()
-    for (key in keys()) {
-        map[key] =
-            when (val v = get(key)) {
-                is org.json.JSONObject -> v.toNestedMap()
-                is org.json.JSONArray -> v.toNestedList()
-                org.json.JSONObject.NULL -> null
-                else -> v
-            }
-    }
-    return map
-}
-
-private fun org.json.JSONArray.toNestedList(): List<Any?> =
-    (0 until length()).map { i ->
-        when (val v = get(i)) {
-            is org.json.JSONObject -> v.toNestedMap()
-            is org.json.JSONArray -> v.toNestedList()
-            org.json.JSONObject.NULL -> null
-            else -> v
-        }
-    }
 
 private fun DetectionStatus.toGuidanceString(): String =
     when (this) {

@@ -131,6 +131,11 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
       result(nil)
     case "dispose":
       teardown()
+      // Dart sends 'cancel' before 'dispose' on the same binary-messenger
+      // queue, so onCancel has already fired and guidanceEventSink is nil.
+      // Clearing the handler now releases the strong reference without risk
+      // of MissingPluginException.
+      eventChannel.setStreamHandler(nil)
       result(nil)
     default:
       result(FlutterMethodNotImplemented)
@@ -301,7 +306,10 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     captureSession = nil
     previewLayer?.removeFromSuperlayer()
     methodChannel.setMethodCallHandler(nil)
-    eventChannel.setStreamHandler(nil)
+    // Null the sink immediately so no events are emitted after teardown.
+    // The StreamHandler is unregistered in the "dispose" method-channel
+    // handler, which runs after Dart's 'cancel' has already arrived.
+    guidanceEventSink = nil
   }
 }
 
@@ -340,10 +348,15 @@ extension BlinkIdScannerView: AVCaptureVideoDataOutputSampleBufferDelegate {
             guard self.blinkIdSession === session else { return }
             self.guidanceEventSink?("wrongSide")
           }
-        } else if let detectionStatus = frameResult.processResult?.inputImageAnalysisResult
-          .documentDetectionStatus
-        {
-          let guidance = detectionStatus.guidanceString
+        } else if let ia = frameResult.processResult?.inputImageAnalysisResult {
+          let guidance: String
+          if ia.blurDetectionStatus == .detected {
+            guidance = "blur"
+          } else if ia.glareDetectionStatus == .detected {
+            guidance = "glare"
+          } else {
+            guidance = ia.documentDetectionStatus.guidanceString
+          }
           await MainActor.run {
             guard self.blinkIdSession === session else { return }
             self.guidanceEventSink?(guidance)
@@ -389,18 +402,12 @@ extension BlinkIdScannerView: AVCaptureVideoDataOutputSampleBufferDelegate {
           }
           let scanResult = session.getResult(redactionSettings: nil)
           let jsonString = BlinkIdSerializationUtils.serializeBlinkIdScanningResult(scanResult)
-          let resultDict: [String: Any]? = jsonString.flatMap { str in
-            guard let data = str.data(using: .utf8),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-            else { return nil }
-            return obj
-          }
           await MainActor.run {
             guard self.blinkIdSession === session else {
               self._lock.withLock { self.isProcessingResult = false }
               return
             }
-            self.methodChannel.invokeMethod("onScanResult", arguments: resultDict)
+            self.methodChannel.invokeMethod("onScanResult", arguments: jsonString)
             self._lock.withLock {
               self.blinkIdSession = nil
               self.isProcessingResult = false
