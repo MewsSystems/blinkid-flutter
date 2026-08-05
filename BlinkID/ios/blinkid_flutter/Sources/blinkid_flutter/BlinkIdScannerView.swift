@@ -37,6 +37,13 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
   private var preferredCameraOverride: String?
   private var pendingCameraResult: FlutterResult?
 
+  // Serializes AVCaptureSession.startRunning()/stopRunning() — both are
+  // documented by Apple as blocking, so neither belongs on the main thread.
+  // Being one serial queue, fed only from the main thread in call order,
+  // also prevents a stale session's queued start from running after a later
+  // switchCamera()/teardown() has already stopped and detached it.
+  private let sessionQueue: DispatchQueue
+
   init(
     frame: CGRect,
     viewId: Int64,
@@ -57,6 +64,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
       name: "com.microblink.blinkid.flutter/scanner/\(viewId)/guidance",
       binaryMessenger: messenger,
     )
+    sessionQueue = DispatchQueue(label: "com.microblink.blinkid.scanner.session.\(viewId)")
 
     super.init()
 
@@ -264,11 +272,19 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
   }
 
   private func stopCaptureSession() {
-    captureSession?.stopRunning()
+    let session = captureSession
     captureSession = nil
     previewLayer?.removeFromSuperlayer()
     previewLayer = nil
     videoOutput = nil
+    // stopRunning() is a blocking call (Apple's docs warn against calling it
+    // on the main thread). All start/stop calls share sessionQueue, and it's
+    // serial, so — since every enqueue below happens from the main thread in
+    // call order — this stop is guaranteed to run after this same session's
+    // own queued startRunning() and before any subsequent session's start.
+    // That ordering alone is what prevents a stale session from being
+    // resurrected after being detached here; no generation tracking needed.
+    sessionQueue.async { session?.stopRunning() }
   }
 
   private func performCameraSetup() {
@@ -328,7 +344,10 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     updateVideoOrientation()
 
     completeCameraResult(resolvedLens: resolvedLens, error: nil)
-    DispatchQueue.global(qos: .userInitiated).async { session.startRunning() }
+    // See stopCaptureSession()'s comment: sharing one serial queue for every
+    // start/stop call, always enqueued in main-thread call order, is what
+    // keeps this session's start from running after a later stop/start.
+    sessionQueue.async { session.startRunning() }
   }
 
   // Returns the position that will actually be bound: .front only if
@@ -365,9 +384,11 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
       isScanning = false
       blinkIdSession = nil
     }
-    captureSession?.stopRunning()
+    let session = captureSession
     captureSession = nil
     previewLayer?.removeFromSuperlayer()
+    // See stopCaptureSession()'s comment — same reasoning applies here.
+    sessionQueue.async { session?.stopRunning() }
     methodChannel.setMethodCallHandler(nil)
     // Null the sink immediately so no events are emitted after teardown.
     // The StreamHandler is unregistered in the "dispose" method-channel
