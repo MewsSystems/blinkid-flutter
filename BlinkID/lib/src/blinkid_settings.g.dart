@@ -60,36 +60,13 @@ const _$ScanningModeEnumMap = {
   ScanningMode.automatic: 'automatic',
 };
 
-BlinkIdScanningSettings _$BlinkIdScanningSettingsFromJson(
-  Map<String, dynamic> json,
-) => BlinkIdScanningSettings(
-  documentCaptureModule: json['documentCaptureModule'] == null
-      ? null
-      : DocumentCaptureModuleSettings.fromJson(
-          json['documentCaptureModule'] as Map<String, dynamic>,
-        ),
-  mrzModule: json['mrzModule'] == null
-      ? null
-      : MrzModuleSettings.fromJson(json['mrzModule'] as Map<String, dynamic>),
-  barcodeModule: json['barcodeModule'] == null
-      ? null
-      : BarcodeModuleSettings.fromJson(
-          json['barcodeModule'] as Map<String, dynamic>,
-        ),
-  vizModule: json['vizModule'] == null
-      ? null
-      : VizModuleSettings.fromJson(json['vizModule'] as Map<String, dynamic>),
-  maxAllowedMismatchesPerField:
-      (json['maxAllowedMismatchesPerField'] as num?)?.toInt() ?? 0,
-);
-
 Map<String, dynamic> _$BlinkIdScanningSettingsToJson(
   BlinkIdScanningSettings instance,
 ) => <String, dynamic>{
-  'documentCaptureModule': ?instance.documentCaptureModule?.toJson(),
-  'mrzModule': ?instance.mrzModule?.toJson(),
-  'barcodeModule': ?instance.barcodeModule?.toJson(),
-  'vizModule': ?instance.vizModule?.toJson(),
+  'documentCaptureModule': instance.documentCaptureModule?.toJson(),
+  'mrzModule': instance.mrzModule?.toJson(),
+  'barcodeModule': instance.barcodeModule?.toJson(),
+  'vizModule': instance.vizModule?.toJson(),
   'maxAllowedMismatchesPerField': instance.maxAllowedMismatchesPerField,
 };
 

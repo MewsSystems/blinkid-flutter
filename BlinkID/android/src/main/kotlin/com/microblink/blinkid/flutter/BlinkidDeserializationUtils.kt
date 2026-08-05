@@ -95,44 +95,52 @@ object BlinkIdDeserializationUtils {
 
     private fun deserializeScanningSettings(scanningSettingsMap: Map<String, Any>?): ScanningSettings {
         if (scanningSettingsMap == null) return ScanningSettings()
-        val documentCaptureModule =
-            optionalDocumentCaptureModuleSettings(
-                scanningSettingsMap["documentCaptureModule"],
-            )
-        val barcodeModule = optionalBarcodeModuleSettings(scanningSettingsMap["barcodeModule"])
-        val mrzModule = optionalMrzModuleSettings(scanningSettingsMap["mrzModule"])
-        val vizModule = optionalVizModuleSettings(scanningSettingsMap["vizModule"])
-        // Absent or null key → use SDK default (extraction enabled), mirroring iOS where only
-        // NSNull explicitly disables a module. Passing null to ScanningSettings disables extraction.
+        // Absent key → SDK default (module enabled). Present-but-null key → explicit
         return ScanningSettings(
-            documentCaptureModule = documentCaptureModule ?: DocumentCaptureModuleSettings(),
-            barcodeModule = barcodeModule ?: BarcodeModuleSettings(),
-            mrzModule = mrzModule ?: MrzModuleSettings(),
-            vizModule = vizModule ?: VizModuleSettings(),
+            documentCaptureModule =
+                resolveModuleSettings(
+                    scanningSettingsMap,
+                    "documentCaptureModule",
+                    DocumentCaptureModuleSettings(),
+                    ::deserializeDocumentCaptureModuleSettings,
+                ),
+            barcodeModule =
+                resolveModuleSettings(
+                    scanningSettingsMap,
+                    "barcodeModule",
+                    BarcodeModuleSettings(),
+                    ::deserializeBarcodeModuleSettings,
+                ),
+            mrzModule =
+                resolveModuleSettings(
+                    scanningSettingsMap,
+                    "mrzModule",
+                    MrzModuleSettings(),
+                    ::deserializeMrzModuleSettings,
+                ),
+            vizModule =
+                resolveModuleSettings(
+                    scanningSettingsMap,
+                    "vizModule",
+                    VizModuleSettings(),
+                    ::deserializeVizModuleSettings,
+                ),
             maxAllowedMismatchesPerField =
                 (scanningSettingsMap["maxAllowedMismatchesPerField"] as? Int)?.toUInt()
                     ?: 0u,
         )
     }
 
-    private fun optionalDocumentCaptureModuleSettings(value: Any?): DocumentCaptureModuleSettings? {
-        val map = value as? Map<String, Any> ?: return null
-        return deserializeDocumentCaptureModuleSettings(map)
-    }
-
-    private fun optionalBarcodeModuleSettings(value: Any?): BarcodeModuleSettings? {
-        val map = value as? Map<String, Any> ?: return null
-        return deserializeBarcodeModuleSettings(map)
-    }
-
-    private fun optionalMrzModuleSettings(value: Any?): MrzModuleSettings? {
-        val map = value as? Map<String, Any> ?: return null
-        return deserializeMrzModuleSettings(map)
-    }
-
-    private fun optionalVizModuleSettings(value: Any?): VizModuleSettings? {
-        val map = value as? Map<String, Any> ?: return null
-        return deserializeVizModuleSettings(map)
+    private fun <T> resolveModuleSettings(
+        map: Map<String, Any>,
+        key: String,
+        default: T,
+        deserialize: (Map<String, Any>) -> T,
+    ): T? {
+        if (!map.containsKey(key)) return default
+        val value = map[key] ?: return null
+        val moduleMap = value as? Map<String, Any> ?: return default
+        return deserialize(moduleMap)
     }
 
     private fun deserializeDocumentCaptureModuleSettings(map: Map<String, Any>): DocumentCaptureModuleSettings =
@@ -288,12 +296,14 @@ object BlinkIdDeserializationUtils {
             }
         if (entries.isEmpty()) return null
 
-        Log.i(
-            TAG,
-            "deserializeRedactionSettingsResolver entries=${entries.size}, " +
-                "modes=${entries.map { it.settings.redactionMode }}, " +
-                "fieldCounts=${entries.map { it.settings.fields.size }}",
-        )
+        if (Log.isLoggable(TAG, Log.DEBUG)) {
+            Log.d(
+                TAG,
+                "deserializeRedactionSettingsResolver entries=${entries.size}, " +
+                    "modes=${entries.map { it.settings.redactionMode }}, " +
+                    "fieldCounts=${entries.map { it.settings.fields.size }}",
+            )
+        }
         return CustomRedactionSettingsResolver(entries)
     }
 
@@ -443,15 +453,16 @@ object BlinkIdDeserializationUtils {
         scanningSettingsMap: Map<String, Any>?,
         scanningSettings: ScanningSettings,
     ) {
-        Log.i(TAG, "[$source] scanningMode=${sessionMap["scanningMode"]}")
-        Log.i(
+        if (!Log.isLoggable(TAG, Log.DEBUG)) return
+        Log.d(TAG, "[$source] scanningMode=${sessionMap["scanningMode"]}")
+        Log.d(
             TAG,
             "[$source] raw modules: documentCapture=${scanningSettingsMap?.get("documentCaptureModule")}, " +
                 "barcode=${scanningSettingsMap?.get("barcodeModule")}, " +
                 "mrz=${scanningSettingsMap?.get("mrzModule")}, " +
                 "viz=${scanningSettingsMap?.get("vizModule")}",
         )
-        Log.i(
+        Log.d(
             TAG,
             "[$source] deserialized modules: documentCapture=${scanningSettings.documentCaptureModule}, " +
                 "barcode=${scanningSettings.barcodeModule}, " +
@@ -459,13 +470,13 @@ object BlinkIdDeserializationUtils {
                 "viz=${scanningSettings.vizModule}",
         )
         scanningSettings.barcodeModule?.let {
-            Log.i(TAG, "[$source] barcode.presenceMandatory=${it.presenceMandatory}")
+            Log.d(TAG, "[$source] barcode.presenceMandatory=${it.presenceMandatory}")
         }
         scanningSettings.mrzModule?.let {
-            Log.i(TAG, "[$source] mrz.presenceMandatory=${it.presenceMandatory}")
+            Log.d(TAG, "[$source] mrz.presenceMandatory=${it.presenceMandatory}")
         }
         scanningSettings.vizModule?.let {
-            Log.i(TAG, "[$source] viz.presenceMandatory=${it.presenceMandatory}")
+            Log.d(TAG, "[$source] viz.presenceMandatory=${it.presenceMandatory}")
         }
     }
 }
@@ -505,27 +516,32 @@ private class CustomRedactionSettingsResolver(
 ) : RedactionSettingsResolver,
     Parcelable {
     override fun resolveRedactionSettings(classInfo: DocumentClassInfo): RedactionSettings? {
+        val debugLoggable = Log.isLoggable(BlinkIdDeserializationUtils.TAG, Log.DEBUG)
         for (entry in entries) {
             if (shouldUseRedactionSettings(entry.documentFilters, classInfo)) {
-                Log.i(
-                    BlinkIdDeserializationUtils.TAG,
-                    "resolveRedactionSettings matched class=${classInfo.country}/" +
-                        "${classInfo.region}/${classInfo.type}, mode=${entry.settings.redactionMode}, " +
-                        "fields=${entry.settings.fields.size}",
-                )
+                if (debugLoggable) {
+                    Log.d(
+                        BlinkIdDeserializationUtils.TAG,
+                        "resolveRedactionSettings matched class=${classInfo.country}/" +
+                            "${classInfo.region}/${classInfo.type}, mode=${entry.settings.redactionMode}, " +
+                            "fields=${entry.settings.fields.size}",
+                    )
+                }
                 return entry.settings
             }
         }
-        Log.i(
-            BlinkIdDeserializationUtils.TAG,
-            "resolveRedactionSettings no matching entry for class=${classInfo.country}/" +
-                "${classInfo.region}/${classInfo.type}, " +
-                "filters=${entries.map { entry ->
-                    entry.documentFilters.map { filter ->
-                        "${filter.country}/${filter.region}/${filter.documentType}"
-                    }
-                }}",
-        )
+        if (debugLoggable) {
+            Log.d(
+                BlinkIdDeserializationUtils.TAG,
+                "resolveRedactionSettings no matching entry for class=${classInfo.country}/" +
+                    "${classInfo.region}/${classInfo.type}, " +
+                    "filters=${entries.map { entry ->
+                        entry.documentFilters.map { filter ->
+                            "${filter.country}/${filter.region}/${filter.documentType}"
+                        }
+                    }}",
+            )
+        }
         return null
     }
 

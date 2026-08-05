@@ -147,6 +147,8 @@ id("org.jetbrains.kotlin.android") version "2.2.21" apply false
 
 No Jetpack Compose setup is required in your app. The plugin uses BlinkID's Activity-based scanning flow (`MbBlinkIdScan`); Compose runtime libraries are resolved transitively through the plugin. If your app already uses Compose for its own UI, you can keep your existing Compose configuration — the plugin does not declare a Compose BOM.
 
+The plugin's own manifest declares `android.permission.CAMERA` (merged into your app's manifest automatically) — you do not need to add it yourself. The plugin requests it at runtime before starting the camera (both `performScan` and `BlinkIdScannerView`); see [Camera permission](#camera-permission) under Custom scanner UI for the denial-handling flow.
+
 ### 5. iOS — permissions and deployment target
 Set the minimum iOS deployment target to **16.0** in your Xcode project (or `ios/Podfile` / `IPHONEOS_DEPLOYMENT_TARGET` in xcconfig files).
 
@@ -235,7 +237,7 @@ final classFilter = ClassFilter()
   ];
 ```
 
-> **Tip:** Set a module to `null` (or omit it) to disable that module entirely. For example, an MRZ-only passport flow can use `BlinkIdScanningSettings(mrzModule: MrzModuleSettings())` with all other modules omitted.
+> **Tip:** Leave a module **unset** for the SDK default (enabled). Set it explicitly to **`null`** to disable that module entirely — omitting it is not the same as disabling it. For example, an MRZ-only passport flow must null out the other three: `BlinkIdScanningSettings(mrzModule: MrzModuleSettings(), documentCaptureModule: null, barcodeModule: null, vizModule: null)`.
 
 ### 4. Scan and handle results
 ```dart
@@ -301,16 +303,21 @@ BlinkIdScanningSettings(
     passportDataPageScanOnly: true,
   ),
   mrzModule: MrzModuleSettings(),
+  barcodeModule: null, // explicitly disabled — see the Tip above
+  vizModule: null,
 )
 ```
 
 **Standalone barcode scanning** — disable document capture; enable only barcode formats you need:
 ```dart
 BlinkIdScanningSettings(
+  documentCaptureModule: null, // required: retail formats need capture disabled
   barcodeModule: BarcodeModuleSettings(
     pdf417ScanningEnabled: true,
     qrScanningEnabled: true,
   ),
+  mrzModule: null,
+  vizModule: null,
 )
 ```
 
@@ -377,7 +384,7 @@ For `ScanningMode.automatic`, `firstImage` should be the front side and `secondI
 |:------|:------------|
 | `BlinkIdScannerController` | `ChangeNotifier` that manages scan state, phase, and guidance. Create one instance per scan screen. |
 | `BlinkIdScannerView` | Platform view widget that renders the camera surface. Mount it once the controller is initialized. |
-| `BlinkIdScannerStatus` | Scan lifecycle: `uninitialized` → `loadingSdk` → `initializing` → `ready` → `scanning` → `processing` → `done` (or `error`). |
+| `BlinkIdScannerStatus` | Scan lifecycle: `uninitialized` → `loadingSdk` → `initializing` → `ready` → `scanning` → `processing` → `done` (or `error`, or `cameraPermissionRequired` — see [Camera permission](#camera-permission)). |
 | `BlinkIdScanPhase` | Current side: `front`, `flip` (waiting for user to flip document), `back`. |
 | `BlinkIdGuidance` | Per-frame detection guidance sealed class (see below). |
 
@@ -497,14 +504,32 @@ await _controller.initialize(
 );
 ```
 
-To switch cameras at runtime call `switchCamera()`. It cancels any in-progress scan (the current `scan()` future completes with `BlinkIdScanCameraSwitchException`), rebinds the native camera, and returns once the controller is back in `ready` state. Call `scan()` again to resume:
+To switch cameras at runtime call `switchCamera()`. It cancels any in-progress scan (the current `scan()` future completes with `BlinkIdScanCameraSwitchException`), rebinds the native camera, and returns once the controller is back in `ready` state — which is only reached once the camera has actually bound, not merely dispatched. Call `scan()` again to resume:
 
 ```dart
-await _controller.switchCamera(PreferredCamera.front);
+final activeCamera = await _controller.switchCamera(PreferredCamera.front);
 final result = await _controller.scan();
 ```
 
-`switchCamera()` throws `StateError` if the platform view is not yet attached or the controller is in `uninitialized` / `error` state.
+`switchCamera()` returns the lens actually bound, which **may differ from the request** — e.g. `front` silently resolves to `back` on a device with no front lens. The resolved value is also available afterwards via `controller.activeCamera`.
+
+`switchCamera()` throws `StateError` if the platform view is not yet attached or if `status` doesn't support switching (`uninitialized`, `loadingSdk`, `initializing`, `error`, or `cameraPermissionRequired`).
+
+##### <a name="camera-permission"></a> Camera permission
+
+The plugin requests `CAMERA` itself — both platforms show the system permission prompt before the first camera bind. If it's denied, `status` becomes `BlinkIdScannerStatus.cameraPermissionRequired` and any in-progress `scan()` completes with `BlinkIdCameraPermissionException`; check `exception.permanentlyDenied` (or `controller.lastPermissionException`) to decide between re-requesting and sending the user to system Settings. Once the host app has obtained the permission by its own means (e.g. via the `permission_handler` package, as in the example), call `controller.retryAfterPermissionGrant()` to resume:
+
+```dart
+} on BlinkIdCameraPermissionException catch (e) {
+  if (e.permanentlyDenied) {
+    await openAppSettings(); // permission_handler
+  } else if ((await Permission.camera.request()).isGranted) {
+    _controller.retryAfterPermissionGrant();
+  }
+}
+```
+
+No manifest changes are needed on Android — the plugin declares `CAMERA` itself (see "Android — minimum SDK and Kotlin version" under Plugin integration, above). On iOS, `NSCameraUsageDescription` in `Info.plist` (see "iOS — permissions and deployment target") is required, or the OS kills the app instead of prompting.
 
 ##### Debug logging
 

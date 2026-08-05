@@ -35,6 +35,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
   private var _startScanTask: Task<Void, Never>?
   private var cameraSetupFailed = false
   private var preferredCameraOverride: String?
+  private var pendingCameraResult: FlutterResult?
 
   init(
     frame: CGRect,
@@ -87,14 +88,28 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
 
     _lock.withLock { currentFrameOrientation = deviceOrientation.cameraFrameOrientation }
 
+    let isFront = preferredCameraOverride == "front"
+
     if #available(iOS 17.0, *) {
       let angle = deviceOrientation.videoRotationAngle
       videoOutput?.connection(with: .video)?.videoRotationAngle = angle
-      previewLayer?.connection?.videoRotationAngle = angle
+      // The front camera sensor is mounted 180° rotated relative to the back
+      // camera. In landscape this cancels out with the usual rotation, so we
+      // use the opposite landscape angle for the preview layer only. Portrait
+      // angles are the same for both cameras.
+      let previewAngle = (isFront && deviceOrientation.isLandscape)
+        ? deviceOrientation.frontCameraLandscapeRotationAngle : angle
+      previewLayer?.connection?.videoRotationAngle = previewAngle
     } else {
       let avOrientation = deviceOrientation.avCaptureOrientation
       videoOutput?.connection(with: .video)?.videoOrientation = avOrientation
-      previewLayer?.connection?.videoOrientation = avOrientation
+      let previewOrientation = (isFront && deviceOrientation.isLandscape)
+        ? deviceOrientation.frontCameraLandscapeAvOrientation : avOrientation
+      previewLayer?.connection?.videoOrientation = previewOrientation
+    }
+
+    if isFront {
+      previewLayer?.connection?.isVideoMirrored = true
     }
   }
 
@@ -103,6 +118,10 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     case "startScan":
       startScan(result: result)
     case "cancelScan":
+      // Abort an in-flight startScan so a session created after this cancel
+      // can never be installed — see startScan()'s checkCancellation().
+      _startScanTask?.cancel()
+      _startScanTask = nil
       _lock.withLock {
         isScanning = false
         isProcessingResult = false
@@ -113,19 +132,26 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
       _lock.withLock { isScanning = true }
       result(nil)
     case "retryCamera":
+      abortPendingCameraResult("Camera retry superseded")
+      pendingCameraResult = result
       cameraSetupFailed = false
       setupCamera()
-      result(nil)
     case "switchCamera":
+      _startScanTask?.cancel()
+      _startScanTask = nil
+      abortPendingCameraResult("Camera switch superseded")
       _lock.withLock {
         isScanning = false
         blinkIdSession = nil
       }
       preferredCameraOverride = call.arguments as? String
       cameraSetupFailed = false
+      // Deferred until the camera has actually rebound (or definitively
+      // failed) — see completeCameraResult(), called from performCameraSetup()
+      // and handleCameraPermissionDenied().
+      pendingCameraResult = result
       stopCaptureSession()
       setupCamera()
-      result(nil)
     case "setDebugLogging":
       _lock.withLock { debugLoggingEnabled = (call.arguments as? Bool) ?? false }
       result(nil)
@@ -208,10 +234,33 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
 
   private func handleCameraPermissionDenied(permanentlyDenied: Bool) {
     cameraSetupFailed = true
+    // No camera bind will happen on this pass — fail any deferred
+    // switchCamera/retryCamera result rather than leaving it pending forever.
+    completeCameraResult(
+      resolvedLens: nil,
+      error: permanentlyDenied ? "Camera permission permanently denied" : "Camera permission required",
+    )
     methodChannel.invokeMethod(
       "onPermissionRequired",
       arguments: ["permanentlyDenied": permanentlyDenied],
     )
+  }
+
+  private func abortPendingCameraResult(_ message: String) {
+    pendingCameraResult?(FlutterError(code: "blinkid_error", message: message, details: nil))
+    pendingCameraResult = nil
+  }
+
+  // Completes the deferred switchCamera/retryCamera result once the camera has
+  // actually bound (or definitively failed) — never on the calling turn.
+  private func completeCameraResult(resolvedLens: String?, error: String?) {
+    guard let pending = pendingCameraResult else { return }
+    pendingCameraResult = nil
+    if let error {
+      pending(FlutterError(code: "blinkid_error", message: error, details: nil))
+    } else {
+      pending(resolvedLens)
+    }
   }
 
   private func stopCaptureSession() {
@@ -228,12 +277,19 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
 
     let position = resolvePosition(
       preferredCameraOverride ?? creationParams["preferredCamera"] as? String)
+    let resolvedLens = position == .front ? "front" : "back"
+    // Pin the lens actually resolved — not the request — so a subsequent
+    // setupCamera() (permission grant, retry) doesn't re-attempt an
+    // unavailable lens, and so callers can be told what's really live.
+    preferredCameraOverride = resolvedLens
+
     guard
       let device = AVCaptureDevice.default(
         .builtInWideAngleCamera, for: .video, position: position),
       let input = try? AVCaptureDeviceInput(device: device)
     else {
       cameraSetupFailed = true
+      completeCameraResult(resolvedLens: nil, error: "Camera device unavailable")
       methodChannel.invokeMethod("onScanError", arguments: "Camera device unavailable")
       return
     }
@@ -247,6 +303,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
 
     guard session.canAddInput(input), session.canAddOutput(output) else {
       cameraSetupFailed = true
+      completeCameraResult(resolvedLens: nil, error: "Camera setup failed")
       methodChannel.invokeMethod("onScanError", arguments: "Camera setup failed")
       return
     }
@@ -262,16 +319,21 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     self.previewLayer = preview
     self.captureSession = session
 
-    // Apply initial orientation and mirroring after connections exist.
-    updateVideoOrientation()
+    // Disable automatic mirroring before updateVideoOrientation() so our
+    // manual isVideoMirrored call inside it isn't overridden by AVFoundation.
     if position == .front {
       preview.connection?.automaticallyAdjustsVideoMirroring = false
-      preview.connection?.isVideoMirrored = true
     }
+    // Apply initial orientation (and front-camera mirroring) after connections exist.
+    updateVideoOrientation()
 
+    completeCameraResult(resolvedLens: resolvedLens, error: nil)
     DispatchQueue.global(qos: .userInitiated).async { session.startRunning() }
   }
 
+  // Returns the position that will actually be bound: .front only if
+  // requested and available, .back otherwise (including any unrecognized
+  // request).
   private func resolvePosition(_ preferred: String?) -> AVCaptureDevice.Position {
     if preferred == "front",
       AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) != nil
@@ -295,6 +357,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
   private func teardown() {
     _startScanTask?.cancel()
     _startScanTask = nil
+    abortPendingCameraResult("Scanner disposed")
     NotificationCenter.default.removeObserver(
       self, name: UIDevice.orientationDidChangeNotification, object: nil)
     UIDevice.current.endGeneratingDeviceOrientationNotifications()
@@ -474,6 +537,27 @@ extension UIDeviceOrientation {
     default: return 90
     }
   }
+
+  // Front camera sensor is 180° rotated vs back in landscape, so swap the angles.
+  @available(iOS 17.0, *)
+  fileprivate var frontCameraLandscapeRotationAngle: CGFloat {
+    switch self {
+    case .landscapeLeft: return 180
+    case .landscapeRight: return 0
+    default: return videoRotationAngle
+    }
+  }
+
+  // Pre-iOS 17 equivalent: back camera inverts the UIDevice landscape axes to get
+  // AVCaptureVideoOrientation. Front camera skips the inversion (double-negative).
+  fileprivate var frontCameraLandscapeAvOrientation: AVCaptureVideoOrientation {
+    switch self {
+    case .landscapeLeft: return .landscapeLeft
+    case .landscapeRight: return .landscapeRight
+    default: return avCaptureOrientation
+    }
+  }
+
 }
 
 extension DetectionStatus {
