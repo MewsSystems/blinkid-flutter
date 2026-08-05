@@ -43,7 +43,7 @@ object BlinkIdDeserializationUtils {
     private const val DEFAULT_RESOURCE_DOWNLOAD_URL = "https://models.cdn.microblink.com/resources"
     private const val DEFAULT_RESOURCES_LOCAL_FOLDER = "MLModels"
     private const val DEFAULT_OTA_DOWNLOAD_URL = "https://blinkid-ota.microblink.com"
-    private const val DEFAULT_OTA_RESOURCES_LOCAL_FOLDER = "ota"
+    private const val DEFAULT_OTA_RESOURCES_LOCAL_FOLDER = "OTAMLModels"
 
     fun deserializeBlinkIdSdkSettings(blinkIdSdkSettingsMap: Map<String, Any>?): BlinkIdSdkSettings? {
         val licenseKey = blinkIdSdkSettingsMap?.get("licenseKey") as? String ?: return null
