@@ -442,19 +442,6 @@ struct BlinkIdDeserializationUtils {
   }
 
   static func deserializeRedactionSettings(_ redactionDict: [String: Any]) -> RedactionSettings? {
-    guard let fieldsRaw = toStringList(redactionDict["fields"]), !fieldsRaw.isEmpty else {
-      print(
-        "[BlinkIdFlutter] deserializeRedactionSettings: no fields deserialized from \(String(describing: redactionDict["fields"]))"
-      )
-      return nil
-    }
-    let fieldTypes: [FieldType] = fieldsRaw.compactMap { FieldType(rawValue: $0) }
-    if fieldTypes.isEmpty {
-      print(
-        "[BlinkIdFlutter] deserializeRedactionSettings: no valid FieldType values in \(fieldsRaw)")
-      return nil
-    }
-
     let mode: RedactionMode
     if let modeRaw = redactionDict["mode"] as? String,
       let parsedMode = RedactionMode(rawValue: modeRaw)
@@ -462,6 +449,16 @@ struct BlinkIdDeserializationUtils {
       mode = parsedMode
     } else {
       mode = .fullResult
+    }
+
+    let fieldsRaw = toStringList(redactionDict["fields"]) ?? []
+    let fieldTypes: [FieldType] = fieldsRaw.compactMap { FieldType(rawValue: $0) }
+    // Empty fields is intentional for `mode: none` (no redaction requested) — only
+    // warn when a redaction mode was actually requested but nothing was deserialized.
+    if fieldTypes.isEmpty && mode != .none {
+      print(
+        "[BlinkIdFlutter] deserializeRedactionSettings: no fields deserialized from \(String(describing: redactionDict["fields"]))"
+      )
     }
 
     let redactBarcode = redactionDict["redactBarcodeResult"] as? Bool ?? false

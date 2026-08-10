@@ -307,7 +307,7 @@ object BlinkIdDeserializationUtils {
             toStringList(redactionSettingsMap["fields"])?.map {
                 enumValueOf<FieldType>(it.replaceFirstChar { char -> char.uppercase() })
             } ?: emptyList()
-        if (fields.isEmpty()) {
+        if (fields.isEmpty() && mode != RedactionMode.None) {
             Log.w(
                 TAG,
                 "deserializeRedactionSettings: no fields deserialized from ${redactionSettingsMap["fields"]}",

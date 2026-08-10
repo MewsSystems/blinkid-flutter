@@ -141,6 +141,7 @@ class BlinkIdScannerController extends ChangeNotifier {
     BlinkIdSdkSettings sdkSettings,
     BlinkIdSessionSettings sessionSettings, {
     PreferredCamera preferredCamera = PreferredCamera.back,
+    RedactionSettings? redactionSettings,
   }) async {
     if (_status != BlinkIdScannerStatus.uninitialized) return;
     _setStatus(BlinkIdScannerStatus.loadingSdk);
@@ -155,6 +156,7 @@ class BlinkIdScannerController extends ChangeNotifier {
       'sdkSettings': sdkSettings.toJson(),
       'sessionSettings': sessionSettings.toJson(),
       'preferredCamera': preferredCamera.name,
+      if (redactionSettings != null) 'redactionSettings': redactionSettings.toJson(),
     };
   }
 
