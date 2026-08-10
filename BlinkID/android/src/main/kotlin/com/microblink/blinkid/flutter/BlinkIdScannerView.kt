@@ -26,6 +26,7 @@ import com.microblink.blinkid.core.result.ProcessingStatus
 import com.microblink.blinkid.core.result.ScanningStatus
 import com.microblink.blinkid.core.session.BlinkIdScanningSession
 import com.microblink.blinkid.core.session.DetectionStatus
+import com.microblink.blinkid.core.settings.RedactionSettings
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
@@ -59,6 +60,12 @@ class BlinkIdScannerView(
             // Default SurfaceView creates a separate window surface that renders above all Flutter widgets.
             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
         }
+    private val redactionSettings: RedactionSettings? by lazy {
+        @Suppress("UNCHECKED_CAST")
+        BlinkIdDeserializationUtils.deserializeRedactionSettings(
+            creationParams["redactionSettings"] as? Map<String, Any>,
+        )
+    }
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val scope = CoroutineScope(Dispatchers.Main)
 
@@ -364,7 +371,7 @@ class BlinkIdScannerView(
                                     // Signal Flutter immediately so it can show a spinner while
                                     // getResult() serializes (potentially large) image data.
                                     methodChannel.invokeMethod("onDocumentScanned", null)
-                                    val scanResult = withContext(Dispatchers.Default) { session.getResult(null) }
+                                    val scanResult = withContext(Dispatchers.Default) { session.getResult(redactionSettings) }
                                     if (scanningSession !== session) return@launch
                                     if (scanResult.isSuccess) {
                                         val jsonString =

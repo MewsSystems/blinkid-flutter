@@ -17,6 +17,12 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
   private let viewId: Int64
   private let creationParams: [String: Any]
   private let sdkProvider: () -> AnyObject?
+  private lazy var redactionSettings: RedactionSettings? = {
+    guard let redactionDict = creationParams["redactionSettings"] as? [String: Any] else {
+      return nil
+    }
+    return BlinkIdDeserializationUtils.deserializeRedactionSettings(redactionDict)
+  }()
 
   private let methodChannel: FlutterMethodChannel
   private let eventChannel: FlutterEventChannel
@@ -492,7 +498,7 @@ extension BlinkIdScannerView: AVCaptureVideoDataOutputSampleBufferDelegate {
             _lock.withLock { isProcessingResult = false }
             return
           }
-          let scanResult = session.getResult(redactionSettings: nil)
+          let scanResult = session.getResult(redactionSettings: redactionSettings)
           let jsonString = BlinkIdSerializationUtils.serializeBlinkIdScanningResult(scanResult)
           await MainActor.run {
             guard self.blinkIdSession === session else {
