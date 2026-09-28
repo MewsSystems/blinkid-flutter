@@ -24,6 +24,8 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.PluginRegistry.ActivityResultListener
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 import java.io.File
 
@@ -58,6 +60,7 @@ class BlinkIdFlutterPlugin :
     private var flutterPluginActivity: Activity? = null
     private var scanResult: Result? = null
     private var lastLeaseRefreshAtMs: Long = 0L
+    private val sdkLifecycleMutex = Mutex()
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "blinkid_flutter")
@@ -167,14 +170,14 @@ class BlinkIdFlutterPlugin :
         lastLeaseRefreshAtMs = System.currentTimeMillis()
     }
 
-    override suspend fun reloadSdk(sdkSettings: Map<String, Any>?): BlinkIdSdk {
+    override suspend fun reloadSdk(sdkSettings: Map<String, Any>?): BlinkIdSdk = sdkLifecycleMutex.withLock {
         BlinkIdSdk.sdkInstance?.close()
         blinkIdSdk = null
         val settings =
             BlinkIdDeserializationUtils.deserializeBlinkIdSdkSettings(sdkSettings)
                 ?: throw IllegalStateException("Incorrect SDK Settings.")
         val activity = flutterPluginActivity ?: throw IllegalStateException("Activity not available.")
-        return BlinkIdSdk.initializeSdk(activity, settings).getOrThrow().also {
+        BlinkIdSdk.initializeSdk(activity, settings).getOrThrow().also {
             blinkIdSdk = it
             lastLeaseRefreshAtMs = System.currentTimeMillis()
         }
@@ -198,7 +201,9 @@ class BlinkIdFlutterPlugin :
         }
     }
 
-    private suspend fun ensureLoadedSdk(call: MethodCall): BlinkIdSdk? {
+    private suspend fun ensureLoadedSdk(call: MethodCall): BlinkIdSdk? = sdkLifecycleMutex.withLock { loadSdkLocked(call) }
+
+    private suspend fun loadSdkLocked(call: MethodCall): BlinkIdSdk? {
         blinkIdSdk?.let { return it }
 
         val blinkIdSdkSettings = call.argument<Map<String, Any>>("blinkIdSdkSettings")

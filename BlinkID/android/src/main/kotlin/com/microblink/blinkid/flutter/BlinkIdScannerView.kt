@@ -33,13 +33,16 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.platform.PlatformView
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -212,7 +215,10 @@ class BlinkIdScannerView(
                 )
             // Cancelled by abortPendingStart() (cancelScan/switchCamera/dispose) while the
             // above suspended — discard the just-created session instead of installing it.
-            ensureActive()
+            if (!isActive) {
+                sessionResult.getOrNull()?.let(::closeSession)
+                return@launch
+            }
             val pending = pendingStartResult ?: return@launch
             pendingStartResult = null
             startJob = null
@@ -239,8 +245,10 @@ class BlinkIdScannerView(
         val initial = sdk.createScanningSession(settings)
         if (!initial.exceptionOrNull().isBlinkIdLicenseError()) return initial
 
-        val isRefreshed = runCatching { sdkHost.refreshLease(sdk) }.isSuccess
+        currentCoroutineContext().ensureActive()
+        val isRefreshed = runCatchingUnlessCancelled { sdkHost.refreshLease(sdk) }.isSuccess
         if (isRefreshed) {
+            currentCoroutineContext().ensureActive()
             val afterRefresh = sdk.createScanningSession(settings)
             if (!afterRefresh.exceptionOrNull().isBlinkIdLicenseError()) {
                 reportLicenseEvent(
@@ -253,11 +261,15 @@ class BlinkIdScannerView(
             }
         }
 
+        currentCoroutineContext().ensureActive()
         @Suppress("UNCHECKED_CAST")
         val afterReload =
-            runCatching { sdkHost.reloadSdk(creationParams["sdkSettings"] as? Map<String, Any>) }
+            runCatchingUnlessCancelled { sdkHost.reloadSdk(creationParams["sdkSettings"] as? Map<String, Any>) }
                 .fold(
-                    onSuccess = { it.createScanningSession(settings) },
+                    onSuccess = {
+                        currentCoroutineContext().ensureActive()
+                        it.createScanningSession(settings)
+                    },
                     onFailure = { Result.failure<BlinkIdScanningSession>(it) },
                 )
         reportLicenseEvent(
@@ -286,9 +298,22 @@ class BlinkIdScannerView(
         scope.launch { methodChannel.invokeMethod("onLicenseEvent", payload) }
     }
 
+    private inline fun <T> runCatchingUnlessCancelled(block: () -> T): Result<T> =
+        try {
+            Result.success(block())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+
     private fun releaseSession() {
         val session = scanningSession ?: return
         scanningSession = null
+        closeSession(session)
+    }
+
+    private fun closeSession(session: BlinkIdScanningSession) {
         try {
             analysisExecutor.execute { runCatching { session.close() } }
         } catch (_: java.util.concurrent.RejectedExecutionException) {
@@ -311,7 +336,7 @@ class BlinkIdScannerView(
     }
 
     // Cancels an in-flight startScan (if any) so a session created after a
-    // cancel/switch can never be installed. See startScan()'s ensureActive() check.
+    // cancel/switch can never be installed. See startScan()'s isActive check.
     private fun abortPendingStart() {
         startJob?.cancel()
         startJob = null
@@ -473,9 +498,13 @@ class BlinkIdScannerView(
                                             }
                                         methodChannel.invokeMethod("onScanResult", jsonString)
                                     } else {
-                                        val err = scanResult.exceptionOrNull()?.message ?: "Scan failed"
+                                        val error = scanResult.exceptionOrNull()
+                                        val err = error?.message ?: "Scan failed"
                                         if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", "getResult() failed: $err")
-                                        methodChannel.invokeMethod("onScanError", err)
+                                        methodChannel.invokeMethod(
+                                            "onScanError",
+                                            mapOf("message" to err, "code" to errorCodeFor(error)),
+                                        )
                                     }
                                     releaseSession()
                                 }

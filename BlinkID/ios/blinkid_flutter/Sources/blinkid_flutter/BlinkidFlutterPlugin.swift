@@ -14,6 +14,8 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
 
   private var blinkIdSdk: BlinkIDSdk?
   private var lastLeaseRefreshAt: Date = .distantPast
+  private var pendingTermination: Task<Void, Never>?
+  private var pendingReload: Task<BlinkIDSdk, Error>?
   private static let leaseRefreshInterval: TimeInterval = 30 * 60
 
   public static func register(with registrar: FlutterPluginRegistrar) {
@@ -86,6 +88,7 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
   private func unloadSdk(_ call: FlutterMethodCall, result: @escaping FlutterResult) async {
     let arguments = call.arguments as? [String: Any]
     let deleteResources = (arguments?["deleteCachedResources"] as? Bool) ?? false
+    await pendingTermination?.value
     if deleteResources {
       await BlinkIDSdk.terminateBlinkIDSdkAndDeleteCachedResources()
     } else {
@@ -96,7 +99,9 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
   }
 
   private func ensureLoadedSdk(_ call: FlutterMethodCall) async throws -> BlinkIDSdk? {
+    if let pendingReload { return try await pendingReload.value }
     if let blinkIdSdk = blinkIdSdk { return blinkIdSdk }
+    await pendingTermination?.value
 
     do {
       guard let settings = try await setupBlinkIdSettings(call) else {
@@ -194,8 +199,7 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
                 blinkIdState.scanningResult))
             self?.rootVc?.dismiss(animated: true)
           } else {
-            Task { await BlinkIDSdk.terminateBlinkIDSdk() }
-            self?.blinkIdSdk = nil
+            self?.scheduleSdkTermination()
             self?.completeScanWithError(BlinkIdFlutterError.scanningCancelled.localizedDescription)
             self?.rootVc?.dismiss(animated: true)
           }
@@ -395,18 +399,37 @@ extension BlinkIdFlutterPlugin: BlinkIdSdkHost {
   }
 
   func reloadSdk(_ sdkSettings: [String: Any]?) async throws -> BlinkIDSdk {
-    await BlinkIDSdk.terminateBlinkIDSdk()
-    blinkIdSdk = nil
+    if let pendingReload { return try await pendingReload.value }
+
     guard let sdkSettings,
       let sanitized = BlinkIdDeserializationUtils.sanitizeDictionary(sdkSettings),
       let settings = BlinkIdDeserializationUtils.deserializeBlinkIdSdkSettings(sanitized)
     else {
       throw BlinkIdFlutterError.incorrectArgument("BlinkID SDK settings")
     }
-    let sdk = try await BlinkIDSdk.createBlinkIDSdk(withSettings: settings)
-    blinkIdSdk = sdk
-    lastLeaseRefreshAt = Date()
-    return sdk
+
+    let termination = pendingTermination
+    let reload = Task { () async throws -> BlinkIDSdk in
+      await termination?.value
+      await BlinkIDSdk.terminateBlinkIDSdk()
+      self.blinkIdSdk = nil
+      let sdk = try await BlinkIDSdk.createBlinkIDSdk(withSettings: settings)
+      self.blinkIdSdk = sdk
+      self.lastLeaseRefreshAt = Date()
+      return sdk
+    }
+    pendingReload = reload
+    defer { pendingReload = nil }
+    return try await reload.value
+  }
+
+  private func scheduleSdkTermination() {
+    blinkIdSdk = nil
+    let previous = pendingTermination
+    pendingTermination = Task {
+      await previous?.value
+      await BlinkIDSdk.terminateBlinkIDSdk()
+    }
   }
 }
 

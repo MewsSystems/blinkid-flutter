@@ -247,22 +247,30 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
       initialError = error
     }
 
+    try Task.checkCancellation()
     if (try? await sdkHost.refreshLease()) != nil {
+      try Task.checkCancellation()
       do {
         let session = try await sdk.createScanningSession(sessionSettings: sessionSettings)
         reportLicenseEvent(action: "licenseRecovery", succeeded: true, steps: ["refresh"], error: nil)
         return session
+      } catch is CancellationError {
+        throw CancellationError()
       } catch let error where !isBlinkIdLicenseError(error) {
         reportLicenseEvent(action: "licenseRecovery", succeeded: false, steps: ["refresh"], error: error)
         throw error
       } catch {}
     }
 
+    try Task.checkCancellation()
     do {
       let reloadedSdk = try await sdkHost.reloadSdk(creationParams["sdkSettings"] as? [String: Any])
+      try Task.checkCancellation()
       let session = try await reloadedSdk.createScanningSession(sessionSettings: sessionSettings)
       reportLicenseEvent(action: "licenseRecovery", succeeded: true, steps: ["refresh", "reload"], error: nil)
       return session
+    } catch is CancellationError {
+      throw CancellationError()
     } catch {
       reportLicenseEvent(
         action: "licenseRecovery", succeeded: false, steps: ["refresh", "reload"], error: error)
@@ -573,13 +581,15 @@ extension BlinkIdScannerView: AVCaptureVideoDataOutputSampleBufferDelegate {
         }
       } catch {
         if isBlinkIdLicenseError(error) {
-          _lock.withLock {
-            self.isScanning = false
-            self.isProcessingResult = false
-          }
           await MainActor.run {
-            guard self.blinkIdSession === session else { return }
-            self._lock.withLock { self.blinkIdSession = nil }
+            let isCurrentSession = self._lock.withLock { () -> Bool in
+              guard self.blinkIdSession === session else { return false }
+              self.blinkIdSession = nil
+              self.isScanning = false
+              self.isProcessingResult = false
+              return true
+            }
+            guard isCurrentSession else { return }
             self.methodChannel.invokeMethod(
               "onScanError",
               arguments: ["message": error.localizedDescription, "code": blinkIdLicenseErrorCode])
