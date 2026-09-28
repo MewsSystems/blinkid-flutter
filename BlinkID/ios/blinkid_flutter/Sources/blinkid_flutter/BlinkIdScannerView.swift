@@ -3,6 +3,8 @@ import BlinkID
 import Flutter
 import UIKit
 
+private struct ScannerSdkUnavailableError: Error {}
+
 private final class CameraContainerView: UIView {
   weak var previewLayer: AVCaptureVideoPreviewLayer?
 
@@ -201,19 +203,16 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     _startScanTask?.cancel()
     _startScanTask = Task { @MainActor [weak self] in
       guard let self else { return }
-      guard let sdk = await self.sdkHost.resolveSdk() else {
-        result(FlutterError(code: "blinkid_error", message: "SDK not initialized", details: nil))
-        return
-      }
-      let sdkGeneration = self.sdkHost.sdkGeneration
       do {
         try Task.checkCancellation()
         let sessionSettings = BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
           sessionSettingsDict,
           source: "customScanner"
         )
-        let session = try await self.createSessionWithLicenseRecovery(
-          sdk: sdk, sdkGeneration: sdkGeneration, sessionSettings: sessionSettings)
+        let session = try await self.sdkHost.runExclusive {
+          guard let sdk = self.sdkHost.sdk else { throw ScannerSdkUnavailableError() }
+          return try await self.createSessionWithLicenseRecovery(sdk: sdk, sessionSettings: sessionSettings)
+        }
         try Task.checkCancellation()
         self._lock.withLock {
           self.blinkIdSession = session
@@ -223,6 +222,8 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
         result(nil)
       } catch is CancellationError {
         result(FlutterError(code: "blinkid_error", message: "Scanner disposed", details: nil))
+      } catch is ScannerSdkUnavailableError {
+        result(FlutterError(code: "blinkid_error", message: "SDK not initialized", details: nil))
       } catch {
         let code = isBlinkIdLicenseError(error) ? blinkIdLicenseErrorCode : "blinkid_error"
         result(FlutterError(code: code, message: error.localizedDescription, details: nil))
@@ -232,7 +233,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
 
   @MainActor
   private func createSessionWithLicenseRecovery(
-    sdk: BlinkIDSdk, sdkGeneration: Int, sessionSettings: BlinkIDSessionSettings
+    sdk: BlinkIDSdk, sessionSettings: BlinkIDSessionSettings
   ) async throws -> BlinkIDSession {
     if let refresh = await sdkHost.refreshLeaseIfDue() {
       switch refresh {
@@ -267,8 +268,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
 
     try Task.checkCancellation()
     do {
-      let reloadedSdk = try await sdkHost.reloadSdk(
-        creationParams["sdkSettings"] as? [String: Any], expectedGeneration: sdkGeneration)
+      let reloadedSdk = try await sdkHost.reloadSdk(creationParams["sdkSettings"] as? [String: Any])
       try Task.checkCancellation()
       let session = try await reloadedSdk.createScanningSession(sessionSettings: sessionSettings)
       reportLicenseEvent(action: "licenseRecovery", succeeded: true, steps: ["refresh", "reload"], error: nil)

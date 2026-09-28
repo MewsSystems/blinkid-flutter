@@ -2,13 +2,12 @@ import BlinkID
 
 @MainActor
 protocol BlinkIdSdkHost: AnyObject {
+  /// Runs `operation` after every earlier SDK lifecycle operation (load, unload, reload, license
+  /// recovery) has finished and before any later one starts. The members below must only be used
+  /// from inside an exclusive operation.
+  func runExclusive<T>(_ operation: @escaping @MainActor () async throws -> T) async throws -> T
+
   var sdk: BlinkIDSdk? { get }
-
-  /// Incremented whenever the SDK is unloaded or terminated outside license recovery.
-  var sdkGeneration: Int { get }
-
-  /// The current SDK once any in-flight reload or termination has finished.
-  func resolveSdk() async -> BlinkIDSdk?
 
   /// Refreshes the license lease when the last refresh is older than the refresh interval; nil when not due.
   func refreshLeaseIfDue() async -> Result<Void, Error>?
@@ -16,6 +15,5 @@ protocol BlinkIdSdkHost: AnyObject {
   func refreshLease() async throws
 
   /// Terminates the current SDK instance and initializes a new one from `sdkSettings`.
-  /// Throws when the SDK was unloaded since `expectedGeneration` was read.
-  func reloadSdk(_ sdkSettings: [String: Any]?, expectedGeneration: Int) async throws -> BlinkIDSdk
+  func reloadSdk(_ sdkSettings: [String: Any]?) async throws -> BlinkIDSdk
 }

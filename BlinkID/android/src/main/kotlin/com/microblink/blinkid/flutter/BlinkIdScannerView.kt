@@ -197,28 +197,21 @@ class BlinkIdScannerView(
         }
         pendingStartResult = result
         startJob = scope.launch {
-            val sdk = sdkHost.awaitSdk()
-            if (sdk == null) {
-                val pending = pendingStartResult ?: return@launch
-                pendingStartResult = null
-                startJob = null
-                pending.error("blinkid_error", "SDK not initialized", null)
-                return@launch
-            }
-            ensureActive()
-            val sdkGeneration = sdkHost.sdkGeneration
             val sessionSettingsMap = creationParams["sessionSettings"] as? Map<*, *>
 
             @Suppress("UNCHECKED_CAST")
-            val sessionResult =
-                createSessionWithLicenseRecovery(
-                    sdk,
-                    sdkGeneration,
-                    BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
-                        sessionSettingsMap as? Map<String, Any>,
-                        false,
-                    ),
+            val settings =
+                BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
+                    sessionSettingsMap as? Map<String, Any>,
+                    false,
                 )
+            val sessionResult =
+                sdkHost.runExclusive {
+                    val sdk =
+                        sdkHost.sdk
+                            ?: return@runExclusive Result.failure(IllegalStateException("SDK not initialized"))
+                    createSessionWithLicenseRecovery(sdk, settings)
+                }
             // Cancelled by abortPendingStart() (cancelScan/switchCamera/dispose) while the
             // above suspended — discard the just-created session instead of installing it.
             if (!isActive) {
@@ -242,7 +235,6 @@ class BlinkIdScannerView(
 
     private suspend fun createSessionWithLicenseRecovery(
         sdk: BlinkIdSdk,
-        sdkGeneration: Int,
         settings: BlinkIdSessionSettings,
     ): Result<BlinkIdScanningSession> {
         sdkHost.refreshLeaseIfDue(sdk)?.let { refresh ->
@@ -271,9 +263,7 @@ class BlinkIdScannerView(
         currentCoroutineContext().ensureActive()
         @Suppress("UNCHECKED_CAST")
         val afterReload =
-            runCatchingUnlessCancelled {
-                sdkHost.reloadSdk(creationParams["sdkSettings"] as? Map<String, Any>, sdkGeneration)
-            }
+            runCatchingUnlessCancelled { sdkHost.reloadSdk(creationParams["sdkSettings"] as? Map<String, Any>) }
                 .fold(
                     onSuccess = {
                         currentCoroutineContext().ensureActive()

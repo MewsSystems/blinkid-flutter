@@ -14,9 +14,7 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
 
   private var blinkIdSdk: BlinkIDSdk?
   private var lastLeaseRefreshAt: Date = .distantPast
-  private var pendingTermination: Task<Void, Never>?
-  private var pendingReload: Task<BlinkIDSdk, Error>?
-  private(set) var sdkGeneration = 0
+  private var lifecycleTail: Task<Void, Never>?
   private static let leaseRefreshInterval: TimeInterval = 30 * 60
 
   public static func register(with registrar: FlutterPluginRegistrar) {
@@ -67,12 +65,14 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
 
   private func refreshLicenseLease(result: @escaping FlutterResult) async {
     do {
-      guard blinkIdSdk != nil else {
-        throw BlinkIdFlutterError.initError(
-          "The BlinkID SDK is not initialized. Call the loadBlinkIdSdk() method to pre-load the SDK first, or perform a scan."
-        )
+      try await runExclusive {
+        guard self.blinkIdSdk != nil else {
+          throw BlinkIdFlutterError.initError(
+            "The BlinkID SDK is not initialized. Call the loadBlinkIdSdk() method to pre-load the SDK first, or perform a scan."
+          )
+        }
+        try await self.refreshLease()
       }
-      try await refreshLease()
       result(true)
     } catch let blinkIdError as BlinkIdFlutterError {
       throwFlutterError(with: blinkIdError.localizedDescription, result: result)
@@ -90,34 +90,34 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
   private func unloadSdk(_ call: FlutterMethodCall, result: @escaping FlutterResult) async {
     let arguments = call.arguments as? [String: Any]
     let deleteResources = (arguments?["deleteCachedResources"] as? Bool) ?? false
-    sdkGeneration += 1
-    if let pendingReload { _ = try? await pendingReload.value }
-    await pendingTermination?.value
-    if deleteResources {
-      await BlinkIDSdk.terminateBlinkIDSdkAndDeleteCachedResources()
-    } else {
-      await BlinkIDSdk.terminateBlinkIDSdk()
+    try? await runExclusive {
+      if deleteResources {
+        await BlinkIDSdk.terminateBlinkIDSdkAndDeleteCachedResources()
+      } else {
+        await BlinkIDSdk.terminateBlinkIDSdk()
+      }
+      self.blinkIdSdk = nil
     }
-    blinkIdSdk = nil
     result(true)
   }
 
   @MainActor
   private func ensureLoadedSdk(_ call: FlutterMethodCall) async throws -> BlinkIDSdk? {
-    if let pendingReload { return try await pendingReload.value }
-    if let blinkIdSdk = blinkIdSdk { return blinkIdSdk }
-    await pendingTermination?.value
+    try await runExclusive {
+      if let blinkIdSdk = self.blinkIdSdk { return blinkIdSdk }
 
-    do {
-      guard let settings = try await setupBlinkIdSettings(call) else {
-        throw BlinkIdFlutterError.incorrectArgument("Incorrect BlinkID SDK settings!")
+      do {
+        guard let settings = try await self.setupBlinkIdSettings(call) else {
+          throw BlinkIdFlutterError.incorrectArgument("Incorrect BlinkID SDK settings!")
+        }
+        let sdk = try await BlinkIDSdk.createBlinkIDSdk(withSettings: settings)
+        self.blinkIdSdk = sdk
+        self.lastLeaseRefreshAt = Date()
+        return sdk
+      } catch {
+        self.blinkIdSdk = nil
+        throw error
       }
-      blinkIdSdk = try await BlinkIDSdk.createBlinkIDSdk(withSettings: settings)
-      lastLeaseRefreshAt = Date()
-      return blinkIdSdk
-    } catch {
-      blinkIdSdk = nil
-      throw error
     }
   }
 
@@ -386,13 +386,22 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
 }
 
 @MainActor extension BlinkIdFlutterPlugin: BlinkIdSdkHost {
-  var sdk: BlinkIDSdk? { blinkIdSdk }
-
-  func resolveSdk() async -> BlinkIDSdk? {
-    if let pendingReload { return try? await pendingReload.value }
-    await pendingTermination?.value
-    return blinkIdSdk
+  func runExclusive<T>(_ operation: @escaping @MainActor () async throws -> T) async throws -> T {
+    let previous = lifecycleTail
+    let task = Task { @MainActor () async throws -> T in
+      await previous?.value
+      try Task.checkCancellation()
+      return try await operation()
+    }
+    lifecycleTail = Task { _ = try? await task.value }
+    return try await withTaskCancellationHandler {
+      try await task.value
+    } onCancel: {
+      task.cancel()
+    }
   }
+
+  var sdk: BlinkIDSdk? { blinkIdSdk }
 
   func refreshLeaseIfDue() async -> Result<Void, Error>? {
     guard Date().timeIntervalSince(lastLeaseRefreshAt) >= Self.leaseRefreshInterval else { return nil }
@@ -409,10 +418,7 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
     lastLeaseRefreshAt = Date()
   }
 
-  func reloadSdk(_ sdkSettings: [String: Any]?, expectedGeneration: Int) async throws -> BlinkIDSdk {
-    guard expectedGeneration == sdkGeneration else { throw BlinkIdFlutterError.sdkUnloaded }
-    if let pendingReload { return try await pendingReload.value }
-
+  func reloadSdk(_ sdkSettings: [String: Any]?) async throws -> BlinkIDSdk {
     guard let sdkSettings,
       let sanitized = BlinkIdDeserializationUtils.sanitizeDictionary(sdkSettings),
       let settings = BlinkIdDeserializationUtils.deserializeBlinkIdSdkSettings(sanitized)
@@ -420,29 +426,20 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
       throw BlinkIdFlutterError.incorrectArgument("BlinkID SDK settings")
     }
 
-    let termination = pendingTermination
-    let reload = Task { @MainActor () async throws -> BlinkIDSdk in
-      await termination?.value
-      guard expectedGeneration == self.sdkGeneration else { throw BlinkIdFlutterError.sdkUnloaded }
-      await BlinkIDSdk.terminateBlinkIDSdk()
-      self.blinkIdSdk = nil
-      let sdk = try await BlinkIDSdk.createBlinkIDSdk(withSettings: settings)
-      self.blinkIdSdk = sdk
-      self.lastLeaseRefreshAt = Date()
-      return sdk
-    }
-    pendingReload = reload
-    defer { pendingReload = nil }
-    return try await reload.value
+    await BlinkIDSdk.terminateBlinkIDSdk()
+    blinkIdSdk = nil
+    let sdk = try await BlinkIDSdk.createBlinkIDSdk(withSettings: settings)
+    blinkIdSdk = sdk
+    lastLeaseRefreshAt = Date()
+    return sdk
   }
 
-  private func scheduleSdkTermination() {
-    sdkGeneration += 1
-    blinkIdSdk = nil
-    let previous = pendingTermination
-    pendingTermination = Task {
-      await previous?.value
-      await BlinkIDSdk.terminateBlinkIDSdk()
+  fileprivate func scheduleSdkTermination() {
+    Task {
+      try? await runExclusive {
+        await BlinkIDSdk.terminateBlinkIDSdk()
+        self.blinkIdSdk = nil
+      }
     }
   }
 }
@@ -481,7 +478,6 @@ enum BlinkIdFlutterError: LocalizedError {
   case initError(String)
   case frontImageError
   case scanningCancelled
-  case sdkUnloaded
 
   var localizedDescription: String {
     switch self {
@@ -496,8 +492,6 @@ enum BlinkIdFlutterError: LocalizedError {
         "Could not extract the information from the first image! An image of a valid document needs to be sent."
     case .scanningCancelled:
       return "Scanning has been cancelled"
-    case .sdkUnloaded:
-      return "The BlinkID SDK was unloaded during license recovery"
     }
   }
 
