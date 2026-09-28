@@ -191,17 +191,21 @@ class BlinkIdScannerView(
     }
 
     private fun startScan(result: MethodChannel.Result) {
-        val sdk = sdkHost.sdk
-        if (sdk == null) {
-            result.error("blinkid_error", "SDK not initialized", null)
-            return
-        }
         if (pendingStartResult != null) {
             result.error("blinkid_error", "Scan already starting", null)
             return
         }
         pendingStartResult = result
         startJob = scope.launch {
+            val sdk = sdkHost.awaitSdk()
+            if (sdk == null) {
+                val pending = pendingStartResult ?: return@launch
+                pendingStartResult = null
+                startJob = null
+                pending.error("blinkid_error", "SDK not initialized", null)
+                return@launch
+            }
+            ensureActive()
             val sessionSettingsMap = creationParams["sessionSettings"] as? Map<*, *>
 
             @Suppress("UNCHECKED_CAST")

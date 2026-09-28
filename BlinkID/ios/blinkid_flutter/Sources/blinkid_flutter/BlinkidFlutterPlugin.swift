@@ -88,6 +88,7 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
   private func unloadSdk(_ call: FlutterMethodCall, result: @escaping FlutterResult) async {
     let arguments = call.arguments as? [String: Any]
     let deleteResources = (arguments?["deleteCachedResources"] as? Bool) ?? false
+    if let pendingReload { _ = try? await pendingReload.value }
     await pendingTermination?.value
     if deleteResources {
       await BlinkIDSdk.terminateBlinkIDSdkAndDeleteCachedResources()
@@ -382,6 +383,12 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
 
 extension BlinkIdFlutterPlugin: BlinkIdSdkHost {
   var sdk: BlinkIDSdk? { blinkIdSdk }
+
+  func resolveSdk() async -> BlinkIDSdk? {
+    if let pendingReload { return try? await pendingReload.value }
+    await pendingTermination?.value
+    return blinkIdSdk
+  }
 
   func refreshLeaseIfDue() async -> Result<Void, Error>? {
     guard Date().timeIntervalSince(lastLeaseRefreshAt) >= Self.leaseRefreshInterval else { return nil }

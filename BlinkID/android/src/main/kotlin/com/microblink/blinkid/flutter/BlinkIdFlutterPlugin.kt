@@ -93,7 +93,9 @@ class BlinkIdFlutterPlugin :
             }
 
             BLINKID_UNLOAD_SDK -> {
-                (unloadBlinkIdSdk(call, result))
+                CoroutineScope(Dispatchers.Main).launch {
+                    sdkLifecycleMutex.withLock { unloadBlinkIdSdk(call, result) }
+                }
             }
 
             BLINKID_REFRESH_LICENSE_LEASE -> {
@@ -157,6 +159,8 @@ class BlinkIdFlutterPlugin :
 
     override val sdk: BlinkIdSdk?
         get() = blinkIdSdk
+
+    override suspend fun awaitSdk(): BlinkIdSdk? = sdkLifecycleMutex.withLock { blinkIdSdk }
 
     override suspend fun refreshLeaseIfDue(sdk: BlinkIdSdk): kotlin.Result<Unit>? =
         if (System.currentTimeMillis() - lastLeaseRefreshAtMs < LEASE_REFRESH_INTERVAL_MS) {

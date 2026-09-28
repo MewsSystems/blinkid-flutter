@@ -194,10 +194,6 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
       result(FlutterError(code: "blinkid_error", message: "Camera unavailable", details: nil))
       return
     }
-    guard let sdk = sdkHost.sdk else {
-      result(FlutterError(code: "blinkid_error", message: "SDK not initialized", details: nil))
-      return
-    }
     guard let sessionSettingsDict = creationParams["sessionSettings"] as? [String: Any] else {
       result(FlutterError(code: "blinkid_error", message: "Missing sessionSettings", details: nil))
       return
@@ -205,7 +201,12 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     _startScanTask?.cancel()
     _startScanTask = Task { @MainActor [weak self] in
       guard let self else { return }
+      guard let sdk = await self.sdkHost.resolveSdk() else {
+        result(FlutterError(code: "blinkid_error", message: "SDK not initialized", details: nil))
+        return
+      }
       do {
+        try Task.checkCancellation()
         let sessionSettings = BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
           sessionSettingsDict,
           source: "customScanner"

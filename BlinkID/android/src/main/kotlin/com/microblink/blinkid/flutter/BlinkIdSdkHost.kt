@@ -5,6 +5,9 @@ import com.microblink.blinkid.core.BlinkIdSdk
 interface BlinkIdSdkHost {
     val sdk: BlinkIdSdk?
 
+    /** The current SDK once any in-flight load or reload has finished. */
+    suspend fun awaitSdk(): BlinkIdSdk?
+
     /** Refreshes the license lease when the last refresh is older than the refresh interval; null when not due. */
     suspend fun refreshLeaseIfDue(sdk: BlinkIdSdk): Result<Unit>?
 
