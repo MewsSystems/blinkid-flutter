@@ -16,7 +16,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
   private let containerView: CameraContainerView
   private let viewId: Int64
   private let creationParams: [String: Any]
-  private let sdkProvider: () -> AnyObject?
+  private let sdkHost: BlinkIdSdkHost
   private lazy var redactionSettings: RedactionSettings? = {
     guard let redactionDict = creationParams["redactionSettings"] as? [String: Any] else {
       return nil
@@ -55,11 +55,11 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     viewId: Int64,
     messenger: FlutterBinaryMessenger,
     creationParams: [String: Any],
-    sdkProvider: @escaping () -> AnyObject?,
+    sdkHost: BlinkIdSdkHost,
   ) {
     self.viewId = viewId
     self.creationParams = creationParams
-    self.sdkProvider = sdkProvider
+    self.sdkHost = sdkHost
     self.containerView = CameraContainerView(frame: frame)
 
     methodChannel = FlutterMethodChannel(
@@ -194,7 +194,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
       result(FlutterError(code: "blinkid_error", message: "Camera unavailable", details: nil))
       return
     }
-    guard let sdk = sdkProvider() as? BlinkIDSdk else {
+    guard let sdk = sdkHost.sdk else {
       result(FlutterError(code: "blinkid_error", message: "SDK not initialized", details: nil))
       return
     }
@@ -210,7 +210,8 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
           sessionSettingsDict,
           source: "customScanner"
         )
-        let session = try await sdk.createScanningSession(sessionSettings: sessionSettings)
+        let session = try await self.createSessionWithLicenseRecovery(
+          sdk: sdk, sessionSettings: sessionSettings)
         try Task.checkCancellation()
         self._lock.withLock {
           self.blinkIdSession = session
@@ -221,8 +222,63 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
       } catch is CancellationError {
         result(FlutterError(code: "blinkid_error", message: "Scanner disposed", details: nil))
       } catch {
-        result(FlutterError(code: "blinkid_error", message: error.localizedDescription, details: nil))
+        let code = isBlinkIdLicenseError(error) ? blinkIdLicenseErrorCode : "blinkid_error"
+        result(FlutterError(code: code, message: error.localizedDescription, details: nil))
       }
+    }
+  }
+
+  private func createSessionWithLicenseRecovery(
+    sdk: BlinkIDSdk, sessionSettings: BlinkIDSessionSettings
+  ) async throws -> BlinkIDSession {
+    if let refresh = await sdkHost.refreshLeaseIfDue() {
+      switch refresh {
+      case .success: reportLicenseEvent(action: "leaseRefresh", succeeded: true, steps: [], error: nil)
+      case .failure(let error):
+        reportLicenseEvent(action: "leaseRefresh", succeeded: false, steps: [], error: error)
+      }
+    }
+
+    let initialError: Error
+    do {
+      return try await sdk.createScanningSession(sessionSettings: sessionSettings)
+    } catch {
+      guard isBlinkIdLicenseError(error) else { throw error }
+      initialError = error
+    }
+
+    if (try? await sdkHost.refreshLease()) != nil {
+      do {
+        let session = try await sdk.createScanningSession(sessionSettings: sessionSettings)
+        reportLicenseEvent(action: "licenseRecovery", succeeded: true, steps: ["refresh"], error: nil)
+        return session
+      } catch let error where !isBlinkIdLicenseError(error) {
+        reportLicenseEvent(action: "licenseRecovery", succeeded: false, steps: ["refresh"], error: error)
+        throw error
+      } catch {}
+    }
+
+    do {
+      let reloadedSdk = try await sdkHost.reloadSdk(creationParams["sdkSettings"] as? [String: Any])
+      let session = try await reloadedSdk.createScanningSession(sessionSettings: sessionSettings)
+      reportLicenseEvent(action: "licenseRecovery", succeeded: true, steps: ["refresh", "reload"], error: nil)
+      return session
+    } catch {
+      reportLicenseEvent(
+        action: "licenseRecovery", succeeded: false, steps: ["refresh", "reload"], error: error)
+      throw initialError
+    }
+  }
+
+  private func reportLicenseEvent(action: String, succeeded: Bool, steps: [String], error: Error?) {
+    let payload: [String: Any] = [
+      "action": action,
+      "succeeded": succeeded,
+      "steps": steps,
+      "error": error.map { $0.localizedDescription } ?? NSNull(),
+    ]
+    DispatchQueue.main.async { [weak self] in
+      self?.methodChannel.invokeMethod("onLicenseEvent", arguments: payload)
     }
   }
 
@@ -516,6 +572,20 @@ extension BlinkIdScannerView: AVCaptureVideoDataOutputSampleBufferDelegate {
           break
         }
       } catch {
+        if isBlinkIdLicenseError(error) {
+          _lock.withLock {
+            self.isScanning = false
+            self.isProcessingResult = false
+          }
+          await MainActor.run {
+            guard self.blinkIdSession === session else { return }
+            self._lock.withLock { self.blinkIdSession = nil }
+            self.methodChannel.invokeMethod(
+              "onScanError",
+              arguments: ["message": error.localizedDescription, "code": blinkIdLicenseErrorCode])
+          }
+          return
+        }
         let debugEnabled = _lock.withLock { debugLoggingEnabled }
         await MainActor.run {
           if debugEnabled {

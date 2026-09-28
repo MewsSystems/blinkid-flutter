@@ -9,6 +9,7 @@ import '../blinkid_result.dart';
 import '../blinkid_settings.dart';
 import '../types.dart';
 import 'blinkid_guidance.dart';
+import 'blinkid_license_event.dart';
 
 enum BlinkIdScannerStatus {
   uninitialized,
@@ -106,6 +107,13 @@ class BlinkIdScannerController extends ChangeNotifier {
   /// `_onGuidance` in `custom_scanner_screen.dart` for a working example).
   Stream<BlinkIdGuidance> get guidanceStream => _guidanceController.stream;
 
+  final _licenseEventController = StreamController<BlinkIdLicenseEvent>.broadcast();
+
+  /// Lease refreshes and license-error recoveries performed natively when a
+  /// scan session starts. Informational — a failed recovery still surfaces as
+  /// [BlinkIdLicenseException] from [scan].
+  Stream<BlinkIdLicenseEvent> get licenseEventStream => _licenseEventController.stream;
+
   MethodChannel? _methodChannel;
   StreamSubscription<dynamic>? _guidanceSub;
   Completer<BlinkIdScanningResult>? _scanCompleter;
@@ -149,7 +157,8 @@ class BlinkIdScannerController extends ChangeNotifier {
       await BlinkIdFlutterPlatform.instance.loadBlinkIdSdk(sdkSettings);
     } on PlatformException catch (e) {
       _setStatus(BlinkIdScannerStatus.uninitialized);
-      throw BlinkIdSdkInitException(e.message ?? 'SDK load failed');
+      final message = e.message ?? 'SDK load failed';
+      throw e.code == blinkIdLicenseErrorCode ? BlinkIdLicenseException(message) : BlinkIdSdkInitException(message);
     }
     _setStatus(BlinkIdScannerStatus.initializing);
     _creationParams = {
@@ -290,6 +299,12 @@ class BlinkIdScannerController extends ChangeNotifier {
         // fired, notifyListeners tore down BlinkIdScannerView, and the native
         // dispose() replied to the pending startScan with "Scanner disposed").
         // Fall through and return completer.future so the caller sees the real error.
+      } else if (e.code == blinkIdLicenseErrorCode) {
+        final error = BlinkIdLicenseException(e.message ?? 'License error');
+        _lastError = error;
+        _setStatus(BlinkIdScannerStatus.error);
+        _scanCompleter = null;
+        throw error;
       } else {
         _lastError = Exception(e.message ?? 'startScan failed');
         _setStatus(BlinkIdScannerStatus.error);
@@ -437,9 +452,22 @@ class BlinkIdScannerController extends ChangeNotifier {
         case 'onScanResult':
           _completeScan(_parseResult(call.arguments));
         case 'onScanError':
-          _failScan(call.arguments as String? ?? 'Scan error');
+          switch (call.arguments) {
+            case {'message': final String? message, 'code': blinkIdLicenseErrorCode}:
+              _failScan(message ?? 'License error', isLicenseError: true);
+            case {'message': final String? message}:
+              _failScan(message ?? 'Scan error');
+            case final String message:
+              _failScan(message);
+            default:
+              _failScan('Scan error');
+          }
         case 'onScanCanceled':
           _abortWithCancel();
+        case 'onLicenseEvent':
+          if (call.arguments case final Map<Object?, Object?> payload) {
+            _licenseEventController.add(BlinkIdLicenseEvent.fromNative(payload));
+          }
         case 'onPermissionRequired':
           final args = call.arguments as Map?;
           final permanentlyDenied = args?['permanentlyDenied'] as bool? ?? false;
@@ -528,8 +556,8 @@ class BlinkIdScannerController extends ChangeNotifier {
     completer?.completeError(const BlinkIdScanCancelException());
   }
 
-  void _failScan(String message) {
-    final error = Exception(message);
+  void _failScan(String message, {bool isLicenseError = false}) {
+    final error = isLicenseError ? BlinkIdLicenseException(message) : Exception(message);
     _lastError = error;
     _setStatus(BlinkIdScannerStatus.error);
     final completer = _scanCompleter;
@@ -557,6 +585,7 @@ class BlinkIdScannerController extends ChangeNotifier {
     _methodChannel?.setMethodCallHandler(null);
     _methodChannel?.invokeMethod<void>('dispose').ignore();
     _guidanceController.close();
+    _licenseEventController.close();
     // Drain in-flight scan without corrupting status — widget tree tearing down.
     final completer = _scanCompleter;
     _scanCompleter = null;
@@ -609,6 +638,19 @@ class BlinkIdSdkInitException implements Exception {
   final String message;
   @override
   String toString() => message;
+}
+
+/// Error code the native side uses for BlinkID license failures (locked,
+/// expired or unverifiable license lease).
+const blinkIdLicenseErrorCode = 'blinkid_license_error';
+
+/// Thrown when the BlinkID license cannot unlock the SDK — from
+/// [BlinkIdScannerController.initialize] or [BlinkIdScannerController.scan].
+///
+/// The loaded SDK stays locked once this happens; recover by calling
+/// `BlinkIdFlutter().unloadBlinkIdSdk()` and initializing a new controller.
+class BlinkIdLicenseException extends BlinkIdSdkInitException {
+  const BlinkIdLicenseException(super.message);
 }
 
 /// Thrown when camera permission has not been granted.

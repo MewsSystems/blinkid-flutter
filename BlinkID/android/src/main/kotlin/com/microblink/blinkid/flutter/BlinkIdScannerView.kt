@@ -25,6 +25,7 @@ import com.microblink.blinkid.core.result.ImageAnalysisDetectionStatus
 import com.microblink.blinkid.core.result.ProcessingStatus
 import com.microblink.blinkid.core.result.ScanningStatus
 import com.microblink.blinkid.core.session.BlinkIdScanningSession
+import com.microblink.blinkid.core.session.BlinkIdSessionSettings
 import com.microblink.blinkid.core.session.DetectionStatus
 import com.microblink.blinkid.core.settings.RedactionSettings
 import io.flutter.plugin.common.BinaryMessenger
@@ -50,7 +51,7 @@ class BlinkIdScannerView(
     private val viewId: Int,
     messenger: BinaryMessenger,
     private val creationParams: Map<String, Any>,
-    private val sdkProvider: () -> BlinkIdSdk?,
+    private val sdkHost: BlinkIdSdkHost,
     private val requestCameraPermission: (Activity, (Boolean) -> Unit) -> Unit,
 ) : PlatformView,
     LifecycleOwner {
@@ -129,7 +130,7 @@ class BlinkIdScannerView(
             "cancelScan" -> {
                 abortPendingStart()
                 isScanning = false
-                scanningSession = null
+                releaseSession()
                 result.success(null)
             }
 
@@ -152,7 +153,7 @@ class BlinkIdScannerView(
                 abortPendingStart()
                 abortPendingCameraResult("Camera switch superseded")
                 isScanning = false
-                scanningSession = null
+                releaseSession()
                 preferredCameraOverride = call.arguments as? String
                 pendingCameraResult = result
                 scope.launch {
@@ -187,7 +188,7 @@ class BlinkIdScannerView(
     }
 
     private fun startScan(result: MethodChannel.Result) {
-        val sdk = sdkProvider()
+        val sdk = sdkHost.sdk
         if (sdk == null) {
             result.error("blinkid_error", "SDK not initialized", null)
             return
@@ -202,7 +203,8 @@ class BlinkIdScannerView(
 
             @Suppress("UNCHECKED_CAST")
             val sessionResult =
-                sdk.createScanningSession(
+                createSessionWithLicenseRecovery(
+                    sdk,
                     BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
                         sessionSettingsMap as? Map<String, Any>,
                         false,
@@ -215,13 +217,97 @@ class BlinkIdScannerView(
             pendingStartResult = null
             startJob = null
             if (sessionResult.isFailure) {
-                pending.error("blinkid_error", sessionResult.exceptionOrNull()?.message, null)
+                val error = sessionResult.exceptionOrNull()
+                pending.error(errorCodeFor(error), error?.message, null)
                 return@launch
             }
+            releaseSession()
             scanningSession = sessionResult.getOrThrow()
             isScanning = true
             pending.success(null)
         }
+    }
+
+    private suspend fun createSessionWithLicenseRecovery(
+        sdk: BlinkIdSdk,
+        settings: BlinkIdSessionSettings,
+    ): Result<BlinkIdScanningSession> {
+        sdkHost.refreshLeaseIfDue(sdk)?.let { refresh ->
+            reportLicenseEvent("leaseRefresh", refresh.isSuccess, emptyList(), refresh.exceptionOrNull())
+        }
+
+        val initial = sdk.createScanningSession(settings)
+        if (!initial.exceptionOrNull().isBlinkIdLicenseError()) return initial
+
+        val isRefreshed = runCatching { sdkHost.refreshLease(sdk) }.isSuccess
+        if (isRefreshed) {
+            val afterRefresh = sdk.createScanningSession(settings)
+            if (!afterRefresh.exceptionOrNull().isBlinkIdLicenseError()) {
+                reportLicenseEvent(
+                    "licenseRecovery",
+                    afterRefresh.isSuccess,
+                    listOf("refresh"),
+                    afterRefresh.exceptionOrNull(),
+                )
+                return afterRefresh
+            }
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        val afterReload =
+            runCatching { sdkHost.reloadSdk(creationParams["sdkSettings"] as? Map<String, Any>) }
+                .fold(
+                    onSuccess = { it.createScanningSession(settings) },
+                    onFailure = { Result.failure<BlinkIdScanningSession>(it) },
+                )
+        reportLicenseEvent(
+            "licenseRecovery",
+            afterReload.isSuccess,
+            listOf("refresh", "reload"),
+            afterReload.exceptionOrNull(),
+        )
+
+        return if (afterReload.isSuccess) afterReload else initial
+    }
+
+    private fun reportLicenseEvent(
+        action: String,
+        isSuccessful: Boolean,
+        steps: List<String>,
+        error: Throwable?,
+    ) {
+        val payload =
+            mapOf(
+                "action" to action,
+                "succeeded" to isSuccessful,
+                "steps" to steps,
+                "error" to error?.message,
+            )
+        scope.launch { methodChannel.invokeMethod("onLicenseEvent", payload) }
+    }
+
+    private fun releaseSession() {
+        val session = scanningSession ?: return
+        scanningSession = null
+        try {
+            analysisExecutor.execute { runCatching { session.close() } }
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
+            runCatching { session.close() }
+        }
+    }
+
+    private fun errorCodeFor(error: Throwable?): String =
+        if (error.isBlinkIdLicenseError()) BLINKID_LICENSE_ERROR_CODE else "blinkid_error"
+
+    private fun failScanFromAnalyzer(
+        session: BlinkIdScanningSession,
+        error: Throwable?,
+    ) {
+        if (scanningSession !== session) return
+        isScanning = false
+        releaseSession()
+        val payload = mapOf("message" to (error?.message ?: "Scan failed"), "code" to errorCodeFor(error))
+        scope.launch { methodChannel.invokeMethod("onScanError", payload) }
     }
 
     // Cancels an in-flight startScan (if any) so a session created after a
@@ -355,8 +441,13 @@ class BlinkIdScannerView(
                     val processResult = runBlocking { session.process(inputImage) }
 
                     if (processResult.isFailure) {
-                        val msg = "process() failed: ${processResult.exceptionOrNull()}"
-                        scope.launch { if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", msg) }
+                        val error = processResult.exceptionOrNull()
+                        if (error.isBlinkIdLicenseError()) {
+                            failScanFromAnalyzer(session, error)
+                        } else {
+                            val msg = "process() failed: $error"
+                            scope.launch { if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", msg) }
+                        }
                     } else if (processResult.isSuccess) {
                         val frameResult = processResult.getOrNull()!!
                         val detectionStatus = frameResult.inputImageAnalysisResult.documentDetectionStatus
@@ -386,7 +477,7 @@ class BlinkIdScannerView(
                                         if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", "getResult() failed: $err")
                                         methodChannel.invokeMethod("onScanError", err)
                                     }
-                                    scanningSession = null
+                                    releaseSession()
                                 }
                             }
 
@@ -417,8 +508,12 @@ class BlinkIdScannerView(
                         }
                     }
                 } catch (e: Exception) {
-                    scope.launch {
-                        if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", "Analyzer error: ${e.message}")
+                    if (e.isBlinkIdLicenseError()) {
+                        failScanFromAnalyzer(session, e)
+                    } else {
+                        scope.launch {
+                            if (debugLoggingEnabled) methodChannel.invokeMethod("onDebugLog", "Analyzer error: ${e.message}")
+                        }
                     }
                 } finally {
                     imageProxy.close()
@@ -460,7 +555,7 @@ class BlinkIdScannerView(
         abortPendingStart()
         abortPendingCameraResult("Scanner disposed")
         isScanning = false
-        scanningSession = null
+        releaseSession()
         // Drain any in-flight analyzer frame before CameraX unbinds.
         try { analysisExecutor.submit {}.get(500L, java.util.concurrent.TimeUnit.MILLISECONDS) } catch (_: Exception) {}
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED

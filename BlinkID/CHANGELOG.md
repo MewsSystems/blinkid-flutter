@@ -1,3 +1,19 @@
+## Unreleased (Mews fork)
+
+### What's new
+- **Native SDK patch updates**: Android `blinkid-ux` 8001.0.2 and iOS `blinkid-ios` 8001.0.1, matching the official v8001.0.0 Flutter release.
+- **`refreshLicenseLease()`**: refreshes the BlinkID license lease while the SDK is initialized (ported from the official v8001.0.0 release).
+- **License lease handling in the custom scanner view**: `startScan` refreshes the license lease when it is older than 30 minutes, and when session creation fails with a license error it refreshes the lease and retries, then reloads the SDK from the view's `sdkSettings` and retries once more. Each refresh and recovery is reported on the new `BlinkIdScannerController.licenseEventStream` (`BlinkIdLicenseEvent`).
+- **`BlinkIdLicenseException`**: `BlinkIdScannerController.initialize()` and `scan()` now throw this (a `BlinkIdSdkInitException` subtype) when the license cannot unlock the SDK, identified by the new native error code `blinkid_license_error` (`blinkIdLicenseErrorCode`). Recover with `unloadBlinkIdSdk()` and a new controller.
+
+### Bug fixes
+- **Custom scanner view swallowed license failures**: a license lock during frame processing was only sent as a debug log, leaving the camera running but never recognising the document. It now stops the scan and reports `onScanError` on both platforms.
+- **Overlapping method calls lost their result**: both plugins stored a single shared result that every call overwrote, so concurrent calls (e.g. a lease refresh during a scan) could leave a Dart `Future` pending forever. Each call now completes its own result; `performScan` rejects a second concurrent scan.
+- **Android scanning sessions were never closed**: sessions dropped on cancel, camera switch, result or dispose were only de-referenced and stayed open until SDK shutdown. They are now closed.
+- **Android `unloadBlinkIdSdk` never replied** when `deleteCachedResources` was missing; it now defaults to `false`. Same on iOS.
+- **Android `onActivityResult`** no longer claims unrelated request codes, and the dead `suspend {}` close after a cancelled scan was removed.
+- **iOS** cleared the cached SDK instance after a cancelled `performScan` terminated the SDK.
+
 ## v8001.0.0
 
 ### What's new
