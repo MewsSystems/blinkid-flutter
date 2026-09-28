@@ -1,7 +1,11 @@
 import BlinkID
 
+@MainActor
 protocol BlinkIdSdkHost: AnyObject {
   var sdk: BlinkIDSdk? { get }
+
+  /// Incremented whenever the SDK is unloaded or terminated outside license recovery.
+  var sdkGeneration: Int { get }
 
   /// The current SDK once any in-flight reload or termination has finished.
   func resolveSdk() async -> BlinkIDSdk?
@@ -12,5 +16,6 @@ protocol BlinkIdSdkHost: AnyObject {
   func refreshLease() async throws
 
   /// Terminates the current SDK instance and initializes a new one from `sdkSettings`.
-  func reloadSdk(_ sdkSettings: [String: Any]?) async throws -> BlinkIDSdk
+  /// Throws when the SDK was unloaded since `expectedGeneration` was read.
+  func reloadSdk(_ sdkSettings: [String: Any]?, expectedGeneration: Int) async throws -> BlinkIDSdk
 }

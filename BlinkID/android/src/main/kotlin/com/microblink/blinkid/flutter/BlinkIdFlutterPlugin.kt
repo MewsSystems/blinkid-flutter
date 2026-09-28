@@ -62,6 +62,9 @@ class BlinkIdFlutterPlugin :
     private var lastLeaseRefreshAtMs: Long = 0L
     private val sdkLifecycleMutex = Mutex()
 
+    @Volatile override var sdkGeneration: Int = 0
+        private set
+
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "blinkid_flutter")
         channel.setMethodCallHandler(this)
@@ -94,6 +97,7 @@ class BlinkIdFlutterPlugin :
 
             BLINKID_UNLOAD_SDK -> {
                 CoroutineScope(Dispatchers.Main).launch {
+                    sdkGeneration++
                     sdkLifecycleMutex.withLock { unloadBlinkIdSdk(call, result) }
                 }
             }
@@ -174,7 +178,11 @@ class BlinkIdFlutterPlugin :
         lastLeaseRefreshAtMs = System.currentTimeMillis()
     }
 
-    override suspend fun reloadSdk(sdkSettings: Map<String, Any>?): BlinkIdSdk = sdkLifecycleMutex.withLock {
+    override suspend fun reloadSdk(
+        sdkSettings: Map<String, Any>?,
+        expectedGeneration: Int,
+    ): BlinkIdSdk = sdkLifecycleMutex.withLock {
+        check(expectedGeneration == sdkGeneration) { "The BlinkID SDK was unloaded during license recovery." }
         BlinkIdSdk.sdkInstance?.close()
         blinkIdSdk = null
         val settings =

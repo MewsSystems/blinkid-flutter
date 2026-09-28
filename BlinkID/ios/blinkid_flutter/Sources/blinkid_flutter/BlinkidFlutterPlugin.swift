@@ -16,6 +16,7 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
   private var lastLeaseRefreshAt: Date = .distantPast
   private var pendingTermination: Task<Void, Never>?
   private var pendingReload: Task<BlinkIDSdk, Error>?
+  private(set) var sdkGeneration = 0
   private static let leaseRefreshInterval: TimeInterval = 30 * 60
 
   public static func register(with registrar: FlutterPluginRegistrar) {
@@ -85,9 +86,11 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
     }
   }
 
+  @MainActor
   private func unloadSdk(_ call: FlutterMethodCall, result: @escaping FlutterResult) async {
     let arguments = call.arguments as? [String: Any]
     let deleteResources = (arguments?["deleteCachedResources"] as? Bool) ?? false
+    sdkGeneration += 1
     if let pendingReload { _ = try? await pendingReload.value }
     await pendingTermination?.value
     if deleteResources {
@@ -99,6 +102,7 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
     result(true)
   }
 
+  @MainActor
   private func ensureLoadedSdk(_ call: FlutterMethodCall) async throws -> BlinkIDSdk? {
     if let pendingReload { return try await pendingReload.value }
     if let blinkIdSdk = blinkIdSdk { return blinkIdSdk }
@@ -381,7 +385,7 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
   }
 }
 
-extension BlinkIdFlutterPlugin: BlinkIdSdkHost {
+@MainActor extension BlinkIdFlutterPlugin: BlinkIdSdkHost {
   var sdk: BlinkIDSdk? { blinkIdSdk }
 
   func resolveSdk() async -> BlinkIDSdk? {
@@ -405,7 +409,8 @@ extension BlinkIdFlutterPlugin: BlinkIdSdkHost {
     lastLeaseRefreshAt = Date()
   }
 
-  func reloadSdk(_ sdkSettings: [String: Any]?) async throws -> BlinkIDSdk {
+  func reloadSdk(_ sdkSettings: [String: Any]?, expectedGeneration: Int) async throws -> BlinkIDSdk {
+    guard expectedGeneration == sdkGeneration else { throw BlinkIdFlutterError.sdkUnloaded }
     if let pendingReload { return try await pendingReload.value }
 
     guard let sdkSettings,
@@ -416,8 +421,9 @@ extension BlinkIdFlutterPlugin: BlinkIdSdkHost {
     }
 
     let termination = pendingTermination
-    let reload = Task { () async throws -> BlinkIDSdk in
+    let reload = Task { @MainActor () async throws -> BlinkIDSdk in
       await termination?.value
+      guard expectedGeneration == self.sdkGeneration else { throw BlinkIdFlutterError.sdkUnloaded }
       await BlinkIDSdk.terminateBlinkIDSdk()
       self.blinkIdSdk = nil
       let sdk = try await BlinkIDSdk.createBlinkIDSdk(withSettings: settings)
@@ -431,6 +437,7 @@ extension BlinkIdFlutterPlugin: BlinkIdSdkHost {
   }
 
   private func scheduleSdkTermination() {
+    sdkGeneration += 1
     blinkIdSdk = nil
     let previous = pendingTermination
     pendingTermination = Task {
@@ -474,6 +481,7 @@ enum BlinkIdFlutterError: LocalizedError {
   case initError(String)
   case frontImageError
   case scanningCancelled
+  case sdkUnloaded
 
   var localizedDescription: String {
     switch self {
@@ -488,6 +496,8 @@ enum BlinkIdFlutterError: LocalizedError {
         "Could not extract the information from the first image! An image of a valid document needs to be sent."
     case .scanningCancelled:
       return "Scanning has been cancelled"
+    case .sdkUnloaded:
+      return "The BlinkID SDK was unloaded during license recovery"
     }
   }
 

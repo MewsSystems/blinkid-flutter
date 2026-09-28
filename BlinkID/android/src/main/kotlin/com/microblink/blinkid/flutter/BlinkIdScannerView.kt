@@ -206,12 +206,14 @@ class BlinkIdScannerView(
                 return@launch
             }
             ensureActive()
+            val sdkGeneration = sdkHost.sdkGeneration
             val sessionSettingsMap = creationParams["sessionSettings"] as? Map<*, *>
 
             @Suppress("UNCHECKED_CAST")
             val sessionResult =
                 createSessionWithLicenseRecovery(
                     sdk,
+                    sdkGeneration,
                     BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
                         sessionSettingsMap as? Map<String, Any>,
                         false,
@@ -240,6 +242,7 @@ class BlinkIdScannerView(
 
     private suspend fun createSessionWithLicenseRecovery(
         sdk: BlinkIdSdk,
+        sdkGeneration: Int,
         settings: BlinkIdSessionSettings,
     ): Result<BlinkIdScanningSession> {
         sdkHost.refreshLeaseIfDue(sdk)?.let { refresh ->
@@ -268,7 +271,9 @@ class BlinkIdScannerView(
         currentCoroutineContext().ensureActive()
         @Suppress("UNCHECKED_CAST")
         val afterReload =
-            runCatchingUnlessCancelled { sdkHost.reloadSdk(creationParams["sdkSettings"] as? Map<String, Any>) }
+            runCatchingUnlessCancelled {
+                sdkHost.reloadSdk(creationParams["sdkSettings"] as? Map<String, Any>, sdkGeneration)
+            }
                 .fold(
                     onSuccess = {
                         currentCoroutineContext().ensureActive()

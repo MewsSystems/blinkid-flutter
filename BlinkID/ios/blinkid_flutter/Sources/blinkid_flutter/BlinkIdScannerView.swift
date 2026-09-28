@@ -205,6 +205,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
         result(FlutterError(code: "blinkid_error", message: "SDK not initialized", details: nil))
         return
       }
+      let sdkGeneration = self.sdkHost.sdkGeneration
       do {
         try Task.checkCancellation()
         let sessionSettings = BlinkIdDeserializationUtils.deserializeBlinkIdSessionSettings(
@@ -212,7 +213,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
           source: "customScanner"
         )
         let session = try await self.createSessionWithLicenseRecovery(
-          sdk: sdk, sessionSettings: sessionSettings)
+          sdk: sdk, sdkGeneration: sdkGeneration, sessionSettings: sessionSettings)
         try Task.checkCancellation()
         self._lock.withLock {
           self.blinkIdSession = session
@@ -229,8 +230,9 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     }
   }
 
+  @MainActor
   private func createSessionWithLicenseRecovery(
-    sdk: BlinkIDSdk, sessionSettings: BlinkIDSessionSettings
+    sdk: BlinkIDSdk, sdkGeneration: Int, sessionSettings: BlinkIDSessionSettings
   ) async throws -> BlinkIDSession {
     if let refresh = await sdkHost.refreshLeaseIfDue() {
       switch refresh {
@@ -265,7 +267,8 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
 
     try Task.checkCancellation()
     do {
-      let reloadedSdk = try await sdkHost.reloadSdk(creationParams["sdkSettings"] as? [String: Any])
+      let reloadedSdk = try await sdkHost.reloadSdk(
+        creationParams["sdkSettings"] as? [String: Any], expectedGeneration: sdkGeneration)
       try Task.checkCancellation()
       let session = try await reloadedSdk.createScanningSession(sessionSettings: sessionSettings)
       reportLicenseEvent(action: "licenseRecovery", succeeded: true, steps: ["refresh", "reload"], error: nil)
