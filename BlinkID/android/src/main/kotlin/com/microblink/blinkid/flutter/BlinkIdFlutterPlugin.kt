@@ -144,7 +144,7 @@ class BlinkIdFlutterPlugin :
         try {
             runExclusive {
                 val sdk =
-                    blinkIdSdk
+                    blinkIdSdk ?: BlinkIdSdk.sdkInstance
                         ?: throw IllegalStateException(
                             "The BlinkID SDK is not initialized. Call loadBlinkIdSdk() first, or perform a scan.",
                         )
