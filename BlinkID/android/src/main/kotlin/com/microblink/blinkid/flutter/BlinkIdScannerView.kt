@@ -205,31 +205,29 @@ class BlinkIdScannerView(
                     sessionSettingsMap as? Map<String, Any>,
                     false,
                 )
-            val sessionResult =
-                sdkHost.runExclusive {
-                    val sdk =
-                        sdkHost.sdk
-                            ?: return@runExclusive Result.failure(IllegalStateException("SDK not initialized"))
-                    createSessionWithLicenseRecovery(sdk, settings)
+            sdkHost.runExclusive {
+                val sessionResult =
+                    sdkHost.sdk?.let { createSessionWithLicenseRecovery(it, settings) }
+                        ?: Result.failure(IllegalStateException("SDK not initialized"))
+                // Cancelled by abortPendingStart() (cancelScan/switchCamera/dispose) while the
+                // above suspended — discard the just-created session instead of installing it.
+                if (!isActive) {
+                    sessionResult.getOrNull()?.let(::closeSession)
+                    return@runExclusive
                 }
-            // Cancelled by abortPendingStart() (cancelScan/switchCamera/dispose) while the
-            // above suspended — discard the just-created session instead of installing it.
-            if (!isActive) {
-                sessionResult.getOrNull()?.let(::closeSession)
-                return@launch
+                val pending = pendingStartResult ?: return@runExclusive
+                pendingStartResult = null
+                startJob = null
+                if (sessionResult.isFailure) {
+                    val error = sessionResult.exceptionOrNull()
+                    pending.error(errorCodeFor(error), error?.message, null)
+                    return@runExclusive
+                }
+                releaseSession()
+                scanningSession = sessionResult.getOrThrow()
+                isScanning = true
+                pending.success(null)
             }
-            val pending = pendingStartResult ?: return@launch
-            pendingStartResult = null
-            startJob = null
-            if (sessionResult.isFailure) {
-                val error = sessionResult.exceptionOrNull()
-                pending.error(errorCodeFor(error), error?.message, null)
-                return@launch
-            }
-            releaseSession()
-            scanningSession = sessionResult.getOrThrow()
-            isScanning = true
-            pending.success(null)
         }
     }
 

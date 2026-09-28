@@ -209,14 +209,15 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
           sessionSettingsDict,
           source: "customScanner"
         )
-        let session = try await self.sdkHost.runExclusive {
+        try await self.sdkHost.runExclusive {
           guard let sdk = self.sdkHost.sdk else { throw ScannerSdkUnavailableError() }
-          return try await self.createSessionWithLicenseRecovery(sdk: sdk, sessionSettings: sessionSettings)
-        }
-        try Task.checkCancellation()
-        self._lock.withLock {
-          self.blinkIdSession = session
-          self.isScanning = true
+          let session = try await self.createSessionWithLicenseRecovery(
+            sdk: sdk, sessionSettings: sessionSettings)
+          try Task.checkCancellation()
+          self._lock.withLock {
+            self.blinkIdSession = session
+            self.isScanning = true
+          }
         }
         self._startScanTask = nil
         result(nil)
