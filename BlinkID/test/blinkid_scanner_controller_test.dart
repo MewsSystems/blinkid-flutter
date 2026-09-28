@@ -204,4 +204,116 @@ void main() {
       await expectLater(scanFuture, throwsA(isA<BlinkIdScanDisposeException>()));
     });
   });
+
+  group('license errors', () {
+    test('onScanError with the license code fails scan() with BlinkIdLicenseException', () async {
+      final controller = BlinkIdScannerController();
+      addTearDown(controller.dispose);
+      final viewId = await _attachReadyController(controller);
+
+      final scanFuture = controller.scan();
+      await _deliverPlatformCall(
+        'com.microblink.blinkid.flutter/scanner/$viewId',
+        const MethodCall('onScanError', {'message': 'locked', 'code': blinkIdLicenseErrorCode}),
+      );
+
+      await expectLater(
+        scanFuture,
+        throwsA(isA<BlinkIdLicenseException>().having((e) => e.message, 'message', 'locked')),
+      );
+      expect(controller.status, BlinkIdScannerStatus.error);
+      expect(controller.lastError, isA<BlinkIdLicenseException>());
+    });
+
+    test('onScanError without the license code keeps the generic Exception', () async {
+      final controller = BlinkIdScannerController();
+      addTearDown(controller.dispose);
+      final viewId = await _attachReadyController(controller);
+      final viewChannel = 'com.microblink.blinkid.flutter/scanner/$viewId';
+
+      final mapFuture = controller.scan();
+      await _deliverPlatformCall(viewChannel, const MethodCall('onScanError', {'message': 'camera', 'code': 'x'}));
+      await expectLater(mapFuture, throwsA(isNot(isA<BlinkIdLicenseException>())));
+
+      controller.reset();
+      final stringFuture = controller.scan();
+      await _deliverPlatformCall(viewChannel, const MethodCall('onScanError', 'boom'));
+      await expectLater(stringFuture, throwsA(isNot(isA<BlinkIdLicenseException>())));
+    });
+
+    test('a license PlatformException from startScan surfaces as BlinkIdLicenseException', () async {
+      final controller = BlinkIdScannerController();
+      addTearDown(controller.dispose);
+      final viewId = await _attachReadyController(controller);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        MethodChannel('com.microblink.blinkid.flutter/scanner/$viewId'),
+        (call) async => call.method == 'startScan'
+            ? throw PlatformException(code: blinkIdLicenseErrorCode, message: 'no rights')
+            : null,
+      );
+
+      await expectLater(controller.scan(), throwsA(isA<BlinkIdLicenseException>()));
+      expect(controller.status, BlinkIdScannerStatus.error);
+    });
+
+    test('a license PlatformException from loadBlinkIdSdk surfaces from initialize()', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('blinkid_flutter'),
+        (call) async => throw PlatformException(code: blinkIdLicenseErrorCode, message: 'no rights'),
+      );
+      final controller = BlinkIdScannerController();
+      addTearDown(controller.dispose);
+
+      await expectLater(
+        controller.initialize(BlinkIdSdkSettings(licenseKey: 'test-license'), BlinkIdSessionSettings()),
+        throwsA(isA<BlinkIdLicenseException>()),
+      );
+      expect(controller.status, BlinkIdScannerStatus.uninitialized);
+    });
+  });
+
+  group('licenseEventStream', () {
+    test('forwards native onLicenseEvent payloads', () async {
+      final controller = BlinkIdScannerController();
+      addTearDown(controller.dispose);
+      final viewId = await _attachReadyController(controller);
+      final events = <BlinkIdLicenseEvent>[];
+      final sub = controller.licenseEventStream.listen(events.add);
+      addTearDown(sub.cancel);
+
+      await _deliverPlatformCall(
+        'com.microblink.blinkid.flutter/scanner/$viewId',
+        const MethodCall('onLicenseEvent', {
+          'action': 'licenseRecovery',
+          'succeeded': true,
+          'steps': ['refresh', 'reload'],
+          'error': null,
+        }),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(events, hasLength(1));
+      expect(events.single.action, BlinkIdLicenseAction.licenseRecovery);
+      expect(events.single.isSuccessful, isTrue);
+      expect(events.single.steps, ['refresh', 'reload']);
+      expect(controller.status, BlinkIdScannerStatus.ready);
+    });
+  });
+
+  group('refreshLicenseLease()', () {
+    test('invokes the refreshLicenseLease method on the plugin channel', () async {
+      final calls = <String>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('blinkid_flutter'),
+        (call) async {
+          calls.add(call.method);
+          return null;
+        },
+      );
+
+      await BlinkIdFlutter().refreshLicenseLease();
+
+      expect(calls, ['refreshLicenseLease']);
+    });
+  });
 }

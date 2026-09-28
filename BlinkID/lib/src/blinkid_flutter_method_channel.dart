@@ -25,6 +25,7 @@ class MethodChannelBlinkIdFlutter extends BlinkIdFlutterPlatform {
       'performDirectApiScanWithAnalysis';
   static const String ARG_LOAD_BLINKID_SDK = 'loadBlinkIdSdk';
   static const String ARG_UNLOAD_BLINKID_SDK = 'unloadBlinkIdSdk';
+  static const String ARG_REFRESH_LICENSE_LEASE = 'refreshLicenseLease';
   static const String ARG_DELETE_CACHED_RESOURCES = 'deleteCachedResources';
   // Standalone deleteCachedResources() is a distinct method-channel call — not
   // to be confused with ARG_DELETE_CACHED_RESOURCES, which is an argument key
@@ -211,6 +212,14 @@ class MethodChannelBlinkIdFlutter extends BlinkIdFlutterPlatform {
         jsonEncode(deleteCachedResources),
       ),
     });
+  }
+
+  /// The `refreshLicenseLease` platform channel method refreshes the BlinkID SDK license lease.
+  ///
+  /// The BlinkID SDK must already be initialized before calling this method.
+  @override
+  Future<void> refreshLicenseLease() async {
+    await methodChannel.invokeMethod(ARG_REFRESH_LICENSE_LEASE);
   }
 
   /// The `deleteCachedResources` platform channel method deletes cached SDK

@@ -3,11 +3,11 @@ import UIKit
 
 public class BlinkIdScannerViewFactory: NSObject, FlutterPlatformViewFactory {
   private let messenger: FlutterBinaryMessenger
-  private let sdkProvider: () -> AnyObject?
+  private let sdkHost: BlinkIdSdkHost
 
-  init(messenger: FlutterBinaryMessenger, sdkProvider: @escaping () -> AnyObject?) {
+  init(messenger: FlutterBinaryMessenger, sdkHost: BlinkIdSdkHost) {
     self.messenger = messenger
-    self.sdkProvider = sdkProvider
+    self.sdkHost = sdkHost
   }
 
   public func create(withFrame frame: CGRect, viewIdentifier viewId: Int64, arguments args: Any?)
@@ -19,7 +19,7 @@ public class BlinkIdScannerViewFactory: NSObject, FlutterPlatformViewFactory {
       viewId: viewId,
       messenger: messenger,
       creationParams: params,
-      sdkProvider: sdkProvider,
+      sdkHost: sdkHost,
     )
   }
 

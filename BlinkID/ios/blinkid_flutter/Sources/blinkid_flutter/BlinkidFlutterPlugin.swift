@@ -7,90 +7,117 @@ import UIKit
 
 public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
 
-  private var result: FlutterResult?
+  private var scanResult: FlutterResult?
   private var rootVc: UIViewController?
   private var classInfoFilterDict: [String: Any]?
   private var redactionSettingsResolverDict: [String: Any]?
 
-  var blinkIdSdk: BlinkIDSdk?
+  private var blinkIdSdk: BlinkIDSdk?
+  private var lastLeaseRefreshAt: Date = .distantPast
+  private var lifecycleTail: Task<Void, Never>?
+  private static let leaseRefreshInterval: TimeInterval = 30 * 60
 
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(
       name: "blinkid_flutter", binaryMessenger: registrar.messenger())
     let instance = BlinkIdFlutterPlugin()
     registrar.addMethodCallDelegate(instance, channel: channel)
-    let factory = BlinkIdScannerViewFactory(
-      messenger: registrar.messenger(),
-      sdkProvider: { instance.blinkIdSdk },
-    )
+    let factory = BlinkIdScannerViewFactory(messenger: registrar.messenger(), sdkHost: instance)
     registrar.register(factory, withId: "com.microblink.blinkid/scanner_view")
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-    self.result = result
-    handleMethodCall(call)
+    handleMethodCall(call, result: result)
   }
 
-  private func handleMethodCall(_ call: FlutterMethodCall) {
+  private func handleMethodCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     guard let method = BlinkIdFlutterMethodChannelArguments(rawValue: call.method) else {
-      self.result?(FlutterMethodNotImplemented)
+      result(FlutterMethodNotImplemented)
       return
     }
 
     switch method {
-    case .performScan: Task { await performScan(call) }
-    case .directApi: Task { await performDirectApiScan(call) }
-    case .directApiWithAnalysis: Task { await performDirectApiScanWithAnalysis(call) }
-    case .loadSdk: Task { await loadSdk(call) }
-    case .unloadSdk: Task { await unloadSdk(call) }
-    case .deleteCachedResources: deleteCachedResources(call)
+    case .performScan: Task { await performScan(call, result: result) }
+    case .directApi: Task { await performDirectApiScan(call, result: result) }
+    case .directApiWithAnalysis: Task { await performDirectApiScanWithAnalysis(call, result: result) }
+    case .loadSdk: Task { await loadSdk(call, result: result) }
+    case .unloadSdk: Task { await unloadSdk(call, result: result) }
+    case .refreshLicenseLease: Task { await refreshLicenseLease(result: result) }
+    case .deleteCachedResources: deleteCachedResources(call, result: result)
     }
   }
 
-  private func loadSdk(_ call: FlutterMethodCall) async {
+  private func loadSdk(_ call: FlutterMethodCall, result: @escaping FlutterResult) async {
     do {
       let _ = try await ensureLoadedSdk(call)
-      result?(true)
+      result(true)
     } catch {
+      let code = errorCode(for: error)
       if let error = error as? InvalidLicenseKeyError {
-        throwFlutterError(with: BlinkIdFlutterError.initError(error.message).localizedDescription)
+        throwFlutterError(
+          with: BlinkIdFlutterError.initError(error.message).localizedDescription, code: code,
+          result: result)
       } else {
-        throwFlutterError(with: error.localizedDescription)
+        throwFlutterError(with: error.localizedDescription, code: code, result: result)
       }
     }
   }
 
-  private func unloadSdk(_ call: FlutterMethodCall) async {
+  private func refreshLicenseLease(result: @escaping FlutterResult) async {
     do {
-      guard let arguments = call.arguments as? [String: Any],
-        let deleteResources = arguments["deleteCachedResources"] as? Bool
-      else {
-        throw BlinkIdFlutterError.incorrectArgument("deleteCachedResources")
+      try await runExclusive {
+        guard self.blinkIdSdk != nil else {
+          throw BlinkIdFlutterError.initError(
+            "The BlinkID SDK is not initialized. Call the loadBlinkIdSdk() method to pre-load the SDK first, or perform a scan."
+          )
+        }
+        try await self.refreshLease()
       }
+      result(true)
+    } catch let blinkIdError as BlinkIdFlutterError {
+      throwFlutterError(with: blinkIdError.localizedDescription, result: result)
+    } catch {
+      let code = errorCode(for: error)
+      if let sdkError = error as? InvalidLicenseKeyError {
+        throwFlutterError(with: sdkError.message, code: code, result: result)
+      } else {
+        throwFlutterError(with: error.localizedDescription, code: code, result: result)
+      }
+    }
+  }
+
+  @MainActor
+  private func unloadSdk(_ call: FlutterMethodCall, result: @escaping FlutterResult) async {
+    let arguments = call.arguments as? [String: Any]
+    let deleteResources = (arguments?["deleteCachedResources"] as? Bool) ?? false
+    try? await runExclusive {
       if deleteResources {
         await BlinkIDSdk.terminateBlinkIDSdkAndDeleteCachedResources()
       } else {
         await BlinkIDSdk.terminateBlinkIDSdk()
       }
-      blinkIdSdk = nil
-      result?(true)
-    } catch {
-      throwFlutterError(with: error.localizedDescription)
+      self.blinkIdSdk = nil
     }
+    result(true)
   }
 
+  @MainActor
   private func ensureLoadedSdk(_ call: FlutterMethodCall) async throws -> BlinkIDSdk? {
-    if let blinkIdSdk = blinkIdSdk { return blinkIdSdk }
+    try await runExclusive {
+      if let blinkIdSdk = self.blinkIdSdk { return blinkIdSdk }
 
-    do {
-      guard let settings = try await setupBlinkIdSettings(call) else {
-        throw BlinkIdFlutterError.incorrectArgument("Incorrect BlinkID SDK settings!")
+      do {
+        guard let settings = try await self.setupBlinkIdSettings(call) else {
+          throw BlinkIdFlutterError.incorrectArgument("Incorrect BlinkID SDK settings!")
+        }
+        let sdk = try await BlinkIDSdk.createBlinkIDSdk(withSettings: settings)
+        self.blinkIdSdk = sdk
+        self.lastLeaseRefreshAt = Date()
+        return sdk
+      } catch {
+        self.blinkIdSdk = nil
+        throw error
       }
-      blinkIdSdk = try await BlinkIDSdk.createBlinkIDSdk(withSettings: settings)
-      return blinkIdSdk
-    } catch {
-      blinkIdSdk = nil
-      throw error
     }
   }
 
@@ -110,10 +137,22 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
     return settings
   }
 
-  private func performScan(_ call: FlutterMethodCall) async {
+  private func performScan(_ call: FlutterMethodCall, result: @escaping FlutterResult) async {
+    if scanResult != nil {
+      throwFlutterError(with: "A BlinkID scan is already in progress.", result: result)
+      return
+    }
+
     guard let arguments = call.arguments as? [String: Any],
       let cleanArguments = BlinkIdDeserializationUtils.sanitizeDictionary(arguments)
-    else { return }
+    else {
+      throwFlutterError(
+        with: BlinkIdFlutterError.incorrectArgument("Flutter raw arguments").localizedDescription,
+        result: result)
+      return
+    }
+
+    scanResult = result
 
     do {
       guard let blinkIdSdk = try await ensureLoadedSdk(call) else {
@@ -159,16 +198,15 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
         uxSettings: uxSettings
       ) { blinkIdState in
         DispatchQueue.main.async { [weak self] in
-          if let scannedResult = blinkIdState.scanningResult {
-            self?.result?(
-              BlinkIdSerializationUtils.serializeBlinkIdScanningResult(blinkIdState.scanningResult))
+          if blinkIdState.scanningResult != nil {
+            self?.completeScan(
+              with: BlinkIdSerializationUtils.serializeBlinkIdScanningResult(
+                blinkIdState.scanningResult))
             self?.rootVc?.dismiss(animated: true)
           } else {
-            Task { await BlinkIDSdk.terminateBlinkIDSdk() }
-            self?.throwFlutterError(
-              with: BlinkIdFlutterError.scanningCancelled.localizedDescription)
+            self?.scheduleSdkTermination()
+            self?.completeScanWithError(BlinkIdFlutterError.scanningCancelled.localizedDescription)
             self?.rootVc?.dismiss(animated: true)
-
           }
 
         }
@@ -176,25 +214,28 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
       }
 
       DispatchQueue.main.async {
-        self.presentScanningUI(scanningUxModel)
+        if !self.presentScanningUI(scanningUxModel) {
+          self.completeScanWithError("Could not present the scanning UI.")
+        }
       }
 
     } catch {
       if let error = error as? InvalidLicenseKeyError {
-        throwFlutterError(with: BlinkIdFlutterError.initError(error.message).localizedDescription)
+        completeScanWithError(BlinkIdFlutterError.initError(error.message).localizedDescription)
       } else {
-        throwFlutterError(with: error.localizedDescription)
+        completeScanWithError(error.localizedDescription)
       }
     }
   }
 
-  private func presentScanningUI(_ model: BlinkIDUXModel) {
+  @discardableResult
+  private func presentScanningUI(_ model: BlinkIDUXModel) -> Bool {
     let keyWindow = UIApplication.shared.connectedScenes
       .compactMap { $0 as? UIWindowScene }
       .flatMap { $0.windows }
       .first(where: \.isKeyWindow)
     guard let rootVC = keyWindow?.rootViewController else {
-      return
+      return false
     }
 
     self.rootVc = rootVC
@@ -202,23 +243,33 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
     let viewController = UIHostingController(rootView: BlinkIDUXView(viewModel: model))
     viewController.modalPresentationStyle = .fullScreen
     rootVC.present(viewController, animated: true)
+    return true
   }
 
-  func performDirectApiScan(_ call: FlutterMethodCall) async {
-    await runDirectApiScan(call, includeAnalysis: false)
+  func performDirectApiScan(_ call: FlutterMethodCall, result: @escaping FlutterResult) async {
+    await runDirectApiScan(call, includeAnalysis: false, result: result)
   }
 
   /// Behaves like `performDirectApiScan`, but the success payload is
   /// `{"result": <scanning result JSON>, "analysis": <analysis JSON>}` instead of the bare
   /// scanning-result JSON.
-  func performDirectApiScanWithAnalysis(_ call: FlutterMethodCall) async {
-    await runDirectApiScan(call, includeAnalysis: true)
+  func performDirectApiScanWithAnalysis(_ call: FlutterMethodCall, result: @escaping FlutterResult)
+    async
+  {
+    await runDirectApiScan(call, includeAnalysis: true, result: result)
   }
 
-  private func runDirectApiScan(_ call: FlutterMethodCall, includeAnalysis: Bool) async {
+  private func runDirectApiScan(
+    _ call: FlutterMethodCall, includeAnalysis: Bool, result: @escaping FlutterResult
+  ) async {
     guard let arguments = call.arguments as? [String: Any],
       let argumentsClean = BlinkIdDeserializationUtils.sanitizeDictionary(arguments)
-    else { return }
+    else {
+      throwFlutterError(
+        with: BlinkIdFlutterError.incorrectArgument("Flutter raw arguments").localizedDescription,
+        result: result)
+      return
+    }
     do {
       guard let blinkIdSdk = try await ensureLoadedSdk(call) else {
         throw BlinkIdFlutterError.initError(
@@ -269,18 +320,18 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
         payload["analysis"] = BlinkIdSerializationUtils.serializeInputImageAnalysisResult(
           lastFrameResult.processResult?.inputImageAnalysisResult)
         DispatchQueue.main.async {
-          self.result?(BlinkIdSerializationUtils.encodeToJson(payload))
+          result(BlinkIdSerializationUtils.encodeToJson(payload))
         }
       } else {
         DispatchQueue.main.async {
-          self.result?(BlinkIdSerializationUtils.serializeBlinkIdScanningResult(scannedResults))
+          result(BlinkIdSerializationUtils.serializeBlinkIdScanningResult(scannedResults))
         }
       }
     } catch {
       if let error = error as? InvalidLicenseKeyError {
-        throwFlutterError(with: error.message)
+        throwFlutterError(with: error.message, result: result)
       } else {
-        throwFlutterError(with: error.localizedDescription)
+        throwFlutterError(with: error.localizedDescription, result: result)
       }
     }
   }
@@ -288,14 +339,14 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
   // Deletes cached SDK resources from disk without requiring the SDK to be initialized — a plain
   // static utility on BlinkIDSdk (unlike unloadSdk, it never touches the live `blinkIdSdk`
   // instance), safe to call at any time, e.g. on logout or storage cleanup.
-  private func deleteCachedResources(_ call: FlutterMethodCall) {
+  private func deleteCachedResources(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     let arguments = call.arguments as? [String: Any]
     let resourcesLocalFolder = (arguments?["resourcesLocalFolder"] as? String) ?? "MLModels"
     let otaResourcesLocalFolder = (arguments?["otaResourcesLocalFolder"] as? String) ?? "OTAMLModels"
     BlinkIDSdk.deleteCachedResources(
       resourcesLocalFolder: resourcesLocalFolder,
       otaResourcesLocalFolder: otaResourcesLocalFolder)
-    result?(true)
+    result(true)
   }
 
   private func addFlutterPinglet(with sessionNumber: Int) async {
@@ -304,12 +355,92 @@ public class BlinkIdFlutterPlugin: NSObject, FlutterPlugin {
       sessionNumber: sessionNumber)
   }
 
-  private func throwFlutterError(with message: String) {
-    result?(
+  private func completeScan(with value: Any?) {
+    scanResult?(value)
+    scanResult = nil
+  }
+
+  private func completeScanWithError(_ message: String) {
+    scanResult?(
       FlutterError(
         code: BlinkIdFlutterError.iosErrorName,
         message: message,
         details: nil))
+    scanResult = nil
+  }
+
+  private func errorCode(for error: Error) -> String {
+    isBlinkIdLicenseError(error) ? blinkIdLicenseErrorCode : BlinkIdFlutterError.iosErrorName
+  }
+
+  private func throwFlutterError(
+    with message: String, code: String = BlinkIdFlutterError.iosErrorName,
+    result: @escaping FlutterResult
+  ) {
+    result(
+      FlutterError(
+        code: code,
+        message: message,
+        details: nil))
+  }
+}
+
+@MainActor extension BlinkIdFlutterPlugin: BlinkIdSdkHost {
+  func runExclusive<T>(_ operation: @escaping @MainActor () async throws -> T) async throws -> T {
+    let previous = lifecycleTail
+    let task = Task { @MainActor () async throws -> T in
+      await previous?.value
+      try Task.checkCancellation()
+      return try await operation()
+    }
+    lifecycleTail = Task { _ = try? await task.value }
+    return try await withTaskCancellationHandler {
+      try await task.value
+    } onCancel: {
+      task.cancel()
+    }
+  }
+
+  var sdk: BlinkIDSdk? { blinkIdSdk }
+
+  func refreshLeaseIfDue() async -> Result<Void, Error>? {
+    guard Date().timeIntervalSince(lastLeaseRefreshAt) >= Self.leaseRefreshInterval else { return nil }
+    do {
+      try await refreshLease()
+      return .success(())
+    } catch {
+      return .failure(error)
+    }
+  }
+
+  func refreshLease() async throws {
+    try await BlinkIDSdk.refreshLicenseLease()
+    lastLeaseRefreshAt = Date()
+  }
+
+  func reloadSdk(_ sdkSettings: [String: Any]?) async throws -> BlinkIDSdk {
+    guard let sdkSettings,
+      let sanitized = BlinkIdDeserializationUtils.sanitizeDictionary(sdkSettings),
+      let settings = BlinkIdDeserializationUtils.deserializeBlinkIdSdkSettings(sanitized)
+    else {
+      throw BlinkIdFlutterError.incorrectArgument("BlinkID SDK settings")
+    }
+
+    await BlinkIDSdk.terminateBlinkIDSdk()
+    blinkIdSdk = nil
+    let sdk = try await BlinkIDSdk.createBlinkIDSdk(withSettings: settings)
+    blinkIdSdk = sdk
+    lastLeaseRefreshAt = Date()
+    return sdk
+  }
+
+  fileprivate func scheduleSdkTermination() {
+    Task {
+      try? await runExclusive {
+        await BlinkIDSdk.terminateBlinkIDSdk()
+        self.blinkIdSdk = nil
+      }
+    }
   }
 }
 
@@ -337,6 +468,7 @@ enum BlinkIdFlutterMethodChannelArguments: String {
   case directApiWithAnalysis = "performDirectApiScanWithAnalysis"
   case loadSdk = "loadBlinkIdSdk"
   case unloadSdk = "unloadBlinkIdSdk"
+  case refreshLicenseLease = "refreshLicenseLease"
   case deleteCachedResources = "deleteCachedResources"
 }
 

@@ -8,6 +8,7 @@ export 'src/blinkid_settings.dart';
 export 'src/blinkid_result.dart';
 export 'src/types.dart';
 export 'src/scanner/blinkid_guidance.dart';
+export 'src/scanner/blinkid_license_event.dart';
 export 'src/scanner/blinkid_scanner_controller.dart';
 export 'src/scanner/blinkid_scanner_view.dart';
 
@@ -158,6 +159,17 @@ class BlinkIdFlutter {
     return BlinkIdFlutterPlatform.instance.unloadBlinkIdSdk(
       deleteCachedResources: deleteCachedResources,
     );
+  }
+
+  /// The `refreshLicenseLease` method refreshes the BlinkID SDK license lease.
+  ///
+  /// This method can be called periodically to maintain an active license status.
+  /// The frequency of refresh calls depends on your license configuration.
+  ///
+  /// The BlinkID SDK must already be initialized (by calling [`loadBlinkIdSdk`]
+  /// or any of the scanning methods) before calling this method.
+  Future<void> refreshLicenseLease() async {
+    return BlinkIdFlutterPlatform.instance.refreshLicenseLease();
   }
 
   /// Deletes cached SDK resources from disk, without requiring the SDK to be

@@ -96,6 +96,12 @@ abstract class BlinkIdFlutterPlatform extends PlatformInterface {
     );
   }
 
+  /// Returns the `refreshLicenseLease` method from the [MethodChannelBlinkIdFlutter].
+  /// See [MethodChannelBlinkIdFlutter] for more detailed information.
+  Future<void> refreshLicenseLease() async {
+    return MethodChannelBlinkIdFlutter().refreshLicenseLease();
+  }
+
   /// Returns the `deleteCachedResources` method from the [MethodChannelBlinkIdFlutter].
   /// See [MethodChannelBlinkIdFlutter] for more detailed information.
   Future<void> deleteCachedResources({
