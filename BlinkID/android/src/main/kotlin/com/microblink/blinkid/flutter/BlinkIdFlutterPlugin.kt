@@ -142,12 +142,14 @@ class BlinkIdFlutterPlugin :
 
     private suspend fun refreshLicenseLease(result: Result) {
         try {
-            val sdk =
-                blinkIdSdk ?: BlinkIdSdk.sdkInstance
-                    ?: throw IllegalStateException(
-                        "The BlinkID SDK is not initialized. Call loadBlinkIdSdk() first, or perform a scan.",
-                    )
-            runExclusive { refreshLease(sdk) }
+            runExclusive {
+                val sdk =
+                    blinkIdSdk
+                        ?: throw IllegalStateException(
+                            "The BlinkID SDK is not initialized. Call loadBlinkIdSdk() first, or perform a scan.",
+                        )
+                refreshLease(sdk)
+            }
             result.success(null)
         } catch (error: Exception) {
             result.error(errorCodeFor(error), error.message, null)
