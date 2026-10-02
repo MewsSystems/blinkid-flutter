@@ -51,6 +51,8 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
   private var preferredCameraOverride: String?
   private var pendingCameraResult: FlutterResult?
   private var interfaceOrientationObservation: NSKeyValueObservation?
+  private var rotationCoordinator: AnyObject?
+  private var rotationObservations: [NSKeyValueObservation] = []
 
   // Serializes AVCaptureSession.startRunning()/stopRunning() — both are
   // documented by Apple as blocking, so neither belongs on the main thread.
@@ -108,6 +110,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
   }
 
   private func updateVideoOrientation() {
+    guard rotationCoordinator == nil else { return }
     guard let videoOrientation = windowScene?.effectiveGeometry.interfaceOrientation.captureVideoOrientation
     else { return }
 
@@ -116,6 +119,37 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     if let connection = previewLayer?.connection, connection.isVideoOrientationSupported {
       connection.videoOrientation = videoOrientation
     }
+  }
+
+  @available(iOS 17.0, *)
+  private func startRotationCoordinator(device: AVCaptureDevice, preview: AVCaptureVideoPreviewLayer) {
+    let coordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: preview)
+    rotationCoordinator = coordinator
+    rotationObservations = [
+      coordinator.observe(\.videoRotationAngleForHorizonLevelPreview, options: [.initial, .new]) {
+        [weak self] coordinator, _ in
+        let angle = coordinator.videoRotationAngleForHorizonLevelPreview
+        DispatchQueue.main.async {
+          guard let connection = self?.previewLayer?.connection,
+            connection.isVideoRotationAngleSupported(angle)
+          else { return }
+          connection.videoRotationAngle = angle
+        }
+      },
+      coordinator.observe(\.videoRotationAngleForHorizonLevelCapture, options: [.initial, .new]) {
+        [weak self] coordinator, _ in
+        let orientation = CameraFrameVideoOrientation(
+          videoRotationAngle: coordinator.videoRotationAngleForHorizonLevelCapture)
+        guard let self else { return }
+        self._lock.withLock { self.currentFrameOrientation = orientation }
+      },
+    ]
+  }
+
+  private func stopRotationCoordinator() {
+    rotationObservations.forEach { $0.invalidate() }
+    rotationObservations = []
+    rotationCoordinator = nil
   }
 
   private func handleMethodCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -343,6 +377,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
   }
 
   private func stopCaptureSession() {
+    stopRotationCoordinator()
     let session = captureSession
     captureSession = nil
     previewLayer?.removeFromSuperlayer()
@@ -406,7 +441,11 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     self.previewLayer = preview
     self.captureSession = session
 
-    updateVideoOrientation()
+    if #available(iOS 17.0, *) {
+      startRotationCoordinator(device: device, preview: preview)
+    } else {
+      updateVideoOrientation()
+    }
 
     completeCameraResult(resolvedLens: resolvedLens, error: nil)
     // See stopCaptureSession()'s comment: sharing one serial queue for every
@@ -619,6 +658,17 @@ extension UIInterfaceOrientation {
     case .landscapeLeft: return .landscapeLeft
     case .landscapeRight: return .landscapeRight
     default: return nil
+    }
+  }
+}
+
+extension CameraFrameVideoOrientation {
+  fileprivate init(videoRotationAngle angle: CGFloat) {
+    switch (Int(angle.rounded()) % 360 + 360) % 360 {
+    case 45..<135: self = .portrait
+    case 135..<225: self = .landscapeLeft
+    case 225..<315: self = .portraitUpsideDown
+    default: self = .landscapeRight
     }
   }
 }
