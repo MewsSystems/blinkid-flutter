@@ -7,10 +7,16 @@ private struct ScannerSdkUnavailableError: Error {}
 
 private final class CameraContainerView: UIView {
   weak var previewLayer: AVCaptureVideoPreviewLayer?
+  var onWindowChanged: (() -> Void)?
 
   override func layoutSubviews() {
     super.layoutSubviews()
     previewLayer?.frame = bounds
+  }
+
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    onWindowChanged?()
   }
 }
 
@@ -44,6 +50,9 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
   private var cameraSetupFailed = false
   private var preferredCameraOverride: String?
   private var pendingCameraResult: FlutterResult?
+  private var interfaceOrientationObservation: NSKeyValueObservation?
+  private var rotationCoordinator: AnyObject?
+  private var rotationObservations: [NSKeyValueObservation] = []
 
   // Serializes AVCaptureSession.startRunning()/stopRunning() — both are
   // documented by Apple as blocking, so neither belongs on the main thread.
@@ -81,52 +90,66 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
       self?.handleMethodCall(call, result: result)
     }
 
-    UIDevice.current.beginGeneratingDeviceOrientationNotifications()
-    NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(deviceOrientationDidChange),
-      name: UIDevice.orientationDidChangeNotification,
-      object: nil,
-    )
+    containerView.onWindowChanged = { [weak self] in self?.observeInterfaceOrientation() }
 
     setupCamera()
   }
 
   public func view() -> UIView { containerView }
 
-  @objc private func deviceOrientationDidChange() {
+  private var windowScene: UIWindowScene? {
+    containerView.window?.windowScene
+      ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+  }
+
+  private func observeInterfaceOrientation() {
+    interfaceOrientationObservation = windowScene?.observe(\.effectiveGeometry) { [weak self] _, _ in
+      DispatchQueue.main.async { self?.updateVideoOrientation() }
+    }
     updateVideoOrientation()
   }
 
   private func updateVideoOrientation() {
-    let deviceOrientation = UIDevice.current.orientation
-    guard deviceOrientation.isValidInterfaceOrientation else { return }
+    guard rotationCoordinator == nil else { return }
+    guard let videoOrientation = windowScene?.effectiveGeometry.interfaceOrientation.captureVideoOrientation
+    else { return }
 
-    _lock.withLock { currentFrameOrientation = deviceOrientation.cameraFrameOrientation }
+    _lock.withLock { currentFrameOrientation = videoOrientation.cameraFrameOrientation }
 
-    let isFront = preferredCameraOverride == "front"
-
-    if #available(iOS 17.0, *) {
-      let angle = deviceOrientation.videoRotationAngle
-      videoOutput?.connection(with: .video)?.videoRotationAngle = angle
-      // The front camera sensor is mounted 180° rotated relative to the back
-      // camera. In landscape this cancels out with the usual rotation, so we
-      // use the opposite landscape angle for the preview layer only. Portrait
-      // angles are the same for both cameras.
-      let previewAngle = (isFront && deviceOrientation.isLandscape)
-        ? deviceOrientation.frontCameraLandscapeRotationAngle : angle
-      previewLayer?.connection?.videoRotationAngle = previewAngle
-    } else {
-      let avOrientation = deviceOrientation.avCaptureOrientation
-      videoOutput?.connection(with: .video)?.videoOrientation = avOrientation
-      let previewOrientation = (isFront && deviceOrientation.isLandscape)
-        ? deviceOrientation.frontCameraLandscapeAvOrientation : avOrientation
-      previewLayer?.connection?.videoOrientation = previewOrientation
+    if let connection = previewLayer?.connection, connection.isVideoOrientationSupported {
+      connection.videoOrientation = videoOrientation
     }
+  }
 
-    if isFront {
-      previewLayer?.connection?.isVideoMirrored = true
-    }
+  @available(iOS 17.0, *)
+  private func startRotationCoordinator(device: AVCaptureDevice, preview: AVCaptureVideoPreviewLayer) {
+    let coordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: preview)
+    rotationCoordinator = coordinator
+    rotationObservations = [
+      coordinator.observe(\.videoRotationAngleForHorizonLevelPreview, options: [.initial, .new]) {
+        [weak self] coordinator, _ in
+        let angle = coordinator.videoRotationAngleForHorizonLevelPreview
+        DispatchQueue.main.async {
+          guard let connection = self?.previewLayer?.connection,
+            connection.isVideoRotationAngleSupported(angle)
+          else { return }
+          connection.videoRotationAngle = angle
+        }
+      },
+      coordinator.observe(\.videoRotationAngleForHorizonLevelCapture, options: [.initial, .new]) {
+        [weak self] coordinator, _ in
+        let orientation = CameraFrameVideoOrientation(
+          videoRotationAngle: coordinator.videoRotationAngleForHorizonLevelCapture)
+        guard let self else { return }
+        self._lock.withLock { self.currentFrameOrientation = orientation }
+      },
+    ]
+  }
+
+  private func stopRotationCoordinator() {
+    rotationObservations.forEach { $0.invalidate() }
+    rotationObservations = []
+    rotationCoordinator = nil
   }
 
   private func handleMethodCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -354,6 +377,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
   }
 
   private func stopCaptureSession() {
+    stopRotationCoordinator()
     let session = captureSession
     captureSession = nil
     previewLayer?.removeFromSuperlayer()
@@ -417,13 +441,11 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     self.previewLayer = preview
     self.captureSession = session
 
-    // Disable automatic mirroring before updateVideoOrientation() so our
-    // manual isVideoMirrored call inside it isn't overridden by AVFoundation.
-    if position == .front {
-      preview.connection?.automaticallyAdjustsVideoMirroring = false
+    if #available(iOS 17.0, *) {
+      startRotationCoordinator(device: device, preview: preview)
+    } else {
+      updateVideoOrientation()
     }
-    // Apply initial orientation (and front-camera mirroring) after connections exist.
-    updateVideoOrientation()
 
     completeCameraResult(resolvedLens: resolvedLens, error: nil)
     // See stopCaptureSession()'s comment: sharing one serial queue for every
@@ -459,9 +481,9 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     _startScanTask?.cancel()
     _startScanTask = nil
     abortPendingCameraResult("Scanner disposed")
-    NotificationCenter.default.removeObserver(
-      self, name: UIDevice.orientationDidChangeNotification, object: nil)
-    UIDevice.current.endGeneratingDeviceOrientationNotifications()
+    interfaceOrientationObservation?.invalidate()
+    interfaceOrientationObservation = nil
+    containerView.onWindowChanged = nil
     _lock.withLock {
       isScanning = false
       blinkIdSession = nil
@@ -628,56 +650,39 @@ extension BlinkIdScannerView: FlutterStreamHandler {
 
 // MARK: - Orientation helpers
 
-extension UIDeviceOrientation {
+extension UIInterfaceOrientation {
+  fileprivate var captureVideoOrientation: AVCaptureVideoOrientation? {
+    switch self {
+    case .portrait: return .portrait
+    case .portraitUpsideDown: return .portraitUpsideDown
+    case .landscapeLeft: return .landscapeLeft
+    case .landscapeRight: return .landscapeRight
+    default: return nil
+    }
+  }
+}
+
+extension CameraFrameVideoOrientation {
+  fileprivate init(videoRotationAngle angle: CGFloat) {
+    switch (Int(angle.rounded()) % 360 + 360) % 360 {
+    case 45..<135: self = .portrait
+    case 135..<225: self = .landscapeLeft
+    case 225..<315: self = .portraitUpsideDown
+    default: self = .landscapeRight
+    }
+  }
+}
+
+extension AVCaptureVideoOrientation {
   fileprivate var cameraFrameOrientation: CameraFrameVideoOrientation {
     switch self {
+    case .portrait: return .portrait
     case .portraitUpsideDown: return .portraitUpsideDown
     case .landscapeLeft: return .landscapeLeft
     case .landscapeRight: return .landscapeRight
-    default: return .portrait
+    @unknown default: return .portrait
     }
   }
-
-  // AVCaptureVideoOrientation landscape axes are inverted vs UIDeviceOrientation.
-  fileprivate var avCaptureOrientation: AVCaptureVideoOrientation {
-    switch self {
-    case .portraitUpsideDown: return .portraitUpsideDown
-    case .landscapeLeft: return .landscapeRight
-    case .landscapeRight: return .landscapeLeft
-    default: return .portrait
-    }
-  }
-
-  @available(iOS 17.0, *)
-  fileprivate var videoRotationAngle: CGFloat {
-    switch self {
-    case .portraitUpsideDown: return 270
-    case .landscapeLeft: return 0
-    case .landscapeRight: return 180
-    default: return 90
-    }
-  }
-
-  // Front camera sensor is 180° rotated vs back in landscape, so swap the angles.
-  @available(iOS 17.0, *)
-  fileprivate var frontCameraLandscapeRotationAngle: CGFloat {
-    switch self {
-    case .landscapeLeft: return 180
-    case .landscapeRight: return 0
-    default: return videoRotationAngle
-    }
-  }
-
-  // Pre-iOS 17 equivalent: back camera inverts the UIDevice landscape axes to get
-  // AVCaptureVideoOrientation. Front camera skips the inversion (double-negative).
-  fileprivate var frontCameraLandscapeAvOrientation: AVCaptureVideoOrientation {
-    switch self {
-    case .landscapeLeft: return .landscapeLeft
-    case .landscapeRight: return .landscapeRight
-    default: return avCaptureOrientation
-    }
-  }
-
 }
 
 extension DetectionStatus {
