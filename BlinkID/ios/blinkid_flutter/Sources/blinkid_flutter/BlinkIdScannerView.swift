@@ -418,6 +418,9 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
 
     let output = AVCaptureVideoDataOutput()
     output.alwaysDiscardsLateVideoFrames = true
+    output.videoSettings = [
+      kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+    ]
     output.setSampleBufferDelegate(
       self,
       queue: DispatchQueue(label: "com.microblink.blinkid.scanner.\(viewId)"),
@@ -432,6 +435,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     session.addInput(input)
     session.addOutput(output)
     self.videoOutput = output
+    useFullSensorFormat(device, in: session)
 
     let preview = AVCaptureVideoPreviewLayer(session: session)
     preview.videoGravity = .resizeAspectFill
@@ -452,6 +456,34 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     // start/stop call, always enqueued in main-thread call order, is what
     // keeps this session's start from running after a later stop/start.
     sessionQueue.async { session.startRunning() }
+  }
+
+  private func useFullSensorFormat(_ device: AVCaptureDevice, in session: AVCaptureSession) {
+    let thirtyFps = CMTime(value: 1, timescale: 30)
+    let candidates = device.formats.filter { format in
+      let d = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+      return CMFormatDescriptionGetMediaSubType(format.formatDescription)
+        == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+        && d.width * 3 == d.height * 4
+        && (1920...2016).contains(d.width)
+        && format.videoSupportedFrameRateRanges.contains {
+          $0.minFrameDuration <= thirtyFps && $0.maxFrameDuration >= thirtyFps
+        }
+    }
+    let widestFieldOfView = candidates.map(\.videoFieldOfView).max() ?? 0
+    let fullSensorFormat = candidates
+      .filter { $0.videoFieldOfView >= widestFieldOfView - 0.5 }
+      .min {
+        CMVideoFormatDescriptionGetDimensions($0.formatDescription).width
+          < CMVideoFormatDescriptionGetDimensions($1.formatDescription).width
+      }
+    guard let fullSensorFormat, (try? device.lockForConfiguration()) != nil else { return }
+    session.beginConfiguration()
+    device.activeFormat = fullSensorFormat
+    device.activeVideoMinFrameDuration = thirtyFps
+    device.videoZoomFactor = device.minAvailableVideoZoomFactor
+    device.unlockForConfiguration()
+    session.commitConfiguration()
   }
 
   // Returns the position that will actually be bound: .front only if
