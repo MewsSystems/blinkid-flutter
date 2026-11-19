@@ -40,6 +40,8 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
   private var previewLayer: AVCaptureVideoPreviewLayer?
   private var videoOutput: AVCaptureVideoDataOutput?
   private var captureDevice: AVCaptureDevice?
+  private var scanGeneration = 0
+  private var scanAwaitingOutcome: Int?
   private let _lock = NSLock()
   private var isScanning = false
   private var isProcessingResult = false
@@ -158,19 +160,19 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     case "startScan":
       startScan(result: result)
     case "cancelScan":
-      let wasStarting = _startScanTask != nil
       // Abort an in-flight startScan so a session created after this cancel
       // can never be installed — see startScan()'s checkCancellation().
       _startScanTask?.cancel()
       _startScanTask = nil
-      let hadUnfinishedScan = _lock.withLock { () -> Bool in
-        let unfinished = wasStarting || (blinkIdSession != nil && !isProcessingResult)
+      _lock.withLock {
         isScanning = false
         isProcessingResult = false
         blinkIdSession = nil
-        return unfinished
       }
-      if hadUnfinishedScan { reportCameraEvent("scanCanceled") }
+      if scanAwaitingOutcome != nil {
+        scanAwaitingOutcome = nil
+        reportCameraEvent("scanCanceled")
+      }
       result(nil)
     case "resumeAfterFlip":
       _lock.withLock { isScanning = true }
@@ -229,6 +231,9 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
       return
     }
     _startScanTask?.cancel()
+    scanGeneration += 1
+    let generation = scanGeneration
+    scanAwaitingOutcome = generation
     _startScanTask = Task { @MainActor [weak self] in
       guard let self else { return }
       do {
@@ -250,14 +255,23 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
         self._startScanTask = nil
         result(nil)
       } catch is CancellationError {
+        self.endFailedStart(generation)
         result(FlutterError(code: "blinkid_error", message: "Scanner disposed", details: nil))
       } catch is ScannerSdkUnavailableError {
+        self.endFailedStart(generation)
         result(FlutterError(code: "blinkid_error", message: "SDK not initialized", details: nil))
       } catch {
+        self.endFailedStart(generation)
         let code = isBlinkIdLicenseError(error) ? blinkIdLicenseErrorCode : "blinkid_error"
         result(FlutterError(code: code, message: error.localizedDescription, details: nil))
       }
     }
+  }
+
+  private func endFailedStart(_ generation: Int) {
+    guard scanGeneration == generation else { return }
+    _startScanTask = nil
+    scanAwaitingOutcome = nil
   }
 
   @MainActor
@@ -684,6 +698,7 @@ extension BlinkIdScannerView: AVCaptureVideoDataOutputSampleBufferDelegate {
               self.methodChannel.invokeMethod(
                 "onDebugLog", arguments: "DocumentScanned — calling getResult()")
             }
+            self.scanAwaitingOutcome = nil
             self.reportCameraEvent("documentScanned")
             self.methodChannel.invokeMethod("onDocumentScanned", arguments: nil)
           }
@@ -719,6 +734,7 @@ extension BlinkIdScannerView: AVCaptureVideoDataOutputSampleBufferDelegate {
               return true
             }
             guard isCurrentSession else { return }
+            self.scanAwaitingOutcome = nil
             self.methodChannel.invokeMethod(
               "onScanError",
               arguments: ["message": error.localizedDescription, "code": blinkIdLicenseErrorCode])
