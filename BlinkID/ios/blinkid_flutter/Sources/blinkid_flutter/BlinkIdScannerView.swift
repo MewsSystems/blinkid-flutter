@@ -158,16 +158,19 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     case "startScan":
       startScan(result: result)
     case "cancelScan":
+      let wasStarting = _startScanTask != nil
       // Abort an in-flight startScan so a session created after this cancel
       // can never be installed — see startScan()'s checkCancellation().
       _startScanTask?.cancel()
       _startScanTask = nil
-      _lock.withLock {
+      let hadUnfinishedScan = _lock.withLock { () -> Bool in
+        let unfinished = wasStarting || (blinkIdSession != nil && !isProcessingResult)
         isScanning = false
         isProcessingResult = false
         blinkIdSession = nil
+        return unfinished
       }
-      reportCameraEvent("scanCanceled")
+      if hadUnfinishedScan { reportCameraEvent("scanCanceled") }
       result(nil)
     case "resumeAfterFlip":
       _lock.withLock { isScanning = true }
