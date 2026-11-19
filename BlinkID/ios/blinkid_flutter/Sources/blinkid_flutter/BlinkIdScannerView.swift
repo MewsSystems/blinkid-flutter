@@ -39,6 +39,9 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
   private var captureSession: AVCaptureSession?
   private var previewLayer: AVCaptureVideoPreviewLayer?
   private var videoOutput: AVCaptureVideoDataOutput?
+  private var captureDevice: AVCaptureDevice?
+  private var scanGeneration = 0
+  private var scanAwaitingOutcome: Int?
   private let _lock = NSLock()
   private var isScanning = false
   private var isProcessingResult = false
@@ -166,6 +169,10 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
         isProcessingResult = false
         blinkIdSession = nil
       }
+      if scanAwaitingOutcome != nil {
+        scanAwaitingOutcome = nil
+        reportCameraEvent("scanCanceled")
+      }
       result(nil)
     case "resumeAfterFlip":
       _lock.withLock { isScanning = true }
@@ -224,6 +231,9 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
       return
     }
     _startScanTask?.cancel()
+    scanGeneration += 1
+    let generation = scanGeneration
+    scanAwaitingOutcome = generation
     _startScanTask = Task { @MainActor [weak self] in
       guard let self else { return }
       do {
@@ -245,14 +255,23 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
         self._startScanTask = nil
         result(nil)
       } catch is CancellationError {
+        self.endFailedStart(generation)
         result(FlutterError(code: "blinkid_error", message: "Scanner disposed", details: nil))
       } catch is ScannerSdkUnavailableError {
+        self.endFailedStart(generation)
         result(FlutterError(code: "blinkid_error", message: "SDK not initialized", details: nil))
       } catch {
+        self.endFailedStart(generation)
         let code = isBlinkIdLicenseError(error) ? blinkIdLicenseErrorCode : "blinkid_error"
         result(FlutterError(code: code, message: error.localizedDescription, details: nil))
       }
     }
+  }
+
+  private func endFailedStart(_ generation: Int) {
+    guard scanGeneration == generation else { return }
+    _startScanTask = nil
+    scanAwaitingOutcome = nil
   }
 
   @MainActor
@@ -380,6 +399,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     stopRotationCoordinator()
     let session = captureSession
     captureSession = nil
+    captureDevice = nil
     previewLayer?.removeFromSuperlayer()
     previewLayer = nil
     videoOutput = nil
@@ -393,7 +413,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     sessionQueue.async { session?.stopRunning() }
   }
 
-  private func performCameraSetup() {
+  private func performCameraSetup(allowsMacroCamera: Bool = true) {
     let session = AVCaptureSession()
     session.sessionPreset = .high
 
@@ -406,8 +426,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     preferredCameraOverride = resolvedLens
 
     guard
-      let device = AVCaptureDevice.default(
-        .builtInWideAngleCamera, for: .video, position: position),
+      let device = cameraDevice(for: position, allowsMacroCamera: allowsMacroCamera),
       let input = try? AVCaptureDeviceInput(device: device)
     else {
       cameraSetupFailed = true
@@ -436,6 +455,12 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     session.addOutput(output)
     self.videoOutput = output
     useFullSensorFormat(device, in: session)
+    if device.isVirtualDevice, !useMacroSwitching(device) {
+      session.removeOutput(output)
+      session.removeInput(input)
+      performCameraSetup(allowsMacroCamera: false)
+      return
+    }
 
     let preview = AVCaptureVideoPreviewLayer(session: session)
     preview.videoGravity = .resizeAspectFill
@@ -444,6 +469,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     containerView.previewLayer = preview
     self.previewLayer = preview
     self.captureSession = session
+    self.captureDevice = device
 
     if #available(iOS 17.0, *) {
       startRotationCoordinator(device: device, preview: preview)
@@ -452,6 +478,7 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     }
 
     completeCameraResult(resolvedLens: resolvedLens, error: nil)
+    reportCameraEvent("configured")
     // See stopCaptureSession()'s comment: sharing one serial queue for every
     // start/stop call, always enqueued in main-thread call order, is what
     // keeps this session's start from running after a later stop/start.
@@ -481,9 +508,65 @@ public class BlinkIdScannerView: NSObject, FlutterPlatformView {
     session.beginConfiguration()
     device.activeFormat = fullSensorFormat
     device.activeVideoMinFrameDuration = thirtyFps
-    device.videoZoomFactor = device.minAvailableVideoZoomFactor
+    if !device.isVirtualDevice {
+      device.videoZoomFactor = device.minAvailableVideoZoomFactor
+    }
     device.unlockForConfiguration()
     session.commitConfiguration()
+  }
+
+  private func cameraDevice(
+    for position: AVCaptureDevice.Position, allowsMacroCamera: Bool
+  ) -> AVCaptureDevice? {
+    let macroCamera =
+      allowsMacroCamera && position == .back && UIDevice.current.userInterfaceIdiom == .phone
+      ? [AVCaptureDevice.DeviceType.builtInTripleCamera, .builtInDualWideCamera].lazy
+        .compactMap { AVCaptureDevice.default($0, for: .video, position: .back) }.first
+      : nil
+    return macroCamera
+      ?? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position)
+  }
+
+  private func useMacroSwitching(_ device: AVCaptureDevice) -> Bool {
+    guard
+      let wideLensZoomFactor = device.virtualDeviceSwitchOverVideoZoomFactors.first.map({
+        CGFloat(truncating: $0)
+      }),
+      (try? device.lockForConfiguration()) != nil
+    else { return false }
+    defer { device.unlockForConfiguration() }
+
+    device.setPrimaryConstituentDeviceSwitchingBehavior(
+      .auto, restrictedSwitchingBehaviorConditions: [])
+    guard device.activePrimaryConstituentDeviceSwitchingBehavior == .auto else { return false }
+
+    device.videoZoomFactor = min(wideLensZoomFactor, device.activeFormat.videoMaxZoomFactor)
+
+    let centre = CGPoint(x: 0.5, y: 0.5)
+    if device.isFocusModeSupported(.continuousAutoFocus) {
+      if device.isFocusPointOfInterestSupported { device.focusPointOfInterest = centre }
+      device.focusMode = .continuousAutoFocus
+    }
+    if device.isSmoothAutoFocusSupported { device.isSmoothAutoFocusEnabled = false }
+    if device.isExposureModeSupported(.continuousAutoExposure) {
+      if device.isExposurePointOfInterestSupported { device.exposurePointOfInterest = centre }
+      device.exposureMode = .continuousAutoExposure
+    }
+    return true
+  }
+
+  private func reportCameraEvent(_ trigger: String) {
+    guard let device = captureDevice else { return }
+    let wideLens = device.constituentDevices.first { $0.deviceType == .builtInWideAngleCamera } ?? device
+    let payload: [String: Any] = [
+      "trigger": trigger,
+      "deviceType": device.deviceType.shortName,
+      "activeLens": (device.activePrimaryConstituent ?? device).deviceType.shortName,
+      "zoomFactor": Double(device.videoZoomFactor),
+      "switchingBehavior": device.activePrimaryConstituentDeviceSwitchingBehavior.name,
+      "minimumFocusDistanceMm": wideLens.minimumFocusDistance,
+    ]
+    methodChannel.invokeMethod("onCameraEvent", arguments: payload)
   }
 
   // Returns the position that will actually be bound: .front only if
@@ -615,6 +698,8 @@ extension BlinkIdScannerView: AVCaptureVideoDataOutputSampleBufferDelegate {
               self.methodChannel.invokeMethod(
                 "onDebugLog", arguments: "DocumentScanned — calling getResult()")
             }
+            self.scanAwaitingOutcome = nil
+            self.reportCameraEvent("documentScanned")
             self.methodChannel.invokeMethod("onDocumentScanned", arguments: nil)
           }
           guard self.blinkIdSession === session else {
@@ -649,6 +734,7 @@ extension BlinkIdScannerView: AVCaptureVideoDataOutputSampleBufferDelegate {
               return true
             }
             guard isCurrentSession else { return }
+            self.scanAwaitingOutcome = nil
             self.methodChannel.invokeMethod(
               "onScanError",
               arguments: ["message": error.localizedDescription, "code": blinkIdLicenseErrorCode])
@@ -713,6 +799,32 @@ extension AVCaptureVideoOrientation {
     case .landscapeLeft: return .landscapeLeft
     case .landscapeRight: return .landscapeRight
     @unknown default: return .portrait
+    }
+  }
+}
+
+extension AVCaptureDevice.DeviceType {
+  fileprivate var shortName: String {
+    switch self {
+    case .builtInTripleCamera: return "triple"
+    case .builtInDualWideCamera: return "dualWide"
+    case .builtInDualCamera: return "dual"
+    case .builtInWideAngleCamera: return "wide"
+    case .builtInUltraWideCamera: return "ultraWide"
+    case .builtInTelephotoCamera: return "telephoto"
+    default: return rawValue
+    }
+  }
+}
+
+extension AVCaptureDevice.PrimaryConstituentDeviceSwitchingBehavior {
+  fileprivate var name: String {
+    switch self {
+    case .unsupported: return "unsupported"
+    case .auto: return "auto"
+    case .restricted: return "restricted"
+    case .locked: return "locked"
+    @unknown default: return "unknown"
     }
   }
 }
