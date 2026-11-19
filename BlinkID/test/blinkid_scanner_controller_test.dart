@@ -300,6 +300,54 @@ void main() {
     });
   });
 
+  group('cameraEventStream', () {
+    test('forwards native onCameraEvent payloads', () async {
+      final controller = BlinkIdScannerController();
+      addTearDown(controller.dispose);
+      final viewId = await _attachReadyController(controller);
+      final events = <BlinkIdCameraEvent>[];
+      final sub = controller.cameraEventStream.listen(events.add);
+      addTearDown(sub.cancel);
+
+      await _deliverPlatformCall(
+        'com.microblink.blinkid.flutter/scanner/$viewId',
+        const MethodCall('onCameraEvent', {
+          'trigger': 'documentScanned',
+          'deviceType': 'triple',
+          'activeLens': 'ultraWide',
+          'zoomFactor': 2.0,
+          'switchingBehavior': 'auto',
+          'minimumFocusDistanceMm': 200,
+        }),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(events, hasLength(1));
+      expect(events.single.trigger, BlinkIdCameraEventTrigger.documentScanned);
+      expect(events.single.deviceType, 'triple');
+      expect(events.single.activeLens, 'ultraWide');
+      expect(events.single.zoomFactor, 2.0);
+      expect(events.single.switchingBehavior, 'auto');
+      expect(events.single.minimumFocusDistanceMm, 200);
+      expect(controller.status, BlinkIdScannerStatus.ready);
+    });
+
+    test('drops an unknown minimum focus distance', () {
+      final event = BlinkIdCameraEvent.fromNative(const {
+        'trigger': 'configured',
+        'deviceType': 'wide',
+        'activeLens': 'wide',
+        'zoomFactor': 1,
+        'switchingBehavior': 'unsupported',
+        'minimumFocusDistanceMm': -1,
+      });
+
+      expect(event.trigger, BlinkIdCameraEventTrigger.configured);
+      expect(event.zoomFactor, 1.0);
+      expect(event.minimumFocusDistanceMm, isNull);
+    });
+  });
+
   group('refreshLicenseLease()', () {
     test('invokes the refreshLicenseLease method on the plugin channel', () async {
       final calls = <String>[];

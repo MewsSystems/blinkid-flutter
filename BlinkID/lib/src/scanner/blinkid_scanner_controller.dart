@@ -8,6 +8,7 @@ import '../blinkid_flutter_platform_interface.dart';
 import '../blinkid_result.dart';
 import '../blinkid_settings.dart';
 import '../types.dart';
+import 'blinkid_camera_event.dart';
 import 'blinkid_guidance.dart';
 import 'blinkid_license_event.dart';
 
@@ -113,6 +114,11 @@ class BlinkIdScannerController extends ChangeNotifier {
   /// scan session starts. Informational — a failed recovery still surfaces as
   /// [BlinkIdLicenseException] from [scan].
   Stream<BlinkIdLicenseEvent> get licenseEventStream => _licenseEventController.stream;
+
+  final _cameraEventController = StreamController<BlinkIdCameraEvent>.broadcast();
+
+  /// Native camera state when the camera binds and when a scan ends. Informational, iOS only.
+  Stream<BlinkIdCameraEvent> get cameraEventStream => _cameraEventController.stream;
 
   MethodChannel? _methodChannel;
   StreamSubscription<dynamic>? _guidanceSub;
@@ -468,6 +474,10 @@ class BlinkIdScannerController extends ChangeNotifier {
           if (call.arguments case final Map<Object?, Object?> payload) {
             _licenseEventController.add(BlinkIdLicenseEvent.fromNative(payload));
           }
+        case 'onCameraEvent':
+          if (call.arguments case final Map<Object?, Object?> payload) {
+            _cameraEventController.add(BlinkIdCameraEvent.fromNative(payload));
+          }
         case 'onPermissionRequired':
           final args = call.arguments as Map?;
           final permanentlyDenied = args?['permanentlyDenied'] as bool? ?? false;
@@ -586,6 +596,7 @@ class BlinkIdScannerController extends ChangeNotifier {
     _methodChannel?.invokeMethod<void>('dispose').ignore();
     _guidanceController.close();
     _licenseEventController.close();
+    _cameraEventController.close();
     // Drain in-flight scan without corrupting status — widget tree tearing down.
     final completer = _scanCompleter;
     _scanCompleter = null;
