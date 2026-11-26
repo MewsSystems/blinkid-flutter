@@ -614,7 +614,7 @@ const _$CountryIdEnumMap = {
   CountryId.uzbekistan: 'uzbekistan',
   CountryId.vanuatu: 'vanuatu',
   CountryId.vaticanCity: 'vaticanCity',
-  CountryId.virginIslandsBritish: 'virginIslandsBritish',
+  CountryId.britishVirginIslands: 'britishVirginIslands',
   CountryId.virginIslandsOfTheUnitedStates: 'virginIslandsOfTheUnitedStates',
   CountryId.wallisAndFutuna: 'wallisAndFutuna',
   CountryId.westernSahara: 'westernSahara',
