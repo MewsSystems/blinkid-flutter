@@ -1,3 +1,15 @@
+## v8002.0.0 (Mews fork)
+
+### What's new
+- **Native SDK update**: iOS `blinkid-ios` 8002.0.3 and Android `blinkid-ux` 8002.0.0 (from 8001.0.1 / 8001.0.2). Brings the October 2026 document models, including the Netherlands polycarbonate passport, which 8001 did not recognise.
+
+### Breaking changes
+- `CountryId.virginIslandsBritish` is renamed to `CountryId.britishVirginIslands`, matching both native SDKs. The old name could no longer match the native wire value.
+
+### Notes
+- Enum values added in 8002 (`DocumentTypeId.specifiedResidenceCard`, `goldenCard`, `vehicleOwnershipCertificate`, `byIdCard`, `RegionId.northernIreland`, new `FieldType`s) are not mirrored yet; they decode as a `null` id with the native `rawValue` populated.
+- The new 8002 session presets (`documentVideo`, `documentPhoto`, ...) and fields (`passportNumber`, `vehicleNumber`, `trafficParticipantNumber`) are not exposed yet.
+
 ## Unreleased (Mews fork)
 
 ### What's new

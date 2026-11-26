@@ -1522,8 +1522,8 @@ enum CountryId {
   vanuatu,
   @JsonValue("vaticanCity")
   vaticanCity,
-  @JsonValue("virginIslandsBritish")
-  virginIslandsBritish,
+  @JsonValue("britishVirginIslands")
+  britishVirginIslands,
   @JsonValue("virginIslandsOfTheUnitedStates")
   virginIslandsOfTheUnitedStates,
   @JsonValue("wallisAndFutuna")
