@@ -108,8 +108,8 @@ dependencies {
 
         // Security: force patched versions of vulnerable transitive deps
         implementation("org.bouncycastle:bcprov-jdk18on") {
-            version { require("1.80.2") }
-            because("CVE-2025-14813 (critical) fixed in 1.80.2")
+            version { require("1.85.2") }
+            because("CVE-2026-8763 (critical), CVE-2026-13506 and CVE-2026-14682 (high) fixed in 1.85.x; remove once blinkid-ux brings in bcprov-jdk18on >= 1.85.2")
         }
         implementation("org.bitbucket.b_c:jose4j") {
             version { require("0.9.6") }
